@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,6 +8,9 @@ import type { TokenUsage } from '@deepseek-ai/dsh-llm'
 import { SESSION_FORMAT_VERSION, SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import SessionStore from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import CostMeter from '@deepseek-ai/dsh-cost-meter'
 import { backfillOpenRouter } from '@deepseek-ai/dsh-cost-meter'
 import { CostLedger } from '@deepseek-ai/dsh-cost-meter'
 import type { ModelCostRates, PriceLookup } from '@deepseek-ai/dsh-cost-meter/client'
@@ -155,6 +158,27 @@ describe('backfillOpenRouter', () => {
       ledger.close()
     } finally {
       rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('warm-syncs the home sessions into the home ledger when the loader defaults the paths to empty strings', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'dsh-cost-warm-home-'))
+    vi.stubEnv('DSH_HOME', home)
+    try {
+      await materializeSession(join(home, 'sessions'))
+      const ctx = new Context()
+      await ctx.plugin(SessionStore)
+      await ctx.plugin(SessionProjectionRegistry)
+      // The loader fills absent path settings with '' (see CostMeter.Config);
+      // the warm sync must resolve them to the home paths, not to a temporary
+      // SQLite database and the process cwd.
+      await ctx.plugin(CostMeter, { ledgerPath: '', sessionsRoot: '', priceCachePath: join(home, 'prices.json'), warmSync: false })
+      await ctx.costMeter.warmSync()
+      expect(ctx.costMeter.byDay().reduce((sum, row) => sum + row.attempts, 0)).toBe(2)
+      await ctx.fiber.dispose()
+    } finally {
+      vi.unstubAllEnvs()
+      rmSync(home, { recursive: true, force: true })
     }
   })
 })
