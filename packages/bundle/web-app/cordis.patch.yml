@@ -327,6 +327,10 @@
     # workspace, model, and session from the `costReport` Remote.
     - id: ui-cost-report
       name: '@deepseek-ai/dsh-client-ui-cost-report'
+    # Floating task-alert bell: sound, system notification and tab-title badge
+    # when a session finishes or waits for the user, plus a list of recent alerts.
+    - id: ui-turn-notify
+      name: '@deepseek-ai/dsh-client-ui-turn-notify'
     # The right Sidebar's workspace file tree tab type.
     - id: ui-sidebar-files
       name: '@deepseek-ai/dsh-client-ui-sidebar-files'

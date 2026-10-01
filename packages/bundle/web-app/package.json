@@ -112,6 +112,7 @@
     "@deepseek-ai/dsh-client-ui-sidebar-browser": "workspace:*",
     "@deepseek-ai/dsh-client-ui-costs": "workspace:*",
     "@deepseek-ai/dsh-client-ui-cost-report": "workspace:*",
+    "@deepseek-ai/dsh-client-ui-turn-notify": "workspace:*",
     "@deepseek-ai/dsh-client-ui-sidebar-documentpreview": "workspace:*",
     "@deepseek-ai/dsh-client-ui-sidebar-files": "workspace:*",
     "@deepseek-ai/dsh-client-ui-sidebar-right": "workspace:*",
