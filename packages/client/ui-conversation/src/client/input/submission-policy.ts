@@ -23,7 +23,7 @@ export { DEFAULT_BUSY_ENTER_BEHAVIOR } from '../../submission-settings.ts'
  * Queue item.
  * @param preferred - the live busy-Enter preference.
  * @param running - whether the addressed agent currently reports busy.
- * @param gesture - plain Enter (or the Send button) or the Cmd/Ctrl-accelerated chord.
+ * @param gesture - plain Enter (or the Send button) or the Alt-accelerated chord.
  * @param steeringAvailable - whether this session transport supports steering.
  * @returns Queue outside steer-capable busy state; otherwise the preferred mode or its opposite.
  */

@@ -22,7 +22,7 @@
     - textbox "Edit queued message": Edited queue item
     - button "Save queued message"
     - button "Cancel editing"
-- textbox "Cmd/Ctrl+Enter steers all queued messages"
+- textbox "Alt+Enter steers all queued messages"
 - button "Add files or run commands"
 - 'button "Access mode, current: Workspace Write"': Workspace Write
 - button "Select model, current DeepSeek-V4-Flash": DeepSeek-V4-Flash

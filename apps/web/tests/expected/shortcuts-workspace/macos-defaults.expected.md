@@ -57,9 +57,9 @@
   - region "Message input":
     - heading "Message input" [level=3]
     - list:
-      - listitem: Use the complementary Queue / Steer action ⌘ Enter
+      - listitem: Use the complementary Queue / Steer action ⌥ Enter
       - listitem: Open reference menu @
-      - listitem: New line ⇧ Enter
+      - listitem: New line ⇧ Enter ⌘ Enter
       - listitem: Send message Enter
       - listitem: Open command menu /
       - listitem: Stop generating Esc Esc

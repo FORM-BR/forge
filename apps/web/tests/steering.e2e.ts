@@ -252,7 +252,7 @@ describe.each(['reconnect', 'delayed-inbox'] as const)('web e2e: composer shortc
     await scaffold?.close()
   })
 
-  it.skipIf(MODE === 'record')('uses Cmd+Enter without creating a Queue row', async () => {
+  it.skipIf(MODE === 'record')('uses Alt+Enter without creating a Queue row', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-composer-steering'))
     expect(fixtureUserPrompts(await readFile(FIXTURE, 'utf8'))).toEqual([PROMPT, STEER])
     const input = page.locator('[data-composer-input]').first()
@@ -266,7 +266,7 @@ describe.each(['reconnect', 'delayed-inbox'] as const)('web e2e: composer shortc
 
     await page.locator('[data-composer-input][contenteditable="true"]').first().waitFor({ timeout: 10_000 })
     await input.fill(STEER)
-    await input.press('Meta+Enter')
+    await input.press('Alt+Enter')
     await expect.poll(() => input.textContent(), { timeout: 5_000 }).toBe('')
     expect(await page.locator('[data-queue-dock]').count()).toBe(0)
 
@@ -350,7 +350,7 @@ describe('web e2e: composer shortcut follows the swapped busy behavior', () => {
     await scaffold?.close()
   })
 
-  it.skipIf(MODE === 'record')('queues Cmd+Enter when plain Enter is configured to Steer', async () => {
+  it.skipIf(MODE === 'record')('queues Alt+Enter when plain Enter is configured to Steer', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-composer-swapped-shortcut'))
     await openSettings(page, 'en')
     const dialog = page.getByRole('dialog', { name: 'Settings' })
@@ -366,10 +366,10 @@ describe('web e2e: composer shortcut follows the swapped busy behavior', () => {
     await input.press('Enter')
     await page.getByRole('button', { name: 'Stop generating' }).waitFor({ timeout: 10_000 })
 
-    const queuedText = 'Queued by the complementary Cmd+Enter shortcut.'
+    const queuedText = 'Queued by the complementary Alt+Enter shortcut.'
     await page.locator('[data-composer-input][contenteditable="true"]').first().waitFor({ timeout: 10_000 })
     await input.fill(queuedText)
-    await input.press('Meta+Enter')
+    await input.press('Alt+Enter')
     const queuedRow = page.locator('[data-queue-dock]').getByRole('listitem').filter({ hasText: queuedText })
     await queuedRow.getByText(queuedText, { exact: true }).waitFor({ timeout: 10_000 })
     expect(await page.locator('[data-pending-steering]').filter({ hasText: queuedText }).count()).toBe(0)
@@ -388,7 +388,7 @@ describe('web e2e: composer shortcut follows the swapped busy behavior', () => {
   }, 90_000)
 })
 
-describe('web e2e: empty-draft Cmd+Enter steers the whole queue', () => {
+describe('web e2e: empty-draft Alt+Enter steers the whole queue', () => {
   const releaseReplay = Promise.withResolvers<undefined>()
   let disposeReplayBarrier: (() => void) | undefined
   let scaffold: WebScaffold
@@ -436,7 +436,7 @@ describe('web e2e: empty-draft Cmd+Enter steers the whole queue', () => {
     }
   })
 
-  it.skipIf(MODE === 'record')('queues two messages, then flushes both with an empty-draft Cmd+Enter', async () => {
+  it.skipIf(MODE === 'record')('queues two messages, then flushes both with an empty-draft Alt+Enter', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-steer-all'))
     const input = page.locator('[data-composer-input]').first()
     await input.waitFor({ timeout: 10_000 })
@@ -472,12 +472,12 @@ describe('web e2e: empty-draft Cmd+Enter steers the whole queue', () => {
       () => dock.getByRole('button', { name: 'Steer queued message', disabled: false }).count(),
       { timeout: 10_000 },
     ).toBe(2)
-    await page.getByRole('textbox', { name: 'Cmd/Ctrl+Enter steers all queued messages', exact: true })
+    await page.getByRole('textbox', { name: 'Alt+Enter steers all queued messages', exact: true })
       .waitFor({ timeout: 10_000 })
 
-    // Empty draft + Cmd+Enter: both queued rows steer in FIFO order, the dock
+    // Empty draft + Alt+Enter: both queued rows steer in FIFO order, the dock
     // empties, and the pending steering renders at the conversation tail.
-    await input.press('Meta+Enter')
+    await input.press('Alt+Enter')
     await expect.poll(
       () => page.locator('[data-pending-steering]').filter({ hasText: /BANANA|ORANGE/ }).count(),
       { timeout: 10_000 },

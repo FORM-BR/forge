@@ -57,9 +57,9 @@
   - region "消息输入":
     - heading "消息输入" [level=3]
     - list:
-      - listitem: 使用互补的 Queue／Steer 方式 ⌘ Enter
+      - listitem: 使用互补的 Queue／Steer 方式 ⌥ Enter
       - listitem: 打开引用菜单 @
-      - listitem: 换行 ⇧ Enter
+      - listitem: 换行 ⇧ Enter ⌘ Enter
       - listitem: 发送消息 Enter
       - listitem: 打开命令菜单 /
       - listitem: 停止生成 Esc Esc

@@ -32,7 +32,7 @@ export interface ComposerKeymapHandlers {
   dismissPopup(): void
   /** Whether Enter may submit right now (locked/busy states refuse). */
   canSubmit(): boolean
-  /** Plain Enter submits; exactly Ctrl+Enter or Cmd+Enter selects accelerated delivery. */
+  /** Plain Enter submits; exactly Alt+Enter selects accelerated delivery. */
   submit(accelerated: boolean): void
   /**
    * Pasted files with directory metadata supplied by the clipboard entry API.
@@ -133,12 +133,23 @@ export function registerComposerKeymap(editor: LexicalEditor, handlers: Composer
       return false
     }, COMMAND_PRIORITY_CRITICAL),
     editor.registerCommand(KEY_ENTER_COMMAND, (event) => {
-      // Returning true stops Lexical's fallback line break without consuming
-      // the DOM event that application shortcuts need.
-      if (event !== null && (event.altKey || event.getModifierState('AltGraph')
-        || (event.ctrlKey && event.metaKey) || (event.shiftKey && (event.ctrlKey || event.metaKey)))) return true
+      // Chords the application owns stay available to registered shortcuts
+      // (returning true stops Lexical's fallback line break without consuming
+      // the DOM event): AltGraph, Ctrl+Cmd, Alt with Cmd/Ctrl/Shift, and
+      // Shift with Cmd/Ctrl. Plain Ctrl/Cmd and plain Alt are composer-owned.
+      if (event !== null && (event.getModifierState('AltGraph')
+        || (event.ctrlKey && event.metaKey)
+        || (event.altKey && (event.ctrlKey || event.metaKey))
+        || (event.shiftKey && (event.altKey || event.ctrlKey || event.metaKey)))) return true
+      // The accelerated chord moved from Cmd/Ctrl to Alt on the main Enter
+      // only: the NumpadEnter keeps its legacy application-chord slot.
+      const numpad = event !== null && event.code === 'NumpadEnter'
+      if (numpad && event.altKey) return true
       // Plain Shift+Enter keeps its native line break, including during composition.
       if (event?.shiftKey === true) return false
+      // Ctrl/Cmd+Enter (main Enter) also keeps the native line break, so
+      // line breaking is available on both Shift and Cmd/Ctrl.
+      if (!numpad && event !== null && (event.ctrlKey || event.metaKey)) return false
       if (event !== null && isComposingEvent(event, recentlyComposing)) {
         // The IME consumes this Enter (candidate pick); neither submit nor
         // break the line. No preventDefault: the browser owns the gesture.
@@ -153,7 +164,11 @@ export function registerComposerKeymap(editor: LexicalEditor, handlers: Composer
       event?.preventDefault()
       if (event?.repeat === true) return true // held-down Enter must not machine-gun sends
       if (!handlers.canSubmit()) return true
-      handlers.submit(event?.ctrlKey === true || event?.metaKey === true)
+      // The main Enter steers with Alt; the NumpadEnter keeps the legacy
+      // Cmd/Ctrl accelerated chord.
+      const mainAlt = event !== null && event.altKey
+      const numpadPrimary = event !== null && (event.ctrlKey || event.metaKey)
+      handlers.submit(numpad ? numpadPrimary : mainAlt)
       return true
     }, COMMAND_PRIORITY_CRITICAL),
     editor.registerCommand(PASTE_COMMAND, (event) => {
