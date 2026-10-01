@@ -45,7 +45,8 @@ function renderReport(overrides: {
     models: models as CostReportPageProps['models'],
     t,
     usePanelInfo: unusedStandardHook,
-    useSessions: unusedStandardHook,
+    useSessions: ((selector: (state: { byId: Record<string, { title?: string }> }) => unknown) =>
+      selector({ byId: { abcdefghijklmnop: { title: 'Fix the login bug' } } })) as CostReportPageProps['useSessions'],
     useSessionStatus: unusedStandardHook,
     useSessionRetainInfo: unusedStandardHook,
     useWorkspaces: unusedStandardHook,
@@ -55,12 +56,14 @@ function renderReport(overrides: {
 }
 
 describe('CostReportPage', () => {
-  it('reads both bucket groups on mount and shows loading until they settle', async () => {
+  it('reads every bucket group on mount and shows loading until they settle', async () => {
     const report = vi.fn(() => new Promise<readonly CostReportRow[]>(() => { /* never settles */ }))
     const { view, report: reportSpy } = renderReport({ report: report as never })
     expect(screen.getByText(en.loading)).toBeTruthy()
     expect(reportSpy).toHaveBeenCalledWith('day', {})
     expect(reportSpy).toHaveBeenCalledWith('session', {})
+    expect(reportSpy).toHaveBeenCalledWith('model', {})
+    expect(reportSpy).toHaveBeenCalledWith('cwd', {})
     view.unmount()
   })
 
@@ -117,19 +120,24 @@ describe('CostReportPage', () => {
     view.unmount()
   })
 
-  it('renders the daily series with proportional bars and day labels', async () => {
+  it('renders the daily series with proportional bars, gap-filled days, and day labels', async () => {
     const report = vi.fn(async () => [
       { ...DAY_ROW, costUsd: 0.1 },
-      { ...DAY_ROW, day: '2026-09-29', costUsd: 0.2 },
+      { ...DAY_ROW, day: '2026-09-30', costUsd: 0.2 },
     ])
     const { view } = renderReport({ report: report as never })
     await screen.findByText(en.dailyCost)
-    const rects = [...view.container.querySelectorAll('rect')].map(el => el.getAttribute('height'))
-    expect(rects).toHaveLength(2)
-    expect(Number(rects[0]!)).toBeGreaterThan(0)
-    expect(Number(rects[1]!)).toBeGreaterThan(Number(rects[0]!))
-    expect(screen.getAllByText('09-28')).toHaveLength(1)
-    expect(screen.getAllByText('09-29')).toHaveLength(1)
+    const bars = [...view.container.querySelectorAll<HTMLElement>('[data-bar]')]
+    // The axis also runs on through today when the range has no upper bound.
+    expect(bars.map(bar => bar.dataset.value).slice(0, 3)).toEqual(['0.1', '0', '0.2'])
+    expect(bars.slice(3).every(bar => bar.dataset.value === '0')).toBe(true)
+    const heights = bars.map(bar => Number.parseFloat(bar.style.height))
+    expect(heights[0]).toBeGreaterThan(0)
+    expect(heights[1]).toBe(0)
+    expect(heights[2]).toBeGreaterThan(heights[0]!)
+    expect(screen.getByLabelText('Sep 29: $0.00')).toBeTruthy()
+    expect(screen.getAllByText('Sep 28').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Sep 30').length).toBeGreaterThan(0)
     view.unmount()
   })
 
@@ -140,8 +148,89 @@ describe('CostReportPage', () => {
     ])
     const { view } = renderReport({ report: report as never })
     await screen.findByText(en.dailyCost)
-    const rects = [...view.container.querySelectorAll('rect')].map(el => el.getAttribute('height'))
-    expect(rects).toEqual(['0', '0'])
+    const heights = [...view.container.querySelectorAll<HTMLElement>('[data-bar]')].map(bar => bar.style.height)
+    expect(heights.length).toBeGreaterThanOrEqual(2)
+    expect(heights.every(height => height === '0%')).toBe(true)
+    view.unmount()
+  })
+
+  it('ranks model and workspace breakdowns and filters by the clicked row', async () => {
+    const report = vi.fn(async (group: string) => {
+      if (group === 'model') {
+        return [
+          { provider: 'openrouter', model: 'cheap/model', costUsd: 0.25, attempts: 1, inputTokens: 1, outputTokens: 1 },
+          { provider: 'openrouter', model: 'pricey/model', costUsd: 0.75, attempts: 1, inputTokens: 1, outputTokens: 1 },
+        ]
+      }
+      if (group === 'cwd') return [{ cwd: 'C:\\Users\\me\\proj', costUsd: 1, attempts: 2, inputTokens: 2, outputTokens: 2 }]
+      return [DAY_ROW]
+    })
+    const { view, instance } = renderReport({ report: report as never })
+    await screen.findByText(en.byModel)
+    const rows = [...view.container.querySelectorAll('button[title]')].map(el => el.textContent)
+    expect(rows.findIndex(text => text?.includes('pricey/model'))).toBeLessThan(rows.findIndex(text => text?.includes('cheap/model')))
+    expect(screen.getByText('75%')).toBeTruthy()
+    expect(screen.getByText('proj')).toBeTruthy()
+    fireEvent.click(screen.getByText('pricey/model'))
+    expect(instance.getSnapshot().model).toBe('pricey/model')
+    await vi.waitFor(() => { expect(report).toHaveBeenCalledWith('cwd', { model: 'pricey/model' }) })
+    view.unmount()
+  })
+
+  it('keeps a closed range from running past its upper bound', async () => {
+    const report = vi.fn(async () => [{ ...DAY_ROW, day: '2026-09-28' }])
+    const { view, instance } = renderReport({ report: report as never })
+    instance.actions.setRange('2026-09-27', '2026-09-29')
+    await vi.waitFor(() => { expect(report).toHaveBeenCalledWith('day', { fromDay: '2026-09-27', toDay: '2026-09-29' }) })
+    await vi.waitFor(() => {
+      expect([...view.container.querySelectorAll<HTMLElement>('[data-bar]')].map(bar => bar.dataset.value)).toEqual(['0', '0.5', '0'])
+    })
+    view.unmount()
+  })
+
+  it('reports cache reads as the share of prompt tokens served from cache', async () => {
+    const report = vi.fn(async () => [{ ...DAY_ROW, inputTokens: 100, cacheReadTokens: 900 }])
+    const { view } = renderReport({ report: report as never })
+    expect((await screen.findAllByText('1K')).length).toBeGreaterThan(0)
+    expect(screen.getByText(en.cacheHitRate.replace('{value}', '90%'))).toBeTruthy()
+    view.unmount()
+  })
+
+  it('labels sessions that used several models', async () => {
+    const report = vi.fn(async (group: string) => (group === 'session'
+      ? [{ sessionId: 'mixed', day: '2026-09-28', costUsd: 0.1, attempts: 1, inputTokens: 1, outputTokens: 1 }]
+      : group === 'day' ? [DAY_ROW] : []))
+    const { view } = renderReport({ report: report as never })
+    expect(await screen.findByText(en.mixedModels)).toBeTruthy()
+    view.unmount()
+  })
+
+  it('applies a quick range preset as an open-ended range', async () => {
+    const report = vi.fn(async () => [DAY_ROW])
+    const { view, instance } = renderReport({ report: report as never })
+    fireEvent.click(screen.getByRole('button', { name: en.last7 }))
+    expect(instance.getSnapshot().fromDay).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(instance.getSnapshot().toDay).toBe('')
+    fireEvent.click(screen.getByRole('button', { name: en.allTime }))
+    expect(instance.getSnapshot().fromDay).toBe('')
+    view.unmount()
+  })
+
+  it('shows the session title when the client session list knows it', async () => {
+    const report = vi.fn(async (group: string) => (group === 'session' ? [SESSION_ROW] : [DAY_ROW]))
+    const { view } = renderReport({ report: report as never })
+    expect(await screen.findByText('Fix the login bug')).toBeTruthy()
+    view.unmount()
+  })
+
+  it('collapses long session lists behind a show-all toggle', async () => {
+    const sessions = Array.from({ length: 12 }, (_, index) => ({ ...SESSION_ROW, sessionId: `s-${index}`, costUsd: 0.5 }))
+    const report = vi.fn(async (group: string) => (group === 'session' ? sessions : [DAY_ROW]))
+    const { view } = renderReport({ report: report as never })
+    await screen.findByText(en.sessions)
+    expect(screen.queryByText('s-11')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: en.showAll.replace('{count}', '12') }))
+    expect(screen.getByText('s-11')).toBeTruthy()
     view.unmount()
   })
 
@@ -152,7 +241,7 @@ describe('CostReportPage', () => {
       { ...SESSION_ROW, sessionId: 'abcdefghijklmnop', costUsd: 0.05 },
       { ...SESSION_ROW, sessionId: 'abcdefghijklmnopqrst', costUsd: 0.0005 },
     ]
-    const report = vi.fn(async (group: string) => (group === 'session' ? sessions : [{ ...DAY_ROW, costUsd: 0.25 }]))
+    const report = vi.fn(async (group: string) => (group === 'session' ? sessions : group === 'day' ? [{ ...DAY_ROW, costUsd: 0.25 }] : []))
     const { view } = renderReport({ report: report as never })
     await screen.findByText(en.sessions)
     expect(screen.getByText('$0.00')).toBeTruthy()
@@ -171,7 +260,7 @@ describe('CostReportPage', () => {
       day: '2026-09-28', cwd: '/w1', provider: 'openrouter', model: 'openai/gpt-4o',
       costUsd: 0.0123, attempts: 2, inputTokens: 100, outputTokens: 50,
     }]
-    const report = vi.fn(async (group: string) => (group === 'session' ? sessions : [DAY_ROW]))
+    const report = vi.fn(async (group: string) => (group === 'session' ? sessions : group === 'day' ? [DAY_ROW] : []))
     const { view } = renderReport({ report: report as never })
     await screen.findByText(en.sessions)
     expect(screen.getByText('—')).toBeTruthy()
