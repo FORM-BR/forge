@@ -179,8 +179,15 @@ function Start-Dev {
     $proc = Start-Process pwsh -ArgumentList '-NoExit', '-Command', $cmd -WorkingDirectory $STAGING -PassThru
     $proc.Id | Out-File -FilePath $pidFile -Encoding ascii
     Start-Sleep -Seconds 6
-    Good "Instancia dev subindo (pid $($proc.Id)). Aguarde o boot e abra:"
-    Write-Host "      http://127.0.0.1:$DEV_PORT" -ForegroundColor Green
+    $urlMatch = Select-String -Path (Join-Path $WORKLOG 'forge-dev.log') -Pattern "dsh web: (http://\S+)" | Select-Object -Last 1
+    if ($urlMatch) {
+        $url = $urlMatch.Matches[0].Groups[1].Value
+        Good "Instancia dev subindo (pid $($proc.Id)). Abra ESTA url (e ela que autentica o browser):"
+        Write-Host "      $url" -ForegroundColor Green
+        Say "  Se a url expirar ou voce fechar, rode 'forge stop' e 'forge dev' de novo."
+    } else {
+        Good "Instancia dev subindo (pid $($proc.Id)). Aguarde o boot e abra a url que aparecer no log."
+    }
     Say "  Logs: $(Join-Path $WORKLOG 'forge-dev.log')  |  Parar: forge stop"
     Say "  O original continua em http://127.0.0.1:3080 — os dois convivem."
 }
