@@ -1,5 +1,6 @@
 @echo off
 title FORGE
+rem FALLBACK (lento: pnpm + tsx, janela visivel). O atalho normal usa launch-forge.vbs -> launch-forge.ps1 (build compilado, escondido).
 cd /d "C:\Users\Felipe\Dev\deepseek-harness"
 call pnpm dsh web
 pause
