@@ -18,7 +18,7 @@ import type { Session, SessionLogOffset as SessionLogOffsetType } from '@deepsee
 import { SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
 // Type-only: activates the `ctx.sessionProjections` Context declaration.
 import type {} from '@deepseek-ai/dsh-session-projection'
-import { costAttemptOf, costUsageProjectionDefinition, foldCostUsage, initCostUsageState } from './cost-projection.ts'
+import { costAttemptOf, costUsageProjectionDefinition, foldCostUsage, initCostUsageState, isBilledSettlement } from './cost-projection.ts'
 import type { CostUsageState } from './cost-projection.ts'
 import type { CostUsageProjection } from './projection.ts'
 import { CostLedger, dayOf } from './ledger.ts'
@@ -270,6 +270,7 @@ export class CostMeter extends Service {
           cacheReadTokens: attempt.cacheReadTokens,
           cacheWriteTokens: attempt.cacheWriteTokens,
           ...(session.header.cwd === undefined ? {} : { cwd: session.header.cwd }),
+          billed: isBilledSettlement(event),
         })
       }
       entry.consumed = SessionLogOffset(entry.consumed + 1)

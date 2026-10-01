@@ -970,6 +970,13 @@ describe('mapStopReason / mapUsage', () => {
     })
     expect(mapUsage(usage(10, 5))).toEqual({ inputTokens: 10, outputTokens: 5, totalTokens: 15 })
   })
+
+  it('maps the provider-billed cost only when the provider reported one', () => {
+    expect(mapUsage({ ...usage(10, 5), billedCost: 0.0042 })).toEqual({
+      inputTokens: 10, outputTokens: 5, totalTokens: 15, costUsd: 0.0042,
+    })
+    expect(mapUsage({ ...usage(10, 5), billedCost: 0 })).toMatchObject({ costUsd: 0 })
+  })
 })
 
 describe('toStreamChunks edge branches', () => {

@@ -19,7 +19,8 @@ import { toPiReplayState } from './replay.ts'
  * Map pi-ai usage (reasoning folded into output by pi-ai).
  * @param usage - cumulative usage from the terminal pi-ai event.
  * @returns harness counts with pi-ai's exact total; cache fields appear only
- *   when non-zero (pi-ai reports zeros, not absence).
+ *   when non-zero (pi-ai reports zeros, not absence), and `costUsd` only when
+ *   the provider billed the call in its usage payload.
  */
 export function mapUsage(usage: PiUsage): TokenUsage {
   return {
@@ -28,6 +29,7 @@ export function mapUsage(usage: PiUsage): TokenUsage {
     totalTokens: usage.totalTokens,
     ...usage.cacheRead > 0 ? { cacheReadTokens: usage.cacheRead } : {},
     ...usage.cacheWrite > 0 ? { cacheWriteTokens: usage.cacheWrite } : {},
+    ...usage.billedCost === undefined ? {} : { costUsd: usage.billedCost },
   }
 }
 

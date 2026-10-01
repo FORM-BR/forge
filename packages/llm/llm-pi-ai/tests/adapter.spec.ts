@@ -89,6 +89,23 @@ describe('PiAiAdapter provider routing', () => {
     expect(server.paths).toEqual(['/chat/completions'])
   })
 
+  it('carries the provider-billed cost from the usage payload into the usage chunk', async () => {
+    const events = [
+      textEvents[0]!,
+      textEvents[1]!,
+      JSON.stringify({
+        choices: [{ delta: {}, index: 0, finish_reason: 'stop' }],
+        // OpenRouter reports the charged USD as `usage.cost`.
+        usage: { prompt_tokens: 3, completion_tokens: 1, cost: 0.000123 },
+      }),
+      '[DONE]',
+    ]
+    const server = await mockServer([{ events }])
+    const ctx = await harness(server.url)
+    const result = await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
+    expect(result.usage).toEqual({ inputTokens: 3, outputTokens: 1, totalTokens: 4, costUsd: 0.000123 })
+  })
+
   it('keeps prepared model metadata and dispatch on one profile snapshot', async () => {
     const first = await mockServer([{ events: textEvents }])
     const second = await mockServer([])

@@ -186,6 +186,12 @@ export interface TokenUsage {
   cacheReadTokens?: number
   cacheWriteTokens?: number
   reasoningTokens?: number
+  /**
+   * USD the provider billed for this call, when it reports one in the usage
+   * payload (OpenRouter `usage.cost`). Absent when the provider reports token
+   * counts only; cost consumers then estimate from a price catalog.
+   */
+  costUsd?: number
 }
 
 /**

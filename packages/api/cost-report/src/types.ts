@@ -52,6 +52,8 @@ export interface CostReportRow {
   readonly outputTokens: number
   /** Prompt tokens served from the provider cache, disjoint from `inputTokens`. */
   readonly cacheReadTokens?: number
+  /** The part of `costUsd` the provider billed; the rest is catalog-estimated. */
+  readonly billedUsd?: number
 }
 
 /** Request of {@link CostReportService.report}: the bucket plus scoping. */

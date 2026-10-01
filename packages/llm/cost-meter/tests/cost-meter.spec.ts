@@ -138,4 +138,13 @@ describe('CostMeter service', () => {
     settle(session, { inputTokens: 500, outputTokens: 500 }, 2, 1)
     expect(ctx.costMeter.byDay()[0]!.attempts).toBe(2)
   })
+
+  it('marks billed settlements in the ledger and estimates the rest', async () => {
+    const { ctx, session } = await harness()
+    settle(session, { ...USAGE, costUsd: 0.25 }, 1, 1)
+    settle(session, { inputTokens: 1000, outputTokens: 1000 }, 2, 1)
+    const [day] = ctx.costMeter.byDay()
+    expect(day!.billedUsd).toBe(0.25)
+    expect(day!.costUsd).toBeGreaterThan(0.25)
+  })
 })

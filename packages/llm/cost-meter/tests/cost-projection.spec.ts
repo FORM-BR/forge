@@ -87,6 +87,26 @@ describe('foldCostUsage', () => {
     })
   })
 
+  it('uses the provider-billed cost instead of the catalog estimate', async () => {
+    const context = await ctx()
+    const session = context.sessions.create()
+    const state = foldCostUsage(initCostUsageState(), settle(session, { ...USAGE, costUsd: 0.0123 }, 1, 1), price)
+    expect(state.totalCostUsd).toBe(0.0123)
+    expect(state.unpricedAttempts).toBe(0)
+  })
+
+  it('counts a billed attempt on an uncatalogued route as priced', async () => {
+    const context = await ctx()
+    const session = context.sessions.create()
+    const state = foldCostUsage(
+      initCostUsageState(),
+      settle(session, { ...USAGE, costUsd: 0.5 }, 1, 1, 'unpriced-provider', 'unknown-model'),
+      price,
+    )
+    expect(state.totalCostUsd).toBe(0.5)
+    expect(state.unpricedAttempts).toBe(0)
+  })
+
   it('counts unpriced routes as zero cost with unpricedAttempts', async () => {
     const context = await ctx()
     const session = context.sessions.create()

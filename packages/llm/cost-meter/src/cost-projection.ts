@@ -1,8 +1,9 @@
 /**
- * Pure folds for catalog-priced session API cost.
+ * Pure folds for session API cost.
  *
  * The fold reads the same durable events as token-meter but attributes a USD
- * cost to every assistant settlement that reports provider usage: buckets
+ * cost to every assistant settlement that reports provider usage: the
+ * provider-billed amount when the usage sample carries one, otherwise buckets
  * times the route's catalog rates. A retried attempt resettles the same
  * (turn, step) slot, replacing the failed sample so a slot never double
  * counts; `llm/retry-started` needs no special handling for that reason.
@@ -101,18 +102,16 @@ function adjustModel(
 ): CostModelRow[] {
   const next = [...byModel]
   const index = next.findIndex(row => row.provider === attempt.provider && row.model === attempt.model)
-  const base: CostModelRow = index === -1
-    ? {
-        provider: attempt.provider,
-        model: attempt.model,
-        costUsd: 0,
-        attempts: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheReadTokens: 0,
-        cacheWriteTokens: 0,
-      }
-    : next[index]!
+  const base: CostModelRow = (index === -1 ? undefined : next[index]) ?? {
+    provider: attempt.provider,
+    model: attempt.model,
+    costUsd: 0,
+    attempts: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+  }
   const updated: CostModelRow = {
     provider: base.provider,
     model: base.model,
@@ -134,8 +133,30 @@ function adjustModel(
 }
 
 /**
+ * The provider-billed USD a usage sample carries, when it is a finite
+ * non-negative amount.
+ * @param usage - one settlement's usage sample.
+ * @returns the billed amount, or `undefined` when the provider reported none.
+ */
+export function billedCostOf(usage: { readonly costUsd?: number }): number | undefined {
+  const cost = usage.costUsd
+  return typeof cost === 'number' && Number.isFinite(cost) && cost >= 0 ? cost : undefined
+}
+
+/**
+ * Whether an event settles an attempt at a provider-billed amount.
+ * @param event - one durable session event.
+ * @returns `true` for an assistant settlement whose usage carries a billed cost.
+ */
+export function isBilledSettlement(event: SessionEvent): boolean {
+  return event.type === 'assistant/message'
+    && event.data.usage !== undefined
+    && billedCostOf(event.data.usage) !== undefined
+}
+
+/**
  * Extract one event's priced attempt, or `undefined` when the event carries no
- * priced usage. Pure and deterministic for a fixed {@link PriceLookup}; the
+ * priced usage. A provider-billed amount wins over the price lookup. Pure and deterministic for a fixed {@link PriceLookup}; the
  * single source of truth shared by the fold and the SQLite ledger, so both
  * attribute cost with the same validity rules.
  */
@@ -151,14 +172,17 @@ export function costAttemptOf(
   const { provider, model } = source
   if (provider.length === 0 || model.length === 0) return undefined
 
-  const rates = price(provider, model)
-  const unpriced = rates === undefined
+  // A provider-billed amount is the charge itself; the catalog only estimates
+  // calls whose provider reported token counts alone.
+  const billed = billedCostOf(usage)
+  const rates = billed === undefined ? price(provider, model) : undefined
+  const unpriced = billed === undefined && rates === undefined
   return {
     turn: event.data.turn,
     step: event.data.step,
     provider,
     model,
-    costUsd: unpriced ? 0 : priceUsage(usage, rates),
+    costUsd: billed ?? (rates === undefined ? 0 : priceUsage(usage, rates)),
     unpriced,
     inputTokens: usage.inputTokens,
     outputTokens: usage.outputTokens,
@@ -221,7 +245,7 @@ export function costUsageProjectionDefinition(
     stateVersion: 2,
     wire: {
       viewSchema: costUsageViewSchema,
-      view: (state) => ({
+      view: state => ({
         totalCostUsd: state.totalCostUsd,
         attempts: state.attempts,
         unpricedAttempts: state.unpricedAttempts,
