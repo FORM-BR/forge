@@ -47,6 +47,8 @@ export interface CostAggregateRow {
   readonly attempts: number
   readonly inputTokens: number
   readonly outputTokens: number
+  /** Prompt tokens served from the provider cache, disjoint from `inputTokens`. */
+  readonly cacheReadTokens: number
 }
 
 /** Aggregation bucket for {@link CostLedger.report}. */
@@ -66,7 +68,11 @@ export interface CostReportFilter {
   readonly sessionId?: string
 }
 
-/** One bucket of a ledger report; only the group's identity fields are set. */
+/**
+ * One bucket of a ledger report. Group identity fields are set per group; a
+ * `session` bucket also carries its last active day, its root, and its route
+ * when every settlement used a single provider/model.
+ */
 export interface CostReportRow {
   readonly day?: string
   readonly cwd?: string
@@ -77,6 +83,8 @@ export interface CostReportRow {
   readonly attempts: number
   readonly inputTokens: number
   readonly outputTokens: number
+  /** Prompt tokens served from the provider cache, disjoint from `inputTokens`. */
+  readonly cacheReadTokens: number
 }
 
 /** Local calendar day of an epoch-millisecond timestamp, in the host zone. */
@@ -99,6 +107,15 @@ const GROUP_COLUMNS: Record<CostReportGroup, readonly string[]> = {
   model: ['provider', 'model'],
   session: ['session_id'],
 }
+
+/**
+ * Descriptive columns of a session bucket: its last active day, its root, and
+ * its route when every settlement used one provider/model (NULL otherwise).
+ */
+const SESSION_DETAIL_COLUMNS = `,
+             MAX(day) AS last_day, MAX(cwd) AS session_cwd,
+             CASE WHEN COUNT(DISTINCT provider || '/' || model) = 1 THEN MAX(provider) END AS only_provider,
+             CASE WHEN COUNT(DISTINCT provider || '/' || model) = 1 THEN MAX(model) END AS only_model`
 
 /**
  * Write-side ledger over one SQLite database. `:memory:` is supported for
@@ -225,7 +242,8 @@ export class CostLedger {
     const statement = this.db.prepare(`
       SELECT ${identity.join(', ')},
              SUM(cost_usd) AS cost_usd, COUNT(*) AS attempts,
-             SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens
+             SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens,
+             SUM(cache_read_tokens) AS cache_read_tokens${group === 'session' ? SESSION_DETAIL_COLUMNS : ''}
       FROM cost_events${where}
       GROUP BY ${identity.join(', ')}
       ORDER BY ${order}
@@ -235,16 +253,23 @@ export class CostLedger {
       attempts: Number(raw.attempts),
       inputTokens: Number(raw.input_tokens),
       outputTokens: Number(raw.output_tokens),
+      cacheReadTokens: Number(raw.cache_read_tokens),
     })
     const rows = statement.all(...values) as Array<Record<string, unknown>>
-    const result = rows.map(raw => {
+    const result = rows.map((raw) => {
       const base = aggregate(raw)
       switch (group) {
         case 'day': return { day: String(raw.day), ...base }
         case 'cwd': return { ...(raw.cwd === null ? {} : { cwd: String(raw.cwd) }), ...base }
         case 'model':
           return { provider: String(raw.provider), model: String(raw.model), ...base }
-        case 'session': return { sessionId: String(raw.session_id), ...base }
+        case 'session': return {
+          sessionId: String(raw.session_id),
+          day: String(raw.last_day),
+          ...(raw.session_cwd === null ? {} : { cwd: String(raw.session_cwd) }),
+          ...(raw.only_model === null ? {} : { provider: String(raw.only_provider), model: String(raw.only_model) }),
+          ...base,
+        }
       }
     })
     return result
@@ -253,23 +278,25 @@ export class CostLedger {
   /** Daily totals across all sessions, ascending by day. */
   byDay(): Array<{ day: string } & CostAggregateRow> {
     return this.report('day').map(row => ({
-      day: row.day!,
+      day: row.day ?? '',
       costUsd: row.costUsd,
       attempts: row.attempts,
       inputTokens: row.inputTokens,
       outputTokens: row.outputTokens,
+      cacheReadTokens: row.cacheReadTokens,
     }))
   }
 
   /** Per-route totals across all sessions, most expensive first. */
   byModel(): Array<{ provider: string; model: string } & CostAggregateRow> {
     return this.report('model').map(row => ({
-      provider: row.provider!,
-      model: row.model!,
+      provider: row.provider ?? '',
+      model: row.model ?? '',
       costUsd: row.costUsd,
       attempts: row.attempts,
       inputTokens: row.inputTokens,
       outputTokens: row.outputTokens,
+      cacheReadTokens: row.cacheReadTokens,
     }))
   }
 

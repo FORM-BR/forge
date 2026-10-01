@@ -130,11 +130,7 @@ export class CostMeter extends Service {
     // Live OpenRouter prices first (the profile's `${provider}` routes), then
     // the installed pi-ai catalog for every other provider.
     this.price = composePriceLookup(this.openRouterPrices.asPriceLookup(), catalogPriceLookup())
-    this.ledger = new CostLedger(
-      config.ledgerPath === undefined || config.ledgerPath === ''
-        ? dshHomePath('statistics', 'costs.sqlite')
-        : config.ledgerPath,
-    )
+    this.ledger = new CostLedger(this.ledgerPath())
 
     // Seed from the on-disk cache before anything can fold history. The
     // projection registry materializes one cell per session at its first read
@@ -148,8 +144,7 @@ export class CostMeter extends Service {
     // the live lookup, without blocking startup. The upsert key makes a rerun
     // idempotent; failures (offline, missing sessions root) are absorbed. An
     // in-memory ledger is test scaffolding, never a real reconciliation.
-    const ledgerPath = this.config.ledgerPath ?? dshHomePath('statistics', 'costs.sqlite')
-    if (this.config.warmSync !== false && ledgerPath !== ':memory:') {
+    if (this.config.warmSync !== false && this.ledgerPath() !== ':memory:') {
       void this.warmSync()
     }
 
@@ -157,10 +152,12 @@ export class CostMeter extends Service {
     // offline fetch leaves the table empty and routes read as unpriced.
     void this.openRouterPrices.ensureLoaded()
 
-    // Readers catch up independently, while eager observation bounds ordinary
-    // read latency without creating state for sessions no consumer has read.
+    // Every durable event reaches the ledger as it lands, whether or not a
+    // consumer has read the session's cost; the first event of a session
+    // replays its earlier history once, and the upsert key keeps that
+    // idempotent with the warm sync.
     ctx.on('session/event', (session) => {
-      if (this.states.has(session)) this._sync(session)
+      this._sync(session)
     })
 
     // Close the SQLite ledger when the service scope tears down.
@@ -211,18 +208,37 @@ export class CostMeter extends Service {
    * and per-session read failures the same way the CLI backfill does.
    */
   async warmSync(): Promise<void> {
-    const sessionsRoot = this.config.sessionsRoot ?? dshHomePath('sessions')
     try {
-      await backfillOpenRouter({
-        sessionsRoot,
-        ledgerPath: this.config.ledgerPath ?? dshHomePath('statistics', 'costs.sqlite'),
+      const result = await backfillOpenRouter({
+        sessionsRoot: this.sessionsRoot(),
+        ledgerPath: this.ledgerPath(),
         price: this.price,
         apply: true,
       })
-    } catch {
+      if (result.sessionsFailed > 0) {
+        this.ctx.logger.warn(`cost-meter: warm sync skipped ${result.sessionsFailed} unreadable session(s)`)
+      }
+    } catch (error) {
       // Warm-sync is best effort: it must never take the meter (or the host)
-      // down. A later boot retries the reconciliation.
+      // down. A later boot retries the reconciliation; the warning keeps a
+      // ledger that stopped filling diagnosable.
+      this.ctx.logger.warn('cost-meter: warm sync failed', error)
     }
+  }
+
+  /**
+   * The SQLite ledger location. The loader defaults absent path settings to
+   * `''`, so both `undefined` and `''` select the home default.
+   */
+  private ledgerPath(): string {
+    const configured = this.config.ledgerPath
+    return configured === undefined || configured === '' ? dshHomePath('statistics', 'costs.sqlite') : configured
+  }
+
+  /** The stored-sessions root the warm sync replays; `''` selects the home default. */
+  private sessionsRoot(): string {
+    const configured = this.config.sessionsRoot
+    return configured === undefined || configured === '' ? dshHomePath('sessions') : configured
   }
 
   /** Catch one session's fold up to the current durable tail. */

@@ -35,7 +35,11 @@ export interface CostReportFilter {
   readonly sessionId?: string
 }
 
-/** One bucket of a ledger report; only the group's identity fields are set. */
+/**
+ * One bucket of a ledger report. Group identity fields are set per group; a
+ * `session` bucket also carries its last active day, its root, and its route
+ * when every settlement used a single provider/model.
+ */
 export interface CostReportRow {
   readonly day?: string
   readonly cwd?: string
@@ -46,6 +50,8 @@ export interface CostReportRow {
   readonly attempts: number
   readonly inputTokens: number
   readonly outputTokens: number
+  /** Prompt tokens served from the provider cache, disjoint from `inputTokens`. */
+  readonly cacheReadTokens?: number
 }
 
 /** Request of {@link CostReportService.report}: the bucket plus scoping. */

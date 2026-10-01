@@ -131,4 +131,11 @@ describe('CostMeter service', () => {
     // The same pass upserts the priced row, so the durable aggregate is priced too.
     expect(ctx.costMeter.byModel()[0]!.costUsd).toBeGreaterThan(0)
   })
+
+  it('records settlements in the ledger without a measure() call', async () => {
+    const { ctx, session } = await harness()
+    settle(session, USAGE, 1, 1)
+    settle(session, { inputTokens: 500, outputTokens: 500 }, 2, 1)
+    expect(ctx.costMeter.byDay()[0]!.attempts).toBe(2)
+  })
 })

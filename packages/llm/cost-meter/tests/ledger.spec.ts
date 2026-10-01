@@ -37,8 +37,8 @@ describe('CostLedger', () => {
       ledger.upsert(row({ sessionId: 's1', seq: 1, day: '2026-01-05', costUsd: 0.002 }))
       ledger.upsert(row({ sessionId: 's2', seq: 0, day: '2026-01-06', costUsd: 0.004 }))
       expect(ledger.byDay()).toEqual([
-        { day: '2026-01-05', costUsd: 0.003, attempts: 2, inputTokens: 2000, outputTokens: 200 },
-        { day: '2026-01-06', costUsd: 0.004, attempts: 1, inputTokens: 1000, outputTokens: 100 },
+        { day: '2026-01-05', costUsd: 0.003, attempts: 2, inputTokens: 2000, outputTokens: 200, cacheReadTokens: 0 },
+        { day: '2026-01-06', costUsd: 0.004, attempts: 1, inputTokens: 1000, outputTokens: 100, cacheReadTokens: 0 },
       ])
     } finally {
       ledger.close()
@@ -52,7 +52,7 @@ describe('CostLedger', () => {
       // Replay of the same event: the settlement corrected its tokens.
       ledger.upsert(row({ sessionId: 's1', seq: 0, costUsd: 0.002, inputTokens: 2000 }))
       expect(ledger.byDay()).toEqual([
-        { day: '2026-01-05', costUsd: 0.002, attempts: 1, inputTokens: 2000, outputTokens: 100 },
+        { day: '2026-01-05', costUsd: 0.002, attempts: 1, inputTokens: 2000, outputTokens: 100, cacheReadTokens: 0 },
       ])
     } finally {
       ledger.close()
@@ -66,8 +66,21 @@ describe('CostLedger', () => {
       ledger.upsert(row({ sessionId: 's1', seq: 1, provider: 'openrouter', model: 'b', costUsd: 0.005 }))
       ledger.upsert(row({ sessionId: 's2', seq: 0, provider: 'openrouter', model: 'a', costUsd: 0.002 }))
       expect(ledger.byModel()).toEqual([
-        { provider: 'openrouter', model: 'b', costUsd: 0.005, attempts: 1, inputTokens: 1000, outputTokens: 100 },
-        { provider: 'openrouter', model: 'a', costUsd: 0.003, attempts: 2, inputTokens: 2000, outputTokens: 200 },
+        { provider: 'openrouter', model: 'b', costUsd: 0.005, attempts: 1, inputTokens: 1000, outputTokens: 100, cacheReadTokens: 0 },
+        { provider: 'openrouter', model: 'a', costUsd: 0.003, attempts: 2, inputTokens: 2000, outputTokens: 200, cacheReadTokens: 0 },
+      ])
+    } finally {
+      ledger.close()
+    }
+  })
+
+  it('sums cache-read tokens separately from input tokens', () => {
+    const ledger = new CostLedger(':memory:')
+    try {
+      ledger.upsert(row({ sessionId: 's1', seq: 0, inputTokens: 100, cacheReadTokens: 900 }))
+      ledger.upsert(row({ sessionId: 's1', seq: 1, inputTokens: 50, cacheReadTokens: 450 }))
+      expect(ledger.report('day')).toEqual([
+        { day: '2026-01-05', costUsd: 0.002, attempts: 2, inputTokens: 150, outputTokens: 200, cacheReadTokens: 1350 },
       ])
     } finally {
       ledger.close()
@@ -79,7 +92,7 @@ describe('CostLedger', () => {
     try {
       ledger.upsert(row({ sessionId: 's1', seq: 0, costUsd: 0, unpriced: true }))
       expect(ledger.byDay()).toEqual([
-        { day: '2026-01-05', costUsd: 0, attempts: 1, inputTokens: 1000, outputTokens: 100 },
+        { day: '2026-01-05', costUsd: 0, attempts: 1, inputTokens: 1000, outputTokens: 100, cacheReadTokens: 0 },
       ])
     } finally {
       ledger.close()
@@ -93,9 +106,9 @@ describe('CostLedger', () => {
       ledger.upsert(row({ sessionId: 's2', seq: 0, cwd: 'C:\\work\\two', costUsd: 0.004 }))
       ledger.upsert(row({ sessionId: 's3', seq: 0, costUsd: 0.002 }))
       expect(ledger.report('cwd')).toEqual([
-        { cwd: 'C:\\work\\two', costUsd: 0.004, attempts: 1, inputTokens: 1000, outputTokens: 100 },
-        { costUsd: 0.002, attempts: 1, inputTokens: 1000, outputTokens: 100 },
-        { cwd: 'C:\\work\\one', costUsd: 0.001, attempts: 1, inputTokens: 1000, outputTokens: 100 },
+        { cwd: 'C:\\work\\two', costUsd: 0.004, attempts: 1, inputTokens: 1000, outputTokens: 100, cacheReadTokens: 0 },
+        { costUsd: 0.002, attempts: 1, inputTokens: 1000, outputTokens: 100, cacheReadTokens: 0 },
+        { cwd: 'C:\\work\\one', costUsd: 0.001, attempts: 1, inputTokens: 1000, outputTokens: 100, cacheReadTokens: 0 },
       ])
       expect(ledger.workspaces()).toEqual(['C:\\work\\one', 'C:\\work\\two'])
     } finally {
@@ -110,12 +123,16 @@ describe('CostLedger', () => {
       ledger.upsert(row({ sessionId: 's1', seq: 1, day: '2026-01-06', cwd: 'C:\\a', model: 'm2', costUsd: 0.002 }))
       ledger.upsert(row({ sessionId: 's2', seq: 0, day: '2026-01-06', cwd: 'C:\\b', model: 'm1', costUsd: 0.004 }))
       expect(ledger.report('session')).toEqual([
-        { sessionId: 's2', costUsd: 0.004, attempts: 1, inputTokens: 1000, outputTokens: 100 },
-        { sessionId: 's1', costUsd: 0.003, attempts: 2, inputTokens: 2000, outputTokens: 200 },
+        // A single-route session reports its route; a mixed one leaves it unset.
+        {
+          sessionId: 's2', day: '2026-01-06', cwd: 'C:\\b', provider: 'openrouter', model: 'm1',
+          costUsd: 0.004, attempts: 1, inputTokens: 1000, outputTokens: 100, cacheReadTokens: 0,
+        },
+        { sessionId: 's1', day: '2026-01-06', cwd: 'C:\\a', costUsd: 0.003, attempts: 2, inputTokens: 2000, outputTokens: 200, cacheReadTokens: 0 },
       ])
       expect(ledger.report('model')).toEqual([
-        { provider: 'openrouter', model: 'm1', costUsd: 0.005, attempts: 2, inputTokens: 2000, outputTokens: 200 },
-        { provider: 'openrouter', model: 'm2', costUsd: 0.002, attempts: 1, inputTokens: 1000, outputTokens: 100 },
+        { provider: 'openrouter', model: 'm1', costUsd: 0.005, attempts: 2, inputTokens: 2000, outputTokens: 200, cacheReadTokens: 0 },
+        { provider: 'openrouter', model: 'm2', costUsd: 0.002, attempts: 1, inputTokens: 1000, outputTokens: 100, cacheReadTokens: 0 },
       ])
       expect(ledger.models()).toEqual([
         { provider: 'openrouter', model: 'm1' },
@@ -134,21 +151,21 @@ describe('CostLedger', () => {
       ledger.upsert(row({ sessionId: 's1', seq: 2, day: '2026-01-07', cwd: 'C:\\a', model: 'm2', costUsd: 0.003 }))
       ledger.upsert(row({ sessionId: 's2', seq: 0, day: '2026-01-06', cwd: 'C:\\b', model: 'm1', costUsd: 0.004 }))
       expect(ledger.report('day', { fromDay: '2026-01-06', toDay: '2026-01-06' })).toEqual([
-        { day: '2026-01-06', costUsd: 0.006, attempts: 2, inputTokens: 2000, outputTokens: 200 },
+        { day: '2026-01-06', costUsd: 0.006, attempts: 2, inputTokens: 2000, outputTokens: 200, cacheReadTokens: 0 },
       ])
       expect(ledger.report('day', { cwd: 'C:\\a' })).toEqual([
-        { day: '2026-01-05', costUsd: 0.001, attempts: 1, inputTokens: 1000, outputTokens: 100 },
-        { day: '2026-01-06', costUsd: 0.002, attempts: 1, inputTokens: 1000, outputTokens: 100 },
-        { day: '2026-01-07', costUsd: 0.003, attempts: 1, inputTokens: 1000, outputTokens: 100 },
+        { day: '2026-01-05', costUsd: 0.001, attempts: 1, inputTokens: 1000, outputTokens: 100, cacheReadTokens: 0 },
+        { day: '2026-01-06', costUsd: 0.002, attempts: 1, inputTokens: 1000, outputTokens: 100, cacheReadTokens: 0 },
+        { day: '2026-01-07', costUsd: 0.003, attempts: 1, inputTokens: 1000, outputTokens: 100, cacheReadTokens: 0 },
       ])
       expect(ledger.report('day', { model: 'm1' })).toEqual([
-        { day: '2026-01-05', costUsd: 0.001, attempts: 1, inputTokens: 1000, outputTokens: 100 },
-        { day: '2026-01-06', costUsd: 0.004, attempts: 1, inputTokens: 1000, outputTokens: 100 },
+        { day: '2026-01-05', costUsd: 0.001, attempts: 1, inputTokens: 1000, outputTokens: 100, cacheReadTokens: 0 },
+        { day: '2026-01-06', costUsd: 0.004, attempts: 1, inputTokens: 1000, outputTokens: 100, cacheReadTokens: 0 },
       ])
       expect(ledger.report('day', { sessionId: 's1' })).toEqual([
-        { day: '2026-01-05', costUsd: 0.001, attempts: 1, inputTokens: 1000, outputTokens: 100 },
-        { day: '2026-01-06', costUsd: 0.002, attempts: 1, inputTokens: 1000, outputTokens: 100 },
-        { day: '2026-01-07', costUsd: 0.003, attempts: 1, inputTokens: 1000, outputTokens: 100 },
+        { day: '2026-01-05', costUsd: 0.001, attempts: 1, inputTokens: 1000, outputTokens: 100, cacheReadTokens: 0 },
+        { day: '2026-01-06', costUsd: 0.002, attempts: 1, inputTokens: 1000, outputTokens: 100, cacheReadTokens: 0 },
+        { day: '2026-01-07', costUsd: 0.003, attempts: 1, inputTokens: 1000, outputTokens: 100, cacheReadTokens: 0 },
       ])
     } finally {
       ledger.close()
@@ -177,14 +194,14 @@ describe('CostLedger', () => {
           PRIMARY KEY (session_id, seq)
         ) STRICT
       `)
-      legacy.exec(`PRAGMA user_version = 1`)
+      legacy.exec('PRAGMA user_version = 1')
       legacy.close()
 
       const ledger = new CostLedger(path)
       try {
         ledger.upsert(row({ sessionId: 's1', seq: 1, cwd: 'C:\\migrated', costUsd: 0.007 }))
         expect(ledger.report('cwd')).toEqual([
-          { cwd: 'C:\\migrated', costUsd: 0.007, attempts: 1, inputTokens: 1000, outputTokens: 100 },
+          { cwd: 'C:\\migrated', costUsd: 0.007, attempts: 1, inputTokens: 1000, outputTokens: 100, cacheReadTokens: 0 },
         ])
         expect(ledger.workspaces()).toEqual(['C:\\migrated'])
       } finally {
