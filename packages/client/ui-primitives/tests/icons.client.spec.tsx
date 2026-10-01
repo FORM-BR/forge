@@ -127,18 +127,18 @@ describe('ForgeLogo', () => {
     const { container } = render(<primitives.ForgeLogo />)
     const svg = container.querySelector('svg')!
     expect(svg.getAttribute('width')).toBe('24')
-    expect(Number(svg.getAttribute('height'))).toBeCloseTo(19.58, 1)
-    expect(svg.getAttribute('viewBox')).toBe('86 76 353 288')
-    expect(container.querySelectorAll('rect, polyline')).toHaveLength(5)
+    expect(svg.getAttribute('height')).toBe('24')
+    expect(svg.getAttribute('viewBox')).toBe('0 0 256 256')
+    expect(container.querySelectorAll('path, polyline')).toHaveLength(4)
     expect(container.innerHTML).toContain('currentColor')
     expect(container.innerHTML).not.toContain('#')
   })
 
-  it('keeps the mark ratio at every requested size', () => {
+  it('keeps the square mark at every requested size', () => {
     const { container } = render(<primitives.ForgeLogo size={34} />)
     const svg = container.querySelector('svg')!
     expect(svg.getAttribute('width')).toBe('34')
-    expect(Number(svg.getAttribute('height'))).toBeCloseTo(27.74, 1)
+    expect(svg.getAttribute('height')).toBe('34')
   })
 })
 

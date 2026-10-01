@@ -1,16 +1,16 @@
 import type { IconProps } from './icons/props.ts'
 
 /**
- * Native box of the FORGE mark: the painted extents of the three bars and the
- * two chevrons, square-capped and miter-joined, so the authored padding is
- * symmetric around the ink on every side.
+ * Native box of the FORGE mark: a square with the ink centered inside it. The
+ * two nested corner bars end where their outer corners touch the inner of two
+ * butt-capped, miter-joined chevrons, so bars and chevrons read as one arrow.
  */
-export const FORGE_LOGO_VIEWBOX = { x: 86, y: 76, width: 353, height: 288 }
+export const FORGE_LOGO_VIEWBOX = { x: 0, y: 0, width: 256, height: 256 }
 
 /**
- * Render the FORGE mark (barred F followed by a double chevron) in
- * `currentColor` at the mark's native ratio.
- * @param props - icon props; `size` is the rendered width in px.
+ * Render the FORGE mark (two nested corner bars followed by a double chevron)
+ * in `currentColor` inside its square box.
+ * @param props - icon props; `size` is the rendered width and height in px.
  * @returns the mark svg, hidden from the accessibility tree.
  */
 export function ForgeLogo({ size = 24, className }: IconProps) {
@@ -23,23 +23,20 @@ export function ForgeLogo({ size = 24, className }: IconProps) {
       fill="none"
       aria-hidden="true"
     >
-      <rect x="100" y="90" width="36" height="260" fill="currentColor" />
-      <rect x="100" y="90" width="150" height="36" fill="currentColor" />
-      <rect x="180" y="170" width="36" height="180" fill="currentColor" />
+      <path d="M24 241.5V68.5H147.5V88.5H44V241.5Z" fill="currentColor" />
+      <path d="M62.5 241.5V107H147.5V127H82.5V241.5Z" fill="currentColor" />
       <polyline
-        points="270,140 330,220 270,300"
+        points="126.55,38 186.3,97.75 150.41,133.64"
         fill="none"
         stroke="currentColor"
-        strokeWidth="36"
-        strokeLinecap="square"
+        strokeWidth="13.5"
         strokeLinejoin="miter"
       />
       <polyline
-        points="330,140 400,220 330,300"
+        points="144.93,19.61 223.07,97.75 168.8,152.02"
         fill="none"
         stroke="currentColor"
-        strokeWidth="36"
-        strokeLinecap="square"
+        strokeWidth="13.5"
         strokeLinejoin="miter"
       />
     </svg>
