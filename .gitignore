@@ -47,3 +47,15 @@ worktrees/
 .agents/worktrees/
 .typert-*/
 native/system/test/bin/
+
+# --- FORGE: artefatos locais de sessao/build (nunca versionar) ---
+.forge-*
+*.forge-*
+.launch-build-stamp
+old-*.bak
+*-atajo*.log
+# artefatos de compilacao in-place gerados pelo build local
+packages/util/home-paths/src/index.js
+packages/util/home-paths/src/index.js.map
+packages/util/home-paths/src/index.d.ts
+packages/util/home-paths/src/index.d.ts.map

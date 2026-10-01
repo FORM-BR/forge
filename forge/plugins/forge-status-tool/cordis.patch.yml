@@ -1,0 +1,6 @@
+# Bundle FORGE: forge-status-tool
+# Insere uma tool que mostra o estado do fluxo FORGE (Trilha A, Trilha B e versões).
+- insert:
+    - id: forge-status-tool
+      name: '@forge/status-tool'
+      config: {}

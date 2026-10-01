@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Status FORGE",
+    "description": "Tool que mostra o estado do fluxo FORGE (branches, sujeira e versões)."
+  }
+}
