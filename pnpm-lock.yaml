@@ -1197,6 +1197,9 @@ importers:
       '@deepseek-ai/dsh-api-account-controller':
         specifier: workspace:*
         version: link:../account-controller
+      '@deepseek-ai/dsh-api-cost-report':
+        specifier: workspace:*
+        version: link:../cost-report
       '@deepseek-ai/dsh-api-costs-controller':
         specifier: workspace:*
         version: link:../costs-controller
