@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/api/cost-report/README.md
+/:
+  en: eb787d3707c4d77f
+  zh: 08d817b03e96a57b
+/deepseek-ai-dsh-api-cost-report:
+  en: 88b96c5d07dc5ee9
+  zh: 51f9d1d18ce759f0
+/deepseek-ai-dsh-api-cost-report/summary:
+  en: 5e5f79d5b8059b24
+  zh: f734ff4decd59ba4
+/deepseek-ai-dsh-api-cost-report/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 09388d293f9be9cb
+/deepseek-ai-dsh-api-cost-report/use-this-package:
+  en: fa06769d8b4f7322
+  zh: e49cd152a0d1ecc5
+/deepseek-ai-dsh-api-cost-report/use-this-package/report-buckets:
+  en: c5d808777ea997d8
+  zh: 263e0998a3da696d
+/deepseek-ai-dsh-api-cost-report/use-this-package/workspace-and-route-catalogs:
+  en: 67183c253d55e1a2
+  zh: 32a0b4871e706ac2
+/deepseek-ai-dsh-api-cost-report/use-this-package/absent-meter:
+  en: 7ad4d67dbc9740d3
+  zh: e2d3ed5a74412ad4
+/deepseek-ai-dsh-api-cost-report/understand-the-implementation:
+  en: c85d34bf11320d10
+  zh: 53a39e74d84861ea
+/deepseek-ai-dsh-api-cost-report/further-exploration:
+  en: e09d423b1587afe9
+  zh: 58b81c13087d115d
+/deepseek-ai-dsh-api-cost-report/model-experience:
+  en: 78f7a6f03ab90f51
+  zh: 372fb1d904860eec
+/deepseek-ai-dsh-api-cost-report/model-experience/kv-cache-effect:
+  en: 8d7977d8c6d8f051
+  zh: d4e5e9d8fef4bba9
+/deepseek-ai-dsh-api-cost-report/known-limitations-and-deferred-work:
+  en: 5e0547eb6ae66fc9
+  zh: 6c4e3c87ea0d4d6a
+/deepseek-ai-dsh-api-cost-report/known-limitations-and-deferred-work/dev-note:
+  en: edbebf0f1d5a5bea
+  zh: 878cae350cbaac47

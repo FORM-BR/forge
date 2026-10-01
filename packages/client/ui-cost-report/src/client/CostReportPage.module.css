@@ -1,0 +1,28 @@
+.root { display: flex; flex: 1; flex-direction: column; box-sizing: border-box; height: 100%; min-height: 0; gap: 16px; padding: 14px 16px 20px; overflow: auto; color: var(--dsw-alias-label-primary); font-size: 13px; }
+.header { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.heading { margin: 0; font-size: 18px; font-weight: 700; line-height: 1.2; }
+.filters { display: flex; flex-wrap: wrap; gap: 10px 14px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.fieldLabel { font-size: 11px; opacity: 0.65; }
+.filterRow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin: 0; }
+.card { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 1px solid var(--dsw-alias-bg-l2); border-radius: 8px; }
+.card dt { font-size: 11px; opacity: 0.65; }
+.card dd { margin: 0; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.seriesBox { display: flex; flex-direction: column; gap: 6px; margin: 0; min-width: 0; }
+.tableBox { display: flex; flex-direction: column; gap: 4px; margin: 0; min-width: 0; }
+.subheading { margin: 0; font-size: 12px; font-weight: 600; opacity: 0.8; }
+.scroll { overflow-x: auto; min-width: 0; }
+.series { display: block; height: auto; }
+.tickLabel { font-size: 9px; fill: currentColor; opacity: 0.6; }
+.table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.table th { padding: 3px 6px; text-align: left; font-weight: 600; font-size: 11px; opacity: 0.65; white-space: nowrap; }
+.table td { padding: 4px 6px; border-top: 1px solid var(--dsw-alias-bg-l2); vertical-align: top; white-space: nowrap; }
+.table th:last-child, .table td:last-child { text-align: right; }
+.modelCell { display: flex; flex-direction: column; gap: 1px; min-width: 0; padding-right: 4px; white-space: normal; }
+.model { overflow-wrap: anywhere; }
+.provider { font-size: 11px; opacity: 0.6; overflow-wrap: anywhere; }
+.sessionId, .day { font-variant-numeric: tabular-nums; }
+.muted { margin: 0; line-height: 1.5; opacity: 0.65; }
+.error { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; line-height: 1.5; }
+.footnote { margin: 0; font-size: 11px; line-height: 1.5; opacity: 0.55; }

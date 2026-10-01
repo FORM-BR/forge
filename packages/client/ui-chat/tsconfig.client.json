@@ -58,6 +58,9 @@
       "path": "../../llm/token-meter"
     },
     {
+      "path": "../../llm/cost-meter"
+    },
+    {
       "path": "../../util/workspace-path"
     },
     {

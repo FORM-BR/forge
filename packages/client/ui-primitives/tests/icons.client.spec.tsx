@@ -122,28 +122,36 @@ describe('product icon set', () => {
   })
 })
 
-describe('FishLogo', () => {
-  it('renders the fish path in currentColor at the native ratio', () => {
-    const { container } = render(<primitives.FishLogo />)
+describe('ForgeLogo', () => {
+  it('paints the mark with currentColor and no background plate', () => {
+    const { container } = render(<primitives.ForgeLogo />)
     const svg = container.querySelector('svg')!
     expect(svg.getAttribute('width')).toBe('24')
-    expect(Number(svg.getAttribute('height'))).toBeCloseTo(17.66, 1)
-    expect(svg.getAttribute('viewBox')).toBe('0 0 23.16 17.04')
-    expect(container.querySelectorAll('path')).toHaveLength(1)
+    expect(Number(svg.getAttribute('height'))).toBeCloseTo(19.58, 1)
+    expect(svg.getAttribute('viewBox')).toBe('86 76 353 288')
+    expect(container.querySelectorAll('rect, polyline')).toHaveLength(5)
     expect(container.innerHTML).toContain('currentColor')
-    expect(container.innerHTML).not.toContain('M0 0L23.16')
+    expect(container.innerHTML).not.toContain('#')
+  })
+
+  it('keeps the mark ratio at every requested size', () => {
+    const { container } = render(<primitives.ForgeLogo size={34} />)
+    const svg = container.querySelector('svg')!
+    expect(svg.getAttribute('width')).toBe('34')
+    expect(Number(svg.getAttribute('height'))).toBeCloseTo(27.74, 1)
   })
 })
 
-describe('BrandWordmark', () => {
-  it('can render the name artwork with or without its leading mark', () => {
-    const view = render(<primitives.BrandWordmark />)
-    const svg = view.container.querySelector('svg')!
-    expect(svg.getAttribute('width')).toBe('182')
-    expect(svg.getAttribute('viewBox')).toBe('0 0 182 24')
-
-    view.rerender(<primitives.BrandWordmark includeMark={false} />)
-    expect(svg.getAttribute('width')).toBe('156')
-    expect(svg.getAttribute('viewBox')).toBe('26 0 156 24')
+describe('ForgeWordmark', () => {
+  it('spells the product name in the brand font inside its 3:1 box', () => {
+    const { container } = render(<primitives.ForgeWordmark />)
+    const svg = container.querySelector('svg')!
+    expect(svg.getAttribute('width')).toBe('72')
+    expect(svg.getAttribute('height')).toBe('24')
+    expect(svg.getAttribute('viewBox')).toBe('0 0 72 24')
+    const text = container.querySelector('text')!
+    expect(text.textContent).toBe('FORGE')
+    expect(text.getAttribute('textLength')).toBe('72')
+    expect(text.getAttribute('font-family')).toBe('var(--dsw-font-family-brand)')
   })
 })

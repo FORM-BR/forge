@@ -85,6 +85,12 @@
       "path": "../settings-controller"
     },
     {
+      "path": "../costs-controller"
+    },
+    {
+      "path": "../cost-report"
+    },
+    {
       "path": "../workspace-controller/tsconfig.client.json"
     },
     {

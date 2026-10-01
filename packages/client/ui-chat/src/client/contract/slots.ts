@@ -118,10 +118,18 @@ export interface ChatFileMentions {
   forClosing(owner: TurnTailOwnerProps, sessionId: SessionId): MarkdownFileMentions | undefined
 }
 
+/** Optional navigation into the global Costs report panel, provided by its plugin. */
+export interface CostReportNavigation {
+  /** Open the Costs report panel without changing the current Session. */
+  open(): void
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     /** Optional prose file-mention provider. */
     chatFileMentions: ChatFileMentions
+    /** Optional navigation into the global Costs report panel. */
+    costReportNavigation: CostReportNavigation
   }
 }
 
@@ -226,6 +234,8 @@ export interface PerformanceUsageInjected {
     /** Accepted performance and usage detail preference. */
     performanceUsage: ObservableSnapshot<PerformanceUsageMode>
   }
+  /** Open the global Costs report panel; absent while no cost-report plugin provides navigation. */
+  openCostReport?: () => void
 }
 
 /** Business callbacks injected into the Chat view. */
