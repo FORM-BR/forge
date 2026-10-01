@@ -17,7 +17,7 @@ import type { ILayout, PanelInfo } from '@deepseek-ai/dsh-client-ui-layout/clien
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { TestRemote, usePinnedBrowserLanguages } from '@deepseek-ai/dsh-client-test-runtime'
-import type { CostReportFilter, CostReportGroup, CostReportModelRow, CostReportRow } from '@deepseek-ai/dsh-api-cost-report/types'
+import type { CostReportFilter, CostReportGroup, CostReportModelRow, CostReportRow, UsdBrlRate } from '@deepseek-ai/dsh-api-cost-report/types'
 import { apply as hostApply } from '../src/index.ts'
 import { apply, inject, NS, PANEL_ID } from '../src/client/index.ts'
 import { CostReportPanelIcon } from '../src/client/CostReportPanelIcon.tsx'
@@ -51,12 +51,13 @@ async function bench() {
   const report = vi.fn<() => Promise<{ ok: boolean; value?: readonly CostReportRow[]; error?: { code: string; message: string } }>>()
   const workspaces = vi.fn<() => Promise<{ ok: boolean; value?: readonly string[]; error?: { code: string; message: string } }>>()
   const models = vi.fn<() => Promise<{ ok: boolean; value?: readonly CostReportModelRow[]; error?: { code: string; message: string } }>>()
-  const remote = new TestRemote(ctx, { costReport: { report, workspaces, models } })
+  const usdBrlRates = vi.fn<() => Promise<{ ok: boolean; value?: readonly UsdBrlRate[]; error?: { code: string; message: string } }>>()
+  const remote = new TestRemote(ctx, { costReport: { report, workspaces, models, usdBrlRates } })
   const panelInfo = createSnapshotStore<PanelInfo>({ activePanelId: null })
   const selectPanel = vi.fn<ILayout['selectPanel']>((activePanelId) => { panelInfo.set({ activePanelId }) })
   ctx.provide('layout', { panelInfo, selectPanel, beginNavigation: () => new AbortController().signal,
     toggleSidebar: vi.fn(), openRightbar: vi.fn(), closeRightbar: vi.fn() })
-  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, report, workspaces, models, remote, selectPanel, panelInfo }
+  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, report, workspaces, models, usdBrlRates, remote, selectPanel, panelInfo }
 }
 
 /** Declare the shell slots the plugin contributes into, removed on return. */
@@ -87,7 +88,7 @@ describe('ui-cost-report browser plugin', () => {
     expect(entry.locale).toBe(NS)
     // The panel store starts with an open range and no toggles.
     assert(entry.store && 'create' in entry.store)
-    expect(entry.store.create().getSnapshot()).toEqual({ fromDay: '', toDay: '', cwd: null, model: null })
+    expect(entry.store.create().getSnapshot()).toEqual({ fromDay: '', toDay: '', cwd: null, model: null, currency: 'USD' })
     const icon = b.slots.entries('sidebar.panellist')[0]!
     expect(icon.component).toBe(CostReportPanelIcon)
     expect(icon.options).toMatchObject({ id: PANEL_ID, order: 1 })
@@ -146,6 +147,10 @@ describe('ui-cost-report browser plugin', () => {
     expect(b.report).toHaveBeenCalledWith({ group: 'day', filter })
     await expect(face.workspaces()).resolves.toEqual(['/w1'])
     await expect(face.models()).resolves.toEqual([{ provider: 'openrouter', model: 'openai/gpt-4o' }])
+    const rate = { day: '2026-09-28', rate: 5.3, bulletinDay: '2026-09-26' }
+    b.usdBrlRates.mockResolvedValueOnce({ ok: true, value: [rate] })
+    await expect(face.usdBrlRates('2026-09-28', '2026-09-28')).resolves.toEqual([rate])
+    expect(b.usdBrlRates).toHaveBeenCalledWith({ fromDay: '2026-09-28', toDay: '2026-09-28' })
     await fiber.dispose()
   })
 

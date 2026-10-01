@@ -5,12 +5,16 @@
  */
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-store'
 
-/** The panel's inclusive day range and workspace/model toggles. */
+/** Display currency of the panel's amounts; BRL converts at each day's PTAX. */
+export type CostReportCurrency = 'USD' | 'BRL'
+
+/** The panel's inclusive day range, workspace/model toggles, and display currency. */
 export type CostReportFilters = {
   fromDay: string
   toDay: string
   cwd: string | null
   model: string | null
+  currency: CostReportCurrency
 }
 
 type CostReportActions = {
@@ -20,6 +24,8 @@ type CostReportActions = {
   setCwd: (draft: CostReportFilters, cwd: string | null) => void
   /** Select or clear the model filter. */
   setModel: (draft: CostReportFilters, model: string | null) => void
+  /** Switch the display currency. */
+  setCurrency: (draft: CostReportFilters, currency: CostReportCurrency) => void
 }
 
 /**
@@ -28,7 +34,7 @@ type CostReportActions = {
  */
 export function createCostReportStore(): EngineStoreHandle<CostReportFilters, CostReportActions> {
   return defineStore({
-    init: (): CostReportFilters => ({ fromDay: '', toDay: '', cwd: null, model: null }),
+    init: (): CostReportFilters => ({ fromDay: '', toDay: '', cwd: null, model: null, currency: 'USD' }),
     actions: {
       setRange: (draft, fromDay, toDay) => {
         draft.fromDay = fromDay
@@ -36,6 +42,7 @@ export function createCostReportStore(): EngineStoreHandle<CostReportFilters, Co
       },
       setCwd: (draft, cwd) => { draft.cwd = cwd },
       setModel: (draft, model) => { draft.model = model },
+      setCurrency: (draft, currency) => { draft.currency = currency },
     },
   })
 }

@@ -39,6 +39,8 @@ export interface CostLedgerRow {
   readonly cacheWriteTokens: number
   /** Session root (header cwd); `undefined` for sessions without one. */
   readonly cwd?: string
+  /** Whether `costUsd` is the provider-billed amount rather than a catalog estimate. */
+  readonly billed?: boolean
 }
 
 /** One aggregation row over the ledger. */
@@ -49,6 +51,8 @@ export interface CostAggregateRow {
   readonly outputTokens: number
   /** Prompt tokens served from the provider cache, disjoint from `inputTokens`. */
   readonly cacheReadTokens: number
+  /** The part of `costUsd` the provider billed; the rest is catalog-estimated. */
+  readonly billedUsd: number
 }
 
 /** Aggregation bucket for {@link CostLedger.report}. */
@@ -85,6 +89,8 @@ export interface CostReportRow {
   readonly outputTokens: number
   /** Prompt tokens served from the provider cache, disjoint from `inputTokens`. */
   readonly cacheReadTokens: number
+  /** The part of `costUsd` the provider billed; the rest is catalog-estimated. */
+  readonly billedUsd: number
 }
 
 /** Local calendar day of an epoch-millisecond timestamp, in the host zone. */
@@ -98,7 +104,7 @@ export function dayOf(time: number): string {
   }).format(new Date(time))
 }
 
-const SCHEMA_VERSION = 2
+const SCHEMA_VERSION = 3
 
 /** The identity column group of a {@link CostReportGroup}. */
 const GROUP_COLUMNS: Record<CostReportGroup, readonly string[]> = {
@@ -148,6 +154,7 @@ export class CostLedger {
         cache_write_tokens INTEGER NOT NULL DEFAULT 0,
         output_tokens INTEGER NOT NULL,
         cwd TEXT,
+        billed INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (session_id, seq)
       ) STRICT
     `)
@@ -157,6 +164,10 @@ export class CostLedger {
     if (!columns.some(column => column.name === 'cwd')) {
       this.db.exec('ALTER TABLE cost_events ADD COLUMN cwd TEXT')
     }
+    // SCHEMA_VERSION 3: rows written before it are catalog estimates.
+    if (!columns.some(column => column.name === 'billed')) {
+      this.db.exec('ALTER TABLE cost_events ADD COLUMN billed INTEGER NOT NULL DEFAULT 0')
+    }
     this.db.exec('CREATE INDEX IF NOT EXISTS cost_events_day ON cost_events (day)')
     this.db.exec('CREATE INDEX IF NOT EXISTS cost_events_model ON cost_events (provider, model)')
     this.db.exec('CREATE INDEX IF NOT EXISTS cost_events_cwd ON cost_events (cwd)')
@@ -164,8 +175,8 @@ export class CostLedger {
     this.upsertStatement = this.db.prepare(`
       INSERT INTO cost_events (
         session_id, seq, day, time, provider, model, cost_usd, unpriced,
-        input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, cwd
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, cwd, billed
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (session_id, seq) DO UPDATE SET
         day = excluded.day,
         time = excluded.time,
@@ -177,7 +188,8 @@ export class CostLedger {
         cache_read_tokens = excluded.cache_read_tokens,
         cache_write_tokens = excluded.cache_write_tokens,
         output_tokens = excluded.output_tokens,
-        cwd = excluded.cwd
+        cwd = excluded.cwd,
+        billed = excluded.billed
     `)
     this.workspacesStatement = this.db.prepare(`
       SELECT DISTINCT cwd FROM cost_events WHERE cwd IS NOT NULL ORDER BY cwd ASC
@@ -203,6 +215,7 @@ export class CostLedger {
       row.cacheWriteTokens,
       row.outputTokens,
       row.cwd ?? null,
+      row.billed === true ? 1 : 0,
     )
   }
 
@@ -243,7 +256,8 @@ export class CostLedger {
       SELECT ${identity.join(', ')},
              SUM(cost_usd) AS cost_usd, COUNT(*) AS attempts,
              SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens,
-             SUM(cache_read_tokens) AS cache_read_tokens${group === 'session' ? SESSION_DETAIL_COLUMNS : ''}
+             SUM(cache_read_tokens) AS cache_read_tokens,
+             SUM(CASE WHEN billed = 1 THEN cost_usd ELSE 0 END) AS billed_usd${group === 'session' ? SESSION_DETAIL_COLUMNS : ''}
       FROM cost_events${where}
       GROUP BY ${identity.join(', ')}
       ORDER BY ${order}
@@ -254,6 +268,7 @@ export class CostLedger {
       inputTokens: Number(raw.input_tokens),
       outputTokens: Number(raw.output_tokens),
       cacheReadTokens: Number(raw.cache_read_tokens),
+      billedUsd: Number(raw.billed_usd),
     })
     const rows = statement.all(...values) as Array<Record<string, unknown>>
     const result = rows.map((raw) => {
@@ -284,6 +299,7 @@ export class CostLedger {
       inputTokens: row.inputTokens,
       outputTokens: row.outputTokens,
       cacheReadTokens: row.cacheReadTokens,
+      billedUsd: row.billedUsd,
     }))
   }
 
@@ -297,6 +313,7 @@ export class CostLedger {
       inputTokens: row.inputTokens,
       outputTokens: row.outputTokens,
       cacheReadTokens: row.cacheReadTokens,
+      billedUsd: row.billedUsd,
     }))
   }
 

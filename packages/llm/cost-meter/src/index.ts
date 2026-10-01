@@ -18,7 +18,7 @@ import type { Session, SessionLogOffset as SessionLogOffsetType } from '@deepsee
 import { SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
 // Type-only: activates the `ctx.sessionProjections` Context declaration.
 import type {} from '@deepseek-ai/dsh-session-projection'
-import { costAttemptOf, costUsageProjectionDefinition, foldCostUsage, initCostUsageState } from './cost-projection.ts'
+import { costAttemptOf, costUsageProjectionDefinition, foldCostUsage, initCostUsageState, isBilledSettlement } from './cost-projection.ts'
 import type { CostUsageState } from './cost-projection.ts'
 import type { CostUsageProjection } from './projection.ts'
 import { CostLedger, dayOf } from './ledger.ts'
@@ -27,6 +27,8 @@ import { backfillOpenRouter } from './backfill.ts'
 import type { PriceLookup } from './rates.ts'
 import { catalogPriceLookup } from './pricing.ts'
 import { composePriceLookup, OpenRouterPriceTable, DEFAULT_PRICE_CACHE_TTL_MS } from './openrouter.ts'
+import { UsdBrlRateTable } from './usd-brl.ts'
+import type { UsdBrlRate } from './usd-brl.ts'
 
 export type * from './projection.ts'
 // Module-edge re-export: forces the emitted index.d.ts to import the
@@ -43,6 +45,9 @@ export type { BackfillOptions, BackfillResult, BackfillRouteTotal, BackfillSettl
 // Ledger runtime face: the backfill upserts into it and consumers read
 // aggregates; also the seam re-exported for host/CLI callers.
 export { CostLedger, dayOf } from './ledger.ts'
+// Daily USD→BRL table (PTAX) behind the report's currency toggle.
+export { UsdBrlRateTable, ptaxPayloadToBulletins } from './usd-brl.ts'
+export type { UsdBrlRate, UsdBrlRateTableOptions } from './usd-brl.ts'
 
 /** Public settings surface; only the ledger location and price cache are configurable. */
 export interface CostMeterConfig {
@@ -114,6 +119,7 @@ export class CostMeter extends Service {
   private readonly price: PriceLookup
   private readonly ledger: CostLedger
   private readonly openRouterPrices: OpenRouterPriceTable
+  private readonly usdBrl = new UsdBrlRateTable()
   private readonly config: CostMeterConfig
 
   constructor(ctx: Context, config: CostMeterConfig = {}) {
@@ -196,6 +202,17 @@ export class CostMeter extends Service {
     return this.ledger.workspaces()
   }
 
+  /**
+   * USD→BRL rate of every calendar day in an inclusive range (PTAX selling
+   * rate of the day, or the latest earlier bulletin).
+   * @param fromDay - first day, YYYY-MM-DD.
+   * @param toDay - last day, YYYY-MM-DD.
+   * @returns one row per day with a known rate, ascending.
+   */
+  usdBrlRates(fromDay: string, toDay: string): Promise<UsdBrlRate[]> {
+    return this.usdBrl.rates(fromDay, toDay)
+  }
+
   /** Routes with settled events, by provider then model. */
   models(): Array<{ provider: string; model: string }> {
     return this.ledger.models()
@@ -270,6 +287,7 @@ export class CostMeter extends Service {
           cacheReadTokens: attempt.cacheReadTokens,
           cacheWriteTokens: attempt.cacheWriteTokens,
           ...(session.header.cwd === undefined ? {} : { cwd: session.header.cwd }),
+          billed: isBilledSettlement(event),
         })
       }
       entry.consumed = SessionLogOffset(entry.consumed + 1)

@@ -14,7 +14,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import { costAttemptOf } from './cost-projection.ts'
+import { costAttemptOf, isBilledSettlement } from './cost-projection.ts'
 import type { CostAttempt } from './cost-projection.ts'
 import { CostLedger, dayOf } from './ledger.ts'
 import type { PriceLookup } from './rates.ts'
@@ -37,6 +37,8 @@ export interface BackfillSettlement {
   readonly cwd?: string
   /** Whether the settlement carries an OpenRouter generation id on the event. */
   readonly hasGenerationId: boolean
+  /** Whether `costUsd` is the provider-billed amount rather than a catalog estimate. */
+  readonly billed: boolean
 }
 
 /** Per-route totals reported by a backfill run. */
@@ -126,6 +128,7 @@ function settlementOf(event: SessionEvent, sessionId: string, cwd: string | unde
     cacheWriteTokens: attempt.cacheWriteTokens,
     ...(cwd === undefined ? {} : { cwd }),
     hasGenerationId: generationIdOf(event) !== undefined,
+    billed: isBilledSettlement(event),
   }
 }
 

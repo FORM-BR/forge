@@ -52,6 +52,8 @@ export interface CostReportRow {
   readonly outputTokens: number
   /** Prompt tokens served from the provider cache, disjoint from `inputTokens`. */
   readonly cacheReadTokens?: number
+  /** The part of `costUsd` the provider billed; the rest is catalog-estimated. */
+  readonly billedUsd?: number
 }
 
 /** Request of {@link CostReportService.report}: the bucket plus scoping. */
@@ -64,4 +66,22 @@ export interface CostReportRequest {
 export interface CostReportModelRow {
   readonly provider: string
   readonly model: string
+}
+
+/** Request of {@link CostReportService.usdBrlRates}: an inclusive day range. */
+export interface UsdBrlRatesRequest {
+  /** First day, YYYY-MM-DD. */
+  readonly fromDay: string
+  /** Last day, YYYY-MM-DD; days after today are clamped to today. */
+  readonly toDay: string
+}
+
+/** One calendar day's USD→BRL rate from the Central Bank of Brazil's PTAX. */
+export interface UsdBrlRate {
+  /** Calendar day, YYYY-MM-DD. */
+  readonly day: string
+  /** BRL per USD: the PTAX selling rate of that day or the latest earlier bulletin. */
+  readonly rate: number
+  /** Business day of the PTAX bulletin the rate comes from. */
+  readonly bulletinDay: string
 }

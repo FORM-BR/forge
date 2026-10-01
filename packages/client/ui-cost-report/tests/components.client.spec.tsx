@@ -7,7 +7,7 @@
 import { createElement } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { CostReportFilter, CostReportModelRow, CostReportRow } from '@deepseek-ai/dsh-api-cost-report/types'
+import type { CostReportFilter, CostReportModelRow, CostReportRow, UsdBrlRate } from '@deepseek-ai/dsh-api-cost-report/types'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import { createCostReportStore } from '../src/client/cost-report-store.ts'
 import { CostReportPage, type CostReportPageProps } from '../src/client/CostReportPage.tsx'
@@ -32,17 +32,20 @@ function renderReport(overrides: {
   report?: (group: string, filter: CostReportFilter) => Promise<readonly CostReportRow[]>
   workspaces?: () => Promise<readonly string[]>
   models?: () => Promise<readonly CostReportModelRow[]>
+  usdBrlRates?: (fromDay: string, toDay: string) => Promise<readonly UsdBrlRate[]>
 } = {}) {
   const instance = createCostReportStore().create()
   const report = overrides.report ?? vi.fn(async () => [DAY_ROW])
   const workspaces = overrides.workspaces ?? vi.fn(async () => ['/w1'])
   const models = overrides.models ?? vi.fn(async () => [{ provider: 'openrouter', model: 'openai/gpt-4o' }])
+  const usdBrlRates = overrides.usdBrlRates ?? vi.fn(async () => [])
   const props: CostReportPageProps = {
     useStore: bindSnapshotSelector(instance),
     actions: instance.actions,
     report: report as CostReportPageProps['report'],
     workspaces: workspaces as CostReportPageProps['workspaces'],
     models: models as CostReportPageProps['models'],
+    usdBrlRates: usdBrlRates as CostReportPageProps['usdBrlRates'],
     t,
     usePanelInfo: unusedStandardHook,
     useSessions: ((selector: (state: { byId: Record<string, { title?: string }> }) => unknown) =>
@@ -52,7 +55,7 @@ function renderReport(overrides: {
     useWorkspaces: unusedStandardHook,
     useResource: unusedStandardHook,
   }
-  return { view: render(createElement(CostReportPage, props)), props, instance, report, workspaces, models }
+  return { view: render(createElement(CostReportPage, props)), props, instance, report, workspaces, models, usdBrlRates }
 }
 
 describe('CostReportPage', () => {
@@ -318,6 +321,45 @@ describe('CostReportPage', () => {
     fireEvent.click(screen.getByRole('button', { name: en.retry }))
     expect(await screen.findByRole('button', { name: 'openai/gpt-4o' })).toBeTruthy()
     expect(models).toHaveBeenCalledTimes(2)
+    view.unmount()
+  })
+  it('converts every amount to BRL at the rate of its day without re-reading the ledger', async () => {
+    const report = vi.fn(async (group: string) => (group === 'day'
+      ? [DAY_ROW, { ...DAY_ROW, day: '2026-09-29', costUsd: 1 }]
+      : group === 'model'
+        ? [{ provider: 'openrouter', model: 'openai/gpt-4o', costUsd: 1.5, attempts: 4, inputTokens: 200, outputTokens: 100 }]
+        : []))
+    const usdBrlRates = vi.fn(async () => [
+      { day: '2026-09-28', rate: 5, bulletinDay: '2026-09-26' },
+      { day: '2026-09-29', rate: 6, bulletinDay: '2026-09-29' },
+    ])
+    const { view } = renderReport({ report: report as never, usdBrlRates })
+    expect(await screen.findByText(en.total)).toBeTruthy()
+    expect(screen.getAllByText('$1.50').length).toBeGreaterThan(0)
+    const reads = report.mock.calls.length
+    fireEvent.click(screen.getByRole('button', { name: 'BRL' }))
+    expect(await screen.findByText(en.fxNote)).toBeTruthy()
+    expect(usdBrlRates).toHaveBeenCalledWith('2026-09-28', '2026-09-29')
+    // 0.5 × 5 + 1 × 6 = 8.50; the model bucket takes the same weighted rate.
+    expect(screen.getAllByText(/R\$\s8,50/).length).toBeGreaterThanOrEqual(2)
+    expect(report.mock.calls.length).toBe(reads)
+    view.unmount()
+  })
+
+  it('keeps USD amounts and says so when the exchange rates are unavailable', async () => {
+    const usdBrlRates = vi.fn(async () => { throw new Error('offline') })
+    const { view } = renderReport({ usdBrlRates })
+    expect(await screen.findByText(en.total)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'BRL' }))
+    expect(await screen.findByText(en.fxUnavailable)).toBeTruthy()
+    expect(screen.getAllByText('$0.50').length).toBeGreaterThan(0)
+    view.unmount()
+  })
+
+  it('states when the amounts are what the provider billed', async () => {
+    const report = vi.fn(async (group: string) => (group === 'day' ? [{ ...DAY_ROW, billedUsd: 0.5 }] : []))
+    const { view } = renderReport({ report: report as never })
+    expect(await screen.findByText(en.billedAll)).toBeTruthy()
     view.unmount()
   })
 })

@@ -35,7 +35,7 @@ index 67f9341a6f7d855dce25054fd48cd9077e8e04a1..afdb5c2c873abb72ca8011b7e3f06a23
                  type: "toolcall_delta",
                  contentIndex: toolBlocksByKey.get(key),
 diff --git a/dist/api/openai-completions.js b/dist/api/openai-completions.js
-index 48464f2bf56b9369d5c202e4f02fc4f13d35b412..d829f5e8e56e788d96fa7a82c0e3cfaef3fc1f63 100644
+index 48464f2bf56b9369d5c202e4f02fc4f13d35b412..28c1f5e8401106ea7268e1affb61dfebce0729cb 100644
 --- a/dist/api/openai-completions.js
 +++ b/dist/api/openai-completions.js
 @@ -453,7 +453,6 @@ export const stream = (model, context, options) => {
@@ -46,6 +46,18 @@ index 48464f2bf56b9369d5c202e4f02fc4f13d35b412..d829f5e8e56e788d96fa7a82c0e3cfae
                              }
                              else if (toolCall.custom?.input) {
                                  const nextInput = getCustomToolCallInput(block) + toolCall.custom.input;
+@@ -1203,6 +1202,11 @@ function parseChunkUsage(rawUsage, model) {
+         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+     };
+     calculateCost(model, usage);
++    // dsh: keep the provider-billed USD (OpenRouter reports it as `usage.cost`)
++    // so the harness records what was charged instead of re-estimating it.
++    if (typeof rawUsage.cost === "number" && Number.isFinite(rawUsage.cost) && rawUsage.cost >= 0) {
++        usage.billedCost = rawUsage.cost;
++    }
+     return usage;
+ }
+ function mapStopReason(reason) {
 diff --git a/dist/api/openai-responses-shared.js b/dist/api/openai-responses-shared.js
 index 43e463dbfd1e6cc437ebc680468036f47678de26..f4259772e289c326697ea7f2ece25954bfb5a520 100644
 --- a/dist/api/openai-responses-shared.js
@@ -71,3 +83,19 @@ index 5b9cb1680c47083a9a36eefa93124c67c750fd42..dc5a43ebd801fa6d4b7897c3739b588d
                  break;
              }
              case "toolcall_end":
+diff --git a/dist/types.d.ts b/dist/types.d.ts
+index f61c9ea00420e71de3957d7436e5889a9a41557f..f4eeb81224183fc2447d0038c313e88b990edda8 100644
+--- a/dist/types.d.ts
++++ b/dist/types.d.ts
+@@ -276,6 +276,11 @@ export interface Usage {
+      */
+     reasoning?: number;
+     totalTokens: number;
++    /**
++     * Provider-billed USD for this call, when the provider reports it in the
++     * usage payload (OpenRouter `usage.cost`). dsh patch.
++     */
++    billedCost?: number;
+     cost: {
+         input: number;
+         output: number;

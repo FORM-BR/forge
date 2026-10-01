@@ -1,8 +1,8 @@
 /**
  * Host Remote owner for the global cost report: ledger aggregates by day,
  * workspace (cwd), provider/model route, and session — plus the workspace and
- * route catalogs the panel's filters read — over the generated `costReport`
- * namespace. All reads are projections of the SQLite ledger the cost meter
+ * route catalogs the panel's filters read and the daily USD→BRL rates of its
+ * currency toggle — over the generated `costReport` namespace. All reads are projections of the SQLite ledger the cost meter
  * maintains, so they survive restarts and never measure on demand.
  *
  * @module @deepseek-ai/dsh-api-cost-report
@@ -11,7 +11,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import type { CostMeter } from '@deepseek-ai/dsh-cost-meter'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
-import type { CostReportModelRow, CostReportRequest, CostReportRow } from './types.ts'
+import type { CostReportModelRow, CostReportRequest, CostReportRow, UsdBrlRate, UsdBrlRatesRequest } from './types.ts'
 
 export type * from './types.ts'
 
@@ -65,6 +65,19 @@ export class CostReportService extends TypertRemoteService {
   @Remote
   models(): CostReportModelRow[] {
     return this.meter().models()
+  }
+
+  /**
+   * USD→BRL rate of every calendar day in a range, from the Central Bank of
+   * Brazil's PTAX bulletins (cached on disk by the cost meter).
+   * @param request - inclusive day range.
+   * @returns one row per day with a known rate, ascending; empty offline
+   *   before the first successful fetch.
+   * @throws RemoteError when no cost meter is mounted.
+   */
+  @Remote
+  async usdBrlRates(request: UsdBrlRatesRequest): Promise<UsdBrlRate[]> {
+    return await this.meter().usdBrlRates(request.fromDay, request.toDay)
   }
 
   /** Resolve the optional cost meter or report how to supply it. */
