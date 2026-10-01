@@ -65,6 +65,11 @@ export function apply(ctx: Context): void {
       if (!result.ok) throw new Error(`costReport.models failed: ${result.error.code}: ${result.error.message}`)
       return result.value
     },
+    usdBrlRates: async (fromDay, toDay) => {
+      const result = await ctx.remote.costReport.usdBrlRates({ fromDay, toDay })
+      if (!result.ok) throw new Error(`costReport.usdBrlRates failed: ${result.error.code}: ${result.error.message}`)
+      return result.value
+    },
   })
   ctx.slots.inject('main', function* () {
     const handle = createCostReportStore(), instance = handle.create()

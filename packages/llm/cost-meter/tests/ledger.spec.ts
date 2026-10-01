@@ -16,7 +16,7 @@ function row(overrides: Partial<CostLedgerRow> & Pick<CostLedgerRow, 'sessionId'
     unpriced: false,
     inputTokens: 1000,
     outputTokens: 100,
-    cacheReadTokens: 0, billedUsd: 0,
+    cacheReadTokens: 0,
     cacheWriteTokens: 0,
     ...overrides,
   }

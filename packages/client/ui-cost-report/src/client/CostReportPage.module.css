@@ -1,6 +1,7 @@
 .root { --cr-accent: var(--dsw-alias-state-business-primary); --cr-line: var(--dsw-alias-border-l2); --cr-surface: color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent); display: flex; flex: 1; flex-direction: column; box-sizing: border-box; height: 100%; min-height: 0; gap: 16px; padding: 18px 24px 28px; overflow: auto; color: var(--dsw-alias-label-primary); font-size: 13px; }
 .root > * { flex-shrink: 0; }
 .header { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.titleRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
 .heading { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.2; }
 .footnote { margin: 0; font-size: 11px; line-height: 1.5; color: var(--dsw-alias-label-tertiary); }
 
