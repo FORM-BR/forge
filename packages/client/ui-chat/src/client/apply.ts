@@ -284,7 +284,15 @@ export function apply(ctx: Context): void {
   ctx.slots.inject('conversation.composer.dock', () =>
     ctx.slots.register({
       name: 'conversation.composer.dock', id: 'stats', order: 0, locale: NS,
-      inject: () => ({ hooks: { performanceUsage } }),
+      // The costs report panel owns the shortcut: resolved per mount, so
+      // composing the plugin out removes the dock's link with it.
+      inject: () => {
+        const navigation = ctx.get('costReportNavigation')
+        return {
+          hooks: { performanceUsage },
+          ...(navigation === undefined ? {} : { openCostReport: () => navigation.open() }),
+        }
+      },
     }, StatsPills))
 
   ctx.slots.inject('conversation.approval.detail', () =>

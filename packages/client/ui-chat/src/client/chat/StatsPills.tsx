@@ -4,14 +4,19 @@
 // Mounted on 'conversation.composer.dock' so it sticks with the composer in the
 // active conversation scrollport (see ConversationRoot data-conversation-scroll).
 
-import { memo, useMemo, useState } from 'react'
+import { Fragment, memo, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { IconDatabaseOutlineRegular, IconGaugeOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import {
+  IconDataOutlineRegular, IconDatabaseOutlineRegular, IconGaugeOutlineRegular,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import type { UseProjection } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { InjectFace, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: merges the sessionStats key into SessionProjectionMap for useProjection.
 import type {} from '@deepseek-ai/dsh-session-stats/client'
 import type { TokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
+// Type-only: the import loads projection.ts, whose augmentation adds the
+// costUsage key to SessionProjectionMap, and supplies CostUsageProjection.
+import type { CostUsageProjection } from '@deepseek-ai/dsh-cost-meter/client'
 import type { ChatViewSlotProps, PerformanceUsageInjected } from '../contract/slots.ts'
 import type { ChatSnapshot } from '../contract/snapshot.ts'
 import { formatTokensPerSecond } from './message-chrome.ts'
@@ -133,6 +138,18 @@ function exactCount(value: number, t: ChatViewSlotProps['t']): string {
 
 /** External open state one pill's dialog reads and writes (the row's exclusive slot). */
 type PillDialog = Pick<ReturnType<typeof useStatDialog>, 'open' | 'setOpen'>
+
+/** Fixed en-US USD currency formatting; costs are always USD-denominated. */
+const usdFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
+
+/**
+ * Display-ready USD reading for a catalog-priced cost total.
+ * @param usd - cost in US dollars.
+ * @returns currency-formatted text, e.g. `$0.42`.
+ */
+export function formatUsd(usd: number): string {
+  return usdFormatter.format(usd)
+}
 
 function TimePill({ stats, t, dialog }: {
   stats: WindowStats
@@ -313,12 +330,82 @@ function UsagePill({ usage, t, dialog }: {
   )
 }
 
-export const StatsPills = memo(function StatsPills({ useChat, useProjection, usePerformanceUsage, t }: StatsPillsProps) {
+function CostPill({ cost, t, dialog, openCostReport }: {
+  cost: CostUsageProjection
+  t: ChatViewSlotProps['t']
+  dialog: PillDialog
+  /** Open the global Costs report panel; the dock only provides it while the report plugin is composed. */
+  openCostReport?: () => void
+}) {
+  const { open, setOpen, rootRef, panelRef, pos } = useStatDialog(dialog)
+  const totalText = formatUsd(cost.totalCostUsd)
+  return (
+    <span ref={rootRef} className={css.anchor}>
+      <button
+        type="button"
+        className={css.pill}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label={t('stats.dialog.costTitle')}
+        onClick={() => { setOpen(!open) }}
+      >
+        <IconDataOutlineRegular />
+        <span className={css.label}>{totalText}</span>
+      </button>
+      {open && createPortal(
+        <div
+          ref={panelRef}
+          className={dialogCss.panel}
+          role="dialog"
+          aria-label={t('stats.dialog.costTitle')}
+          style={pos ?? MEASURE_STYLE}
+        >
+          <div className={dialogCss.title}>
+            <span className={dialogCss.titleLabel}>
+              <IconDataOutlineRegular />
+              {t('stats.dialog.costTitle')}
+            </span>
+            <span className={dialogCss.titleValue}>{totalText}</span>
+          </div>
+          <div className={dialogCss.titleRule} aria-hidden />
+          <dl className={dialogCss.details} data-session-stats-cost>
+            {cost.byModel.map(row => (
+              <Fragment key={`${row.provider}/${row.model}`}>
+                <dt className={dialogCss.route}>{`${row.provider}/${row.model}`}</dt>
+                <dd>{formatUsd(row.costUsd)}</dd>
+              </Fragment>
+            ))}
+            {cost.unpricedAttempts > 0 && (
+              <>
+                <dt>{t('stats.dialog.unpriced')}</dt>
+                <dd>{cost.unpricedAttempts}</dd>
+              </>
+            )}
+          </dl>
+          {openCostReport !== undefined && (
+            <button
+              type="button"
+              className={dialogCss.report}
+              onClick={() => { setOpen(false); openCostReport() }}
+            >
+              {t('stats.dialog.report')}
+            </button>
+          )}
+        </div>,
+        document.body,
+      )}
+    </span>
+  )
+}
+
+export const StatsPills = memo(function StatsPills({ useChat, useProjection, usePerformanceUsage, t, openCostReport }: StatsPillsProps) {
   const mode = usePerformanceUsage(value => value)
   const settledNodes = useChat(s => s.legacy.nodes)
   const usage = useProjection('tokenUsage')
-  // One exclusive slot for both dialogs: opening either pill closes the other.
-  const [openPill, setOpenPill] = useState<'time' | 'usage' | null>(null)
+  const cost = useProjection('costUsage')
+  // One exclusive slot for the time, usage, and cost dialogs: opening any pill
+  // closes the others.
+  const [openPill, setOpenPill] = useState<'time' | 'usage' | 'cost' | null>(null)
   // Every figure rides the durable sessionStats projection, so paging and
   // compaction cannot change any of them; an assembly without the unit falls
   // back to the window-scoped fold wholesale (same field names), paid only
@@ -329,22 +416,26 @@ export const StatsPills = memo(function StatsPills({ useChat, useProjection, use
   // billing (e.g. every request failed) shows its counts without a usage pill.
   const hasTokens = usage !== undefined
     && (billedInputTokens(usage) > 0 || usage.outputTokens > 0)
+  // Gated on settled billing attempts: a session with priced or unpriced
+  // settlements shows the cost pill; a unit-free assembly omits it.
+  const hasCost = cost !== undefined && cost.attempts > 0
   if (mode === 'compact') {
     const speed = stats.decodeMs > 0
       ? t('message.tokensPerSecond', { tps: formatTokensPerSecond(stats.decodeTokens / (stats.decodeMs / 1_000)) })
       : null
     const cacheHit = hasTokens ? cacheHitPercent(usage) : null
-    if (speed === null && cacheHit === null) return null
+    if (speed === null && cacheHit === null && !hasCost) return null
     return (
       <div className={css.root} data-composer-stats>
         {speed !== null && <span className={css.pill}><IconGaugeOutlineRegular />{speed}</span>}
         {cacheHit !== null && (
           <span className={css.pill}><IconDatabaseOutlineRegular />{t('stats.cacheHit', { percent: cacheHit })}</span>
         )}
+        {hasCost && <span className={css.pill}><IconDataOutlineRegular />{formatUsd(cost.totalCostUsd)}</span>}
       </div>
     )
   }
-  if (stats.steps === 0 && !hasTokens) return null
+  if (stats.steps === 0 && !hasTokens && !hasCost) return null
   return (
     <div className={css.root} data-composer-stats>
       {stats.steps > 0 && (
@@ -364,6 +455,17 @@ export const StatsPills = memo(function StatsPills({ useChat, useProjection, use
           dialog={{
             open: openPill === 'usage',
             setOpen: (open) => { setOpenPill(open ? 'usage' : null) },
+          }}
+        />
+      )}
+      {hasCost && (
+        <CostPill
+          cost={cost}
+          t={t}
+          {...(openCostReport === undefined ? {} : { openCostReport })}
+          dialog={{
+            open: openPill === 'cost',
+            setOpen: (open) => { setOpenPill(open ? 'cost' : null) },
           }}
         />
       )}

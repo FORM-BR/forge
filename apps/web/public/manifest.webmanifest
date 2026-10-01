@@ -1,6 +1,6 @@
 {
-  "name": "DeepSeek Harness",
-  "short_name": "DSH",
+  "name": "FORGE",
+  "short_name": "FORGE",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",

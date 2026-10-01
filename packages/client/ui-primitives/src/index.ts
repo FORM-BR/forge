@@ -40,9 +40,8 @@ export { RiskConfirmation } from './RiskConfirmation.tsx'
 export type { RiskConfirmationProps } from './RiskConfirmation.tsx'
 export { ConnectionIndicator } from './ConnectionIndicator.tsx'
 export type { ConnectionIndicatorState } from './ConnectionIndicator.tsx'
-export { FishLogo, FISH_LOGO_PATH, FISH_LOGO_VIEWBOX } from './FishLogo.tsx'
-export { BrandWordmark } from './BrandWordmark.tsx'
-export type { BrandWordmarkProps } from './BrandWordmark.tsx'
+export { ForgeLogo, FORGE_LOGO_VIEWBOX } from './ForgeLogo.tsx'
+export { ForgeWordmark, FORGE_WORDMARK_VIEWBOX } from './ForgeWordmark.tsx'
 export {
   PermissionIconFullAccessMedium, PermissionIconFullAccessRegular,
   PermissionIconReadOnlyMedium, PermissionIconReadOnlyRegular,

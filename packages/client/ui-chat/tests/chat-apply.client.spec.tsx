@@ -37,7 +37,7 @@ usePinnedBrowserLanguages('zh-CN')
 
 const SID = 'session-1' as SessionId
 
-async function bench() {
+async function bench(withShortcut = false) {
   const runtime = await SlotTestRuntime.create()
   const chatSettings = stubConfigForm<ChatSettings>()
   runtime.ctx.provide('configForms', {
@@ -79,10 +79,16 @@ async function bench() {
     apply: applyConversation,
   })
   const provide = vi.spyOn(runtime.ctx.uiSession, 'provide')
+  // The cost-report plugin is not composed in this bench; a caller may opt in
+  // to assert the composer dock wires the panel shortcut only while it is.
+  const openCostReport = vi.fn()
+  if (withShortcut) {
+    runtime.ctx.provide('costReportNavigation', { open: openCostReport } as never)
+  }
   const chat = await runtime.mount({ inject: [...injectChat], apply: applyChat })
   const sourceDescriptor = provide.mock.calls[0]?.[0]
   if (sourceDescriptor === undefined) throw new Error('ui-chat did not provide its standard source')
-  return { runtime, conversation, chat, chatSettings, sourceDescriptor }
+  return { runtime, conversation, chat, chatSettings, sourceDescriptor, openCostReport }
 }
 
 function storeOf(runtime: SlotTestRuntime, key: 'conversation.session' | 'conversation.session.header' | 'conversation.view') {
@@ -175,6 +181,23 @@ describe('Chat apply wiring', () => {
       expect(injected.hooks.performanceUsage).toBe(face.hooks.performanceUsage)
     }
     await b.runtime.dispose()
+  })
+
+  it('wires the costs report shortcut into the composer dock only while the report plugin is composed', async () => {
+    const plain = await bench()
+    const stats = plain.runtime.slots.entries('conversation.composer.dock').find(entry => entry.options.id === 'stats')!
+    const plainFace = (stats.inject as () => { openCostReport?: () => void })()
+    expect(plainFace.openCostReport).toBeUndefined()
+    const b = await bench(true)
+    try {
+      const dock = b.runtime.slots.entries('conversation.composer.dock').find(entry => entry.options.id === 'stats')!
+      const face = (dock.inject as () => { openCostReport: () => void })()
+      face.openCostReport()
+      expect(b.openCostReport).toHaveBeenCalledTimes(1)
+    } finally {
+      await b.runtime.dispose()
+      await plain.runtime.dispose()
+    }
   })
 
   it('shares one Chat store while keeping it distinct from Conversation state', async () => {

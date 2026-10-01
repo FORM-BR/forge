@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/client/ui-cost-report/README.md
+/:
+  en: b5e4355433d402c0
+  zh: 637d68ad3174f291
+/deepseek-ai-dsh-client-ui-cost-report:
+  en: 54235cb3742be1af
+  zh: 62792d0040343a20
+/deepseek-ai-dsh-client-ui-cost-report/summary:
+  en: dd4b5d305857059a
+  zh: 1948ddb0f72db41b
+/deepseek-ai-dsh-client-ui-cost-report/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 09388d293f9be9cb
+/deepseek-ai-dsh-client-ui-cost-report/use-this-package:
+  en: baa0f951924fdad5
+  zh: bac27bb9fc10013c
+/deepseek-ai-dsh-client-ui-cost-report/use-this-package/panel-entry:
+  en: 0bb9ca2f46cc3ab7
+  zh: 92696676d194463f
+/deepseek-ai-dsh-client-ui-cost-report/use-this-package/filters-and-drill-down:
+  en: 74fd7ea97467da8b
+  zh: afd28f0b6895fe86
+/deepseek-ai-dsh-client-ui-cost-report/use-this-package/opening-from-the-chat-cost-pill:
+  en: 7f3feeb1d8b40eb3
+  zh: 9e5fb0aa60eee434
+/deepseek-ai-dsh-client-ui-cost-report/understand-the-implementation:
+  en: ac2b1355df14abba
+  zh: 43f337118418412c
+/deepseek-ai-dsh-client-ui-cost-report/further-exploration:
+  en: 18e2398e5e016cbc
+  zh: 5f09d0158aa22495
+/deepseek-ai-dsh-client-ui-cost-report/model-experience:
+  en: ac5aa1bbc3dc036f
+  zh: a8fcd3de5de64d34
+/deepseek-ai-dsh-client-ui-cost-report/model-experience/kv-cache-effect:
+  en: 55abc39646719521
+  zh: 4638a10fc47537c1
+/deepseek-ai-dsh-client-ui-cost-report/known-limitations-and-deferred-work:
+  en: b810782aaa924384
+  zh: a658452f9a263a0e
+/deepseek-ai-dsh-client-ui-cost-report/known-limitations-and-deferred-work/dev-note:
+  en: 8b33b0537701d250
+  zh: 4756d6cf642ac79d

@@ -10,11 +10,14 @@ import type {} from '@deepseek-ai/dsh-config-editor'
 import type {} from '@deepseek-ai/dsh-app-boot'
 import { redactSecrets, type RedactedSecret } from './redact.ts'
 import { isVolatilePath, plainConfig, projectForm, volatileForm } from './schema.ts'
+import { LegacySettings, type LegacyDescriptor, type SettingsRegisterOptions, type SettingsScope } from './legacy.ts'
 import type { SettingsNamespace } from './types.ts'
 
 export { redactSecrets } from './redact.ts'
 export type { RedactedSecret, RedactedValue } from './redact.ts'
 export type { SettingsNamespace } from './types.ts'
+export { settingsNamespace } from './legacy.ts'
+export type { SettingsRegisterOptions, SettingsScope } from './legacy.ts'
 
 /** One Loader entry's live Config fields. */
 export interface SettingsDescriptor {
@@ -226,6 +229,7 @@ export class SettingsForms extends Service {
   private closed = false
   private scheduled = false
   private readonly presentations = new Map<Fiber, { auto?: boolean }>()
+  private legacyRegistry: LegacySettings | undefined
 
   constructor(private readonly ownerContext: Context) {
     super(ownerContext, 'settings')
@@ -255,6 +259,27 @@ export class SettingsForms extends Service {
       }
     }
     this.ownerContext.logger.info('settings: imported %s into profile %s', imported, profile.name)
+  }
+
+  private get legacy(): LegacySettings {
+    return this.legacyRegistry ??= new LegacySettings(
+      join(this.ownerContext.profileContext.home, 'legacy-settings'),
+      (ns, revision) => { this.ownerContext.emit('settings/document-updated', ns, revision) },
+      (error) => { this.ownerContext.logger.warn(error) },
+    )
+  }
+
+  /** Compatibility for 0.1.x plugins: register a namespace outside the entry-config model.
+   * Prefer volatile Config fields in new plugins. The section is stored under `<profile>/legacy-settings`.
+   * @param ns Lowercase hyphenated namespace.
+   * @param schema Schemastery schema resolving the namespace.
+   * @param options Composition `base` layer and optional validation.
+   * @returns Scope for reads, observation and updates; unregistered with the calling plugin's fiber.
+   */
+  register<T>(ns: string, schema: z<T>, options?: SettingsRegisterOptions<T>): SettingsScope<T> {
+    const { scope, dispose } = this.legacy.register(ns, schema, options)
+    this.ctx.effect(() => dispose, `settings.register(${JSON.stringify(ns)})`)
+    return scope
   }
 
   /** Register the calling plugin instance's page policy without changing its Config.
@@ -336,7 +361,11 @@ export class SettingsForms extends Service {
       this.revisions.set(id, { ...previous, raw: undefined, revision })
       this.ownerContext.emit('settings/document-updated', previous.ns, revision)
     }
-    return descriptors
+    return [...descriptors, ...this.legacyDescriptors(options)]
+  }
+
+  private legacyDescriptors(options?: SettingsDescribeOptions): LegacyDescriptor[] {
+    return this.legacyRegistry?.describe(options) ?? []
   }
 
   /** Merge editable fields into an entry's config.
@@ -345,6 +374,7 @@ export class SettingsForms extends Service {
    * @param expectedRevision Revision returned by describe.
    */
   async update(ns: string, patch: object, expectedRevision?: number): Promise<void> {
+    if (this.legacyRegistry?.has(ns)) { await this.legacyRegistry.update(ns, patch, expectedRevision); return }
     const input = cloneJsonShaped(patch)
     await this.write(ns, current => mergeLayers(current, input) as Record<string, unknown>, expectedRevision)
   }
@@ -355,6 +385,7 @@ export class SettingsForms extends Service {
    * @param expectedRevision Revision returned by describe.
    */
   async replace(ns: string, section: object, expectedRevision?: number): Promise<void> {
+    if (this.legacyRegistry?.has(ns)) { await this.legacyRegistry.replace(ns, section, expectedRevision); return }
     const input = cloneJsonShaped(section)
     await this.write(ns, (_current, base) => mergeLayers(base, input) as Record<string, unknown>, expectedRevision)
   }

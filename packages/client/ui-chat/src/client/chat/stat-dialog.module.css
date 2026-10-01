@@ -93,3 +93,15 @@
   color: var(--dsw-alias-label-tertiary);
   white-space: nowrap;
 }
+
+/* Footer shortcut of the cost dialog: opens the global Costs report panel. */
+.report {
+  margin-top: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--dsw-alias-link);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}

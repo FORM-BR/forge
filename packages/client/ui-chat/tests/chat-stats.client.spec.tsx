@@ -8,7 +8,7 @@ import type {
 import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
-import { StatsPills, deriveStats, formatDuration, type StatsPillsProps } from '../src/client/chat/StatsPills.tsx'
+import { StatsPills, deriveStats, formatDuration, formatUsd, type StatsPillsProps } from '../src/client/chat/StatsPills.tsx'
 import { formatTokens } from '../src/client/chat/token-format.ts'
 import { en, zh } from '../src/client/locale.ts'
 import { chatSnapshotFixture } from './chat-snapshot-fixture.client.ts'
@@ -122,6 +122,12 @@ describe('formatters', () => {
   it('formats durations under and over a minute', () => {
     expect(formatDuration(45_230, tEn)).toBe('45.2s')
     expect(formatDuration(162_000, tEn)).toBe('2m42s')
+  })
+
+  it('formats USD costs as currency with a fixed en-US reading', () => {
+    expect(formatUsd(0.42)).toBe('$0.42')
+    expect(formatUsd(105)).toBe('$105.00')
+    expect(formatUsd(1_234.5)).toBe('$1,234.50')
   })
 })
 
@@ -464,5 +470,98 @@ describe('StatsPills', () => {
     act(() => { set({ partial: { turn: 1, step: 2, blocks: [{ kind: 'text', text: 'a' }] } }) })
     act(() => { set({ partial: { turn: 1, step: 2, blocks: [{ kind: 'text', text: 'ab' }] } }) })
     expect(renders).toBe(before)
+  })
+
+  function costUsage(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      totalCostUsd: 0.42,
+      attempts: 2,
+      unpricedAttempts: 0,
+      byModel: [
+        {
+          provider: 'openrouterv1', model: 'deepseek/deepseek-v4.1-flash', costUsd: 0.4,
+          attempts: 1, inputTokens: 10, outputTokens: 20, cacheReadTokens: 30, cacheWriteTokens: 0,
+        },
+        {
+          provider: 'openrouterv1', model: '~deepseek/deepseek-v4-flash-latest', costUsd: 0.02,
+          attempts: 1, inputTokens: 5, outputTokens: 50, cacheReadTokens: 0, cacheWriteTokens: 0,
+        },
+      ],
+      ...overrides,
+    }
+  }
+
+  it('renders the session cost pill fed by the costUsage projection, most expensive route first', () => {
+    const { source } = makeSource({ nodes: [assistant(1, 1)] })
+    const view = render(<StatsPills {...props(source, { tokenUsage: USAGE, costUsage: costUsage() })} />)
+    expect(view.getByText('$0.42')).toBeTruthy()
+    // The untimed fixture keeps the counts reading static, so the usage and
+    // cost pills are the only buttons.
+    const costPill = view.getAllByRole('button')[1]!
+    expect(costPill.getAttribute('aria-label')).toBe('Session cost')
+
+    fireEvent.click(costPill)
+    const dialog = view.getByRole('dialog')
+    expect(dialog.getAttribute('aria-label')).toBe('Session cost')
+    expect(dialog.parentElement).toBe(document.body)
+    expect(dialog.firstChild?.textContent).toBe('Session cost$0.42')
+    const details = dialog.querySelector('[data-session-stats-cost]') as HTMLElement
+    expect(details).toBeTruthy()
+    expect(details.textContent).toContain('openrouterv1/deepseek/deepseek-v4.1-flash$0.40')
+    expect(details.textContent).toContain('openrouterv1/~deepseek/deepseek-v4-flash-latest$0.02')
+    // Per-model rows replace the shared Token-usage dialog, not stack onto it.
+    expect(dialog.textContent).not.toContain('Token usage')
+    // Without the report plugin composed there is no navigation shortcut.
+    expect(view.queryByRole('button', { name: 'Costs report' })).toBeNull()
+  })
+
+  it('opens the global Costs report from the cost dialog when the panel plugin is composed', () => {
+    const { source } = makeSource({ nodes: [assistant(1, 1)] })
+    const openCostReport = vi.fn()
+    const view = render(<StatsPills {...props(source, { tokenUsage: USAGE, costUsage: costUsage() })}
+      openCostReport={openCostReport} />)
+    const costPill = view.getAllByRole('button')[1]!
+    fireEvent.click(costPill)
+    const report = view.getByRole('button', { name: 'Costs report' })
+    fireEvent.click(report)
+    expect(openCostReport).toHaveBeenCalledTimes(1)
+    // Navigating closes the session dialog.
+    expect(view.queryByRole('dialog')).toBeNull()
+  })
+
+  it('shows a $0.00 cost pill and an unpriced row when no route has a price', () => {
+    const { source } = makeSource({ nodes: [assistant(1, 1)] })
+    const view = render(<StatsPills {...props(source, {
+      tokenUsage: USAGE,
+      costUsage: costUsage({ totalCostUsd: 0, attempts: 3, unpricedAttempts: 3, byModel: [] }),
+    })} />)
+    const costPill = view.getAllByRole('button')[1]!
+    expect(costPill.textContent).toBe('$0.00')
+    fireEvent.click(costPill)
+    expect(view.getByRole('dialog').textContent).toContain('Unpriced3')
+  })
+
+  it('takes the cost pill label from the active locale', () => {
+    const { source } = makeSource({ nodes: [assistant(1, 1)] })
+    const view = render(<StatsPills {...props(source, { tokenUsage: USAGE, costUsage: costUsage() })} t={t} />)
+    const costPill = view.getAllByRole('button')[1]!
+    expect(costPill.textContent).toBe('$0.42')
+    expect(costPill.getAttribute('aria-label')).toBe('会话成本')
+    fireEvent.click(costPill)
+    expect(view.getByRole('dialog').getAttribute('aria-label')).toBe('会话成本')
+  })
+
+  it('compact reads the cost as a plain pill with no interactive dialog', () => {
+    const { source } = makeSource({ nodes: [timedStep()] })
+    const view = render(<StatsPills {...props(source, { tokenUsage: USAGE, costUsage: costUsage() })} usePerformanceUsage={selector => selector('compact')} />)
+    expect(view.container.textContent).toBe('20 tok/sCache hit 90%$0.42')
+    expect(view.queryByRole('button')).toBeNull()
+  })
+
+  it('omits the cost pill when the costUsage projection is not composed', () => {
+    const { source } = makeSource({ nodes: [assistant(1, 1)] })
+    const view = render(<StatsPills {...props(source)} />)
+    expect(view.container.textContent).not.toContain('$')
+    expect(view.queryByText('$0.42')).toBeNull()
   })
 })

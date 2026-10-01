@@ -102,6 +102,11 @@
     - id: session-stats
       name: '@deepseek-ai/dsh-session-stats'
 
+    # Catalog-priced API cost per session, model and day: the costUsage
+    # projection key and the SQLite ledger behind the costs Remote namespace.
+    - id: cost-meter
+      name: '@deepseek-ai/dsh-cost-meter'
+
     # Whole-log turn outline for the chat turn rail (the turnOutline
     # projection key): every turn stays navigable before its events page in.
     - id: session-turn-outline
@@ -142,6 +147,17 @@
 
     - id: settings-controller
       name: '@deepseek-ai/dsh-api-settings-controller'
+
+    # SQLite cost-history aggregates over Typert Remote for the costs Sidebar
+    # panel; reports a clean error when the cost meter service is absent.
+    - id: costs-controller
+      name: '@deepseek-ai/dsh-api-costs-controller'
+
+    # Cross-session cost report aggregates (day / workspace / model / session)
+    # over Typert Remote for the Costs panel; reports a clean error when the
+    # cost meter service is absent.
+    - id: cost-report
+      name: '@deepseek-ai/dsh-api-cost-report'
 
     # Workspace commands and reconnect-safe projection over Typert Remote.
     - id: workspace-controller
@@ -281,6 +297,15 @@
 
     - id: ui-sidebar-terminal
       name: '@deepseek-ai/dsh-client-ui-sidebar-terminal'
+
+    # The right Sidebar's API cost tracking panel: current Session projection
+    # plus durable daily and per-model ledger history.
+    - id: ui-costs
+      name: '@deepseek-ai/dsh-client-ui-costs'
+    # The sidebar Costs panel: cross-session ledger aggregates by day,
+    # workspace, model, and session from the `costReport` Remote.
+    - id: ui-cost-report
+      name: '@deepseek-ai/dsh-client-ui-cost-report'
     # The right Sidebar's workspace file tree tab type.
     - id: ui-sidebar-files
       name: '@deepseek-ai/dsh-client-ui-sidebar-files'
