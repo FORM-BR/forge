@@ -10,6 +10,7 @@ import type {
   WorkspaceDeleteRequest,
   WorkspaceDeleteValue,
   WorkspaceFollowFrame,
+  WorkspaceGitInfoValue,
   WorkspaceInsertBeforeRequest,
   WorkspaceInsertSessionBeforeRequest,
   WorkspaceOrderValue,
@@ -103,6 +104,9 @@ class FakeWorkspaceRemote implements WorkspaceRemote {
   ) => Promise<RemoteResult<WorkspacePinValue>> = () =>
     Promise.resolve(remoteOk({ pinnedSessionIds: [] }))
 
+  readonly gitInfo = vi.fn<WorkspaceRemote['gitInfo']>(async (path: string): Promise<RemoteResult<WorkspaceGitInfoValue>> =>
+    remoteOk({ path, git: { repoName: 'repo', root: path, branch: 'main', detached: false } }))
+
   create(request: WorkspaceCreateRequest): Promise<RemoteResult<WorkspaceCreateValue>> {
     this.record('create', request)
     return this.onCreate(request)
@@ -188,6 +192,20 @@ describe('ClientWorkspaceModel', () => {
       new RemoteError('gateway/bad-request', 'choose a folder', {}),
     ))
     await expect(model.initializeDefault()).resolves.toMatchObject({ ok: false })
+    expect(model.getSnapshot()).toBe(before)
+  })
+
+  it('forwards a git lookup to the Remote without touching the Workspace list', async () => {
+    const remote = new FakeWorkspaceRemote()
+    const model = modelFor(remote)
+    baseline(model, [workspace('one')])
+    const before = model.getSnapshot()
+    const signal = new AbortController().signal
+    await expect(model.gitInfo('/w/one', signal)).resolves.toEqual({
+      ok: true,
+      value: { path: '/w/one', git: { repoName: 'repo', root: '/w/one', branch: 'main', detached: false } },
+    })
+    expect(remote.gitInfo).toHaveBeenCalledWith('/w/one', signal)
     expect(model.getSnapshot()).toBe(before)
   })
 

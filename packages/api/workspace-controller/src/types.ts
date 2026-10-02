@@ -29,6 +29,26 @@ export interface WorkspaceView {
   readonly updatedAt: string
 }
 
+/** Git repository containing a directory. */
+export interface WorkspaceGitRepo {
+  /** Final segment of the repository's top-level directory. */
+  readonly repoName: string
+  /** Host path of the repository's top-level directory, as git reports it. */
+  readonly root: string
+  /** Checked-out branch name, or the abbreviated commit when HEAD is detached. */
+  readonly branch: string
+  /** True when HEAD points at a commit rather than a branch. */
+  readonly detached: boolean
+}
+
+/** Answer to a git lookup for one directory. */
+export interface WorkspaceGitInfoValue {
+  /** The directory the lookup was about, echoed from the request. */
+  readonly path: string
+  /** Absent when the directory is outside a repository or git is unavailable. */
+  readonly git?: WorkspaceGitRepo
+}
+
 declare module '@deepseek-ai/dsh-typert-protocol' {
   interface RemoteErrorDetailsMap {
     /** The requested directory cannot back a Workspace. */

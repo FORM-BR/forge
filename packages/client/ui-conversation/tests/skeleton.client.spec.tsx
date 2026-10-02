@@ -192,12 +192,14 @@ function mount(
   /** Owner share handed to the two composer tool-row seats, per render. */
   const seatOwners: { key: string; owner: unknown }[] = []
   let pickerOwner: unknown
+  let statusOwner: unknown
   const renderSlot = ((key: string, owner: object, opts?: { only?: string; fallback?: ReactNode }) => {
     slotCalls.push(key)
     if (key === 'conversation.input.model' || key === 'conversation.input.plan') {
       seatOwners.push({ key, owner })
     }
     if (key === 'conversation.hero.workspace') { pickerOwner = owner; return null }
+    if (key === 'conversation.hero.workspace.status') { statusOwner = owner; return null }
     if (key === 'conversation.session.header.lineage') {
       lineageOwners.push(owner as ConversationHeaderLineageOwnerProps)
       return opts?.fallback ?? null
@@ -375,6 +377,7 @@ function mount(
   return {
     view, store, wiring, sink, retargetWorkspace, session, conversation, slotCalls, lineageOwners, seatOwners, open,
     pickerOwner: () => pickerOwner,
+    statusOwner: () => statusOwner,
     rerender: () => { view.rerender(<ConversationMainPanel {...props} />) },
   }
 }
@@ -683,6 +686,18 @@ describe('ConversationRoot resident composer', () => {
     // The agent-preset chip sits in the same row, for the same reason: both
     // choices are only open before the first message.
     expect(b.slotCalls).toContain('conversation.hero.agentPreset')
+  })
+
+  it('hands the hero status seat the directory and title of the targeted workspace', async () => {
+    const b = mount(
+      sessionSnapshotOf({ blank: true }),
+      [{ ...workspace('one'), sessionIds: [SID] }, { ...workspace('second'), title: 'Second Title' }],
+    )
+    expect(b.slotCalls).toContain('conversation.hero.workspace.status')
+    expect(b.statusOwner()).toEqual({ path: '/projects/one', title: 'one' })
+    const owner = b.pickerOwner() as { onPick(id: WorkspaceId): void }
+    await act(async () => { owner.onPick(wid('second')); await Promise.resolve() })
+    expect(b.statusOwner()).toEqual({ path: '/projects/second', title: 'Second Title' })
   })
 
   it('prompt failure renders the promptError strip (ordinary failure, no transaction UI)', () => {

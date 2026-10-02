@@ -12,7 +12,10 @@
  * `shell.overlay` (see the contract module doc). It also declares two
  * Session-row seats: the leading decoration a row renders only while its own
  * primary state is idle, and the section the row's hover card renders between
- * its relative time and its trailing status line. Export discipline:
+ * its relative time and its trailing status line. A third registration puts
+ * the workspace status line (cwd, git repository, branch) into the
+ * `conversation.composer.dock` list, and the hero's branch chip into
+ * `conversation.hero.workspace.status`. Export discipline:
  * packages/client/AGENTS.md.
  */
 import type {} from '@deepseek-ai/dsh-client-product-analytics/client'
@@ -39,7 +42,7 @@ import {
   type ArchiveSessionInjected, type ForkSessionInjected, menuOpenStateFactory, type PinSessionInjected,
   type SessionArchiveConfirmInjected, type SessionArchiveConfirmRequest,
   type RenameSessionInjected, type RowToast, type RowToastInjected, type RowToastState, type SessionRenameDialogInjected,
-  type WorkspaceBrowserInjected, type WorkspacePickerInjected,
+  type WorkspaceBrowserInjected, type WorkspacePickerInjected, type WorkspaceStatusInjected,
 } from './contract/slots.ts'
 import { createWorkspaceShortcutControls, installWorkspaceShortcuts } from './shortcuts.ts'
 import { UiWorkspaceService } from './navigation.ts'
@@ -51,6 +54,8 @@ import { ForkSessionMenuItem } from './session-actions/ForkSession.tsx'
 import { PinSessionMenuItem, PinSessionRowButton } from './session-actions/PinSession.tsx'
 import { RenameSessionMenuItem, SessionRenameDialog } from './session-actions/RenameSession.tsx'
 import { RowActionToast } from './session-actions/RowActionToast.tsx'
+import { HeroGitChip } from './status/HeroGitChip.tsx'
+import { WorkspaceStatusLine } from './status/WorkspaceStatusLine.tsx'
 import { WorkspacePicker } from './WorkspacePicker.tsx'
 import { en, zh, type WorkspaceKey } from './locales.ts'
 
@@ -255,6 +260,9 @@ export function apply(ctx: Context): void {
     createWorkspace: input => workspaces.create(input),
     hooks: { directoryFlow: pickerFlowSource },
   })
+  const statusInjected = (): WorkspaceStatusInjected => ({
+    gitInfo: (path, signal) => workspaces.gitInfo(path, signal),
+  })
   // Each registration declares its owned children in the same call; slot
   // injection follows both the owner and declaration HMR lifetimes.
   ctx.slots.inject('sidebar.workspaces', () => ctx.slots.register(
@@ -307,6 +315,18 @@ export function apply(ctx: Context): void {
       name: 'shell.overlay', id: 'workspace.row-toast', locale: NS, store: viewStore, inject: rowToastInjected,
     }, RowActionToast)
   })
+  // Ambient line under the composer, ahead of the session stats pills (order 0).
+  ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register(
+    {
+      name: 'conversation.composer.dock', id: 'workspace-status', order: -100, locale: NS, inject: statusInjected,
+    },
+    WorkspaceStatusLine,
+  ))
+  // Branch chip beside the blank-session Workspace chip.
+  ctx.slots.inject('conversation.hero.workspace.status', () => ctx.slots.register(
+    { name: 'conversation.hero.workspace.status', locale: NS, inject: statusInjected },
+    HeroGitChip,
+  ))
   ctx.slots.inject('conversation.hero.workspace', () => ctx.slots.register(
     {
       name: 'conversation.hero.workspace',
