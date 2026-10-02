@@ -1,7 +1,7 @@
 /** Test-owned workspaces face: the renderer standard-kit observable plus recorded actions. */
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type {
-  IWorkspaces, WorkspaceId, WorkspaceSnapshot, WorkspaceView,
+  IWorkspaces, WorkspaceGitInfoValue, WorkspaceId, WorkspaceSnapshot, WorkspaceView,
 } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
@@ -89,6 +89,19 @@ export class TestWorkspaces implements IWorkspaces {
     this.calls.push({ method: 'initializeDefault', args: [signal] })
     const stub = this.stubs.get('initializeDefault')
     return await (stub?.(signal) as Promise<WorkspaceView | undefined> | undefined)
+  }
+
+  /**
+   * Look up git facts for a directory (recorded). The default answers outside any repository.
+   * @param path - Host directory.
+   * @param signal - caller lifetime.
+   * @returns the stubbed answer, or the path alone.
+   */
+  async gitInfo(path: string, signal?: AbortSignal): Promise<WorkspaceGitInfoValue> {
+    this.calls.push({ method: 'gitInfo', args: [path, signal] })
+    const stub = this.stubs.get('gitInfo')
+    if (stub !== undefined) return await (stub(path, signal) as Promise<WorkspaceGitInfoValue>)
+    return { path }
   }
 
   /**

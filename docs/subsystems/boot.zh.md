@@ -89,6 +89,12 @@ Source: [`packages/boot/hmr/src/index.ts`](../../packages/boot/hmr/src/index.ts)
 Manage profile files and apply their declared reload lifecycle.
 
 ```ts cordis-catalog
+/** Report whether this process was started in safe mode (`dsh --safe` or `FORGE_SAFE_MODE=1`).
+ * Safe mode is fixed at launch: leaving it means starting the application again without the flag.
+ * @returns The launch-time safe mode state.
+ */
+@Remote safeMode(): SafeModeStatus
+
 /** Read exact plugin-version exemptions saved in this profile.
  * @returns Accepted package-name@version keys with the runtime versions they may run on, and any
  * record or file problem the reader rejected, which the caller reports instead of failing.

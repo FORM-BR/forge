@@ -26,6 +26,8 @@ The Host controller serializes mutations whose correctness depends on current re
 
 The Client entry provides `ClientWorkspaceModel` and `createWorkspaceStateStream()`. The model owns Workspace rows, registry order, archived and pinned Session identities, unary mutation echoes, and stream/unary race resolution. A newer Host row wins by `updatedAt`; a committed stream order outranks an older unary response; a removed Workspace id cannot be resurrected by delayed data. Pin snapshots change only when their identities or order change. The package exposes framework-neutral snapshots and subscriptions, leaving navigation policy and React hooks to the UI owner. `WorkspaceController.archiveSession(sessionId, { stopActivity })` throws `WorkspaceArchiveError` with the Host's `rpcError`, so a surface can tell the running-work refusal from a missing Session or a carrier fault and offer to stop the work.
 
+`workspace.gitInfo(path, signal)` is a read-only lookup for status displays: it runs `git` in a fully qualified Host directory and answers with the echoed path plus, inside a repository, the repository name (basename of the top-level directory), its root, the current branch, and whether HEAD is detached (the branch field then holds the abbreviated commit). A directory outside any repository, a missing directory, a missing `git` executable, and an expired deadline all answer with the path alone; a relative path fails as `gateway/bad-request`, and a caller abort as `gateway/cancelled`. The Client service exposes it as `workspaces.gitInfo(path, signal?)`, which rejects on a Host failure.
+
 <a id="first-use-workspace"></a>
 ### First-use Workspace
 
@@ -39,6 +41,7 @@ The [Workspace registry](../../workspace/workspace/README.md#first-use-workspace
 | --- | --- | --- |
 | `documentsDirectory` | System Documents directory | Fully qualified Host directory override |
 | `documentsLookupTimeoutMs` | `10000` | Positive maximum duration of OS directory lookup, in milliseconds |
+| `gitLookupTimeoutMs` | `3000` | Positive maximum duration of one `workspace.gitInfo` lookup, in milliseconds |
 
 Documents lookup holds the registry mutation queue, so other Workspace mutations, including registration of a picked directory, can wait up to `documentsLookupTimeoutMs`. Cancellation can stop the lookup; after resolution succeeds, it does not roll back creation or registration.
 

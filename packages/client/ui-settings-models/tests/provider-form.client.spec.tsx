@@ -378,6 +378,28 @@ describe('model list editing', () => {
     expect(screen.getByLabelText<HTMLInputElement>(`${en.maxTokens} 1`).value).toBe('256K')
   })
 
+  it('declares reasoning levels on one row and leaves its neighbors untouched', async () => {
+    const neighbor = { id: 'plain', name: 'Plain' }
+    const { mutate } = await mountSection({
+      providers: { openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'think' }, neighbor] } },
+    })
+    openEditor('openai')
+    expandModel(1)
+    const levels = within(screen.getByRole('group', { name: `${en.modelReasoning} 1` }))
+    // Off needs a real level beside it: the adapter refuses a dict offering only off.
+    expect(levels.getByRole<HTMLInputElement>('checkbox', { name: en.modelReasoningOff }).disabled).toBe(true)
+    fireEvent.click(levels.getByRole('checkbox', { name: en.modelReasoningHigh }))
+    fireEvent.click(levels.getByRole('checkbox', { name: en.modelReasoningXhigh }))
+    fireEvent.click(levels.getByRole('checkbox', { name: en.modelReasoningOff }))
+    fireEvent.click(screen.getByText(en.apply))
+
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([
+      { id: 'think', reasoningEfforts: { high: 'high', xhigh: 'xhigh', off: null } },
+      neighbor,
+    ])
+  })
+
   it('edits one row of several and lets a cleared capacity leave the profile', async () => {
     const { mutate } = await mountSection({
       providers: { openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'first' }, { id: 'second' }] } },

@@ -104,6 +104,12 @@ export interface Config {
    * omission defaults to {@link DEFAULT_MAX_PARALLEL_TOOL_CALLS}.
    */
   maxParallelToolCalls: Volatile<number>
+  /**
+   * Direct mode: while on, every agent's system prompt carries a short policy
+   * asking for concise answers, minimal tool use, and no subagents for trivial
+   * work. It only advises the model; omission means off.
+   */
+  directMode: Volatile<boolean>
   /** Agents created or resumed at plugin startup. */
   agents: (AgentOptions & {
     /** Stable config label used in logs and as the fresh combined-id prefix. */

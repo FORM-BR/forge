@@ -129,6 +129,10 @@ export function ConversationContent(props: ConversationContentProps) {
         },
         onClose: () => { setPickerOpen(false) },
       })}
+      {renderSlot('conversation.hero.workspace.status', {
+        path: (pendingWorkspace ?? sessionWorkspace)?.path,
+        title: chipTitle,
+      })}
       {renderSlot('conversation.hero.agentPreset', {})}
     </div>
   )

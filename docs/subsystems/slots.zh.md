@@ -176,6 +176,7 @@ root
 │     ├─ conversation.hero.brand.mark
 │     ├─ conversation.hero.workspace
 │     │  └─ conversation.hero.workspace.directoryFlow
+│     ├─ conversation.hero.workspace.status
 │     └─ conversation.hero.agentPreset
 ├─ rightbar
 │  └─ rightbar.session

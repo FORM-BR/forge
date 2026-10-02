@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
@@ -476,5 +477,43 @@ describe('first-use Remote', () => {
     vi.spyOn(ctx.workspaceRegistry, 'initializeDefault').mockRejectedValueOnce(new Error('permission denied'))
     await expect(controller.initializeDefault(new AbortController().signal))
       .rejects.toThrow('permission denied')
+  })
+})
+
+describe('git info Remote', () => {
+  const gitAvailable = (() => {
+    try {
+      execFileSync('git', ['--version'], { stdio: 'ignore' })
+      return true
+    } catch {
+      // No git executable on this machine: the real-repository case is skipped.
+      return false
+    }
+  })()
+
+  it('refuses a relative path as a bad request', async () => {
+    const { controller } = await harness()
+    await expect(controller.gitInfo('relative/dir', new AbortController().signal))
+      .rejects.toMatchObject({ code: 'gateway/bad-request' })
+  })
+
+  it('answers without git for a directory outside any repository', async () => {
+    const { controller, root } = await harness()
+    await expect(controller.gitInfo(root, new AbortController().signal)).resolves.toEqual({ path: root })
+  })
+
+  it('maps the caller abort to gateway/cancelled', async () => {
+    const { controller, root } = await harness()
+    await expect(controller.gitInfo(root, AbortSignal.abort())).rejects.toMatchObject({ code: 'gateway/cancelled' })
+  })
+
+  it.skipIf(!gitAvailable)('reports the repository name and branch from a nested directory', async () => {
+    const { controller, root } = await harness()
+    const repo = stageDir(root, 'my-repo')
+    const nested = stageDir(repo, 'src')
+    execFileSync('git', ['init', '--initial-branch=feat-x', repo], { stdio: 'ignore' })
+    const result = await controller.gitInfo(nested, new AbortController().signal)
+    expect(result.path).toBe(nested)
+    expect(result.git).toMatchObject({ repoName: 'my-repo', branch: 'feat-x', detached: false })
   })
 })

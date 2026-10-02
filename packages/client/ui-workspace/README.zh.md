@@ -67,6 +67,10 @@ Session 行渲染运行时的实时 `pendingInteraction` 分类：审批显示**
 
 当成组的与平铺的 Session 行所对应的 Session 存在活动定时任务时，该行显示时钟标记。它是行首 `sidebar.session.row.leading` seat 的占用方，因此仅在该行主状态为 idle 时渲染，绝不与行自身的状态点同时出现；归档行该格同样留空，搜索结果没有该 seat，也不显示标记。它不是按钮，没有 Tab stop，点击其所在区域不会打开整行。标记自身的读取及其「活动」条件的确切含义由 [ui-schedule](../ui-schedule/README.zh.md) 负责。
 
+### 工作区状态行
+
+在输入框下方，`conversation.composer.dock` 显示一行低调的状态：会话的工作目录（过长时缩短为末尾若干段，完整路径作为提示文字），以及该目录位于 git 仓库内时的仓库名与分支；HEAD 游离时显示缩写提交。目录来自会话列表行；git 信息来自按目录发起的一次 `workspaces.gitInfo(path, signal)` 查询，会话开始或结束运行时会重新查询，使智能体自己的命令所切换的分支能够显示。查询失败、目录不在任何仓库内、或 Host 没有 `git` 时，只显示目录。该行只出现在常驻输入框中。在空白会话的主视觉区，`conversation.hero.workspace.status` slot（由 ui-conversation 声明）在工作区 chip 旁为所选工作区显示分支 chip，按工作区目录查询；仅当仓库名与工作区标题或文件夹名不同时才附带仓库名。
+
 -----
 
 `ctx.uiWorkspace.openSession(target)` 会同步替换其拥有的 `mainView` reference，并让主区域返回 Conversation，而不等待 `reference.ready`，因此历史加载会显示在已经选中的 Session 视图内。目标可以是已知 Session id，也可以是持久的直接父子 subagent 地址；显式地址不要求预先加载 parent catalog。`openWorkspace(id, beforeOpen?)` 仅在请求未被后续导航替代时打开结果；新会话使用 `openWorkspace`。`forkSession(id)` 创建子会话，不导航，也不替代尚未完成的导航。可选的同步准备回调在目标被 retain 后执行，并且仅对仍有效的 Workspace 请求执行，因此过期请求不会搬移 composer 草稿。后续导航或 owner 释放会阻止晚到的 UI 提交，但不取消底层 Session 创建。启动恢复会 retain 主 reference，不改变已选面板，也不取消后续导航。归档主 Session 会释放其 reference 并清除主选择。选择失败时保留当前全局面板。Session 行读取 `usePanelInfo`，在全局面板活跃时不显示 Session 选中样式；仅把焦点移到搜索框或目录选择器不会离开该面板。

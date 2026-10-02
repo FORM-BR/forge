@@ -879,6 +879,21 @@ describe('workspaces action face', () => {
     expect(ws.list.getSnapshot().archivedSessionIds).toEqual(['s1'])
     await runtime.dispose()
   })
+
+  it('answers git lookups outside a repository by default and honors a stub', async () => {
+    const runtime = await SlotTestRuntime.create()
+    const ws = runtime.workspaces
+    const signal = new AbortController().signal
+    await expect(ws.gitInfo('/tmp/plain', signal)).resolves.toEqual({ path: '/tmp/plain' })
+    const git = { repoName: 'repo', root: '/w/repo', branch: 'main', detached: false }
+    ws.stub('gitInfo', async path => ({ path, git }))
+    await expect(ws.gitInfo('/w/repo')).resolves.toEqual({ path: '/w/repo', git })
+    expect(ws.calls).toEqual([
+      { method: 'gitInfo', args: ['/tmp/plain', signal] },
+      { method: 'gitInfo', args: ['/w/repo', undefined] },
+    ])
+    await runtime.dispose()
+  })
 })
 
 describe('single-slot mounting edge arms', () => {

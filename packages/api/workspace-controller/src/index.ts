@@ -2,11 +2,12 @@
 
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
+import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { WorkspaceCommands } from './commands.ts'
 import { DirectoryPickerController } from './directory-picker.ts'
 import { WorkspaceFeed, workspaceView } from './feed.ts'
 import { defaultWorkspaceDirectory, validateDocumentsDirectory } from './default-directory.ts'
+import { isGitInfoPath, resolveGitInfo } from './git-info.ts'
 import type {
   WorkspaceArchiveSessionRequest,
   WorkspaceArchiveValue,
@@ -15,6 +16,7 @@ import type {
   WorkspaceDeleteRequest,
   WorkspaceDeleteValue,
   WorkspaceFollowFrame,
+  WorkspaceGitInfoValue,
   WorkspaceInsertBeforeRequest,
   WorkspaceInsertSessionBeforeRequest,
   WorkspaceOrderValue,
@@ -35,10 +37,12 @@ export interface Config {
   documentsDirectory?: string
   /** Maximum duration of the operating system's Documents lookup. */
   documentsLookupTimeoutMs?: number
+  /** Maximum duration of one git repository lookup. */
+  gitLookupTimeoutMs?: number
 }
 
 /** Directory policy after schema defaults have been applied. */
-type ResolvedConfig = Config & { documentsLookupTimeoutMs: number }
+type ResolvedConfig = Config & { documentsLookupTimeoutMs: number; gitLookupTimeoutMs: number }
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -54,6 +58,7 @@ export class WorkspaceController extends TypertRemoteService {
   static Config: z<Config, ResolvedConfig> = z.object({
     documentsDirectory: z.string(),
     documentsLookupTimeoutMs: z.natural().min(1).default(10_000),
+    gitLookupTimeoutMs: z.natural().min(1).default(3_000),
   })
 
   private readonly config: ResolvedConfig
@@ -104,6 +109,28 @@ export class WorkspaceController extends TypertRemoteService {
       )
     })
     return workspace === undefined ? undefined : { workspace: workspaceView(workspace) }
+  }
+
+  /**
+   * Report the git repository containing a directory, for the status bar.
+   * Read-only: runs `git` against the path and never writes. A directory
+   * outside a repository, a missing directory, a missing `git` executable, and
+   * an expired deadline all answer without `git` rather than failing.
+   * @param path - fully qualified Host directory, typically a Session's cwd.
+   * @param signal - caller lifetime; abort terminates the running git child.
+   * @returns the echoed path plus repository name, root, and branch when inside a repository.
+   */
+  @Remote('gitInfo')
+  async gitInfo(path: string, signal: AbortSignal): Promise<WorkspaceGitInfoValue> {
+    if (!isGitInfoPath(path)) {
+      throw new RemoteError('gateway/bad-request', 'workspace.gitInfo requires a fully qualified path', {})
+    }
+    try {
+      return await resolveGitInfo(path, signal, this.config.gitLookupTimeoutMs)
+    } catch (error: unknown) {
+      // resolveGitInfo rejects only when the caller's own signal aborted.
+      throw new RemoteError('gateway/cancelled', 'git lookup was aborted', {}, { cause: error })
+    }
   }
 
   /**

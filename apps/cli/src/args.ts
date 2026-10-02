@@ -27,6 +27,8 @@ interface ProfileInvocation {
   patches: string[]
   /** Everything after the launcher's own flags, verbatim, for injected app plugins. */
   args: string[]
+  /** Boot in safe mode: shipped bundles only, no third-party plugins (`--safe`). */
+  safe?: true | undefined
 }
 
 /** Print a composed profile tree and exit without booting. */
@@ -67,6 +69,7 @@ interface BootOptions {
   dumpDefaultConfig?: boolean
   dumpConfigSchema?: boolean
   fromDefaultProfile?: string
+  safe?: boolean
 }
 
 /**
@@ -94,6 +97,8 @@ Examples:
                                             create rescue from the shipped web template, then boot it
   dsh headless "run the tests"              answer one task, print the result, and exit
   dsh tui --patch ./extra.yml               boot a custom profile with one extra overlay
+  dsh web --safe                            safe mode: shipped plugins only, nothing in the profile is edited
+                                            (same as setting FORGE_SAFE_MODE=1)
   dsh tui --resume <session>                arguments after the launcher flags reach the app
   dsh web --help                            the web app's own flags and help
   dsh plugin --profile tui add <package>    install a plugin into the tui profile
@@ -114,7 +119,7 @@ function resolveBoot(program: Command, profile: string, options: BootOptions, ar
   if (options.fromDefaultProfile === '') program.error('error: --from-default-profile needs a name')
   const dumps = [options.dumpConfig, options.dumpDefaultConfig, options.dumpConfigSchema].filter(Boolean)
   if (dumps.length === 0) {
-    return { mode: 'profile', profile, fromDefaultProfile: options.fromDefaultProfile, patches, args }
+    return { mode: 'profile', profile, fromDefaultProfile: options.fromDefaultProfile, patches, args, ...options.safe === true ? { safe: true as const } : {} }
   }
   if (dumps.length > 1) {
     program.error('error: --dump-config, --dump-default-config, and --dump-config-schema are mutually exclusive')
@@ -167,6 +172,7 @@ export function parseDshArgs(argv: readonly string[], version: string): DshInvoc
     .option('--profile <name>', 'the profile under $DSH_HOME/profiles to boot', selectProfile)
     .option('--from-default-profile <name>', 'initialize a new custom profile from a shipped profile template')
     .option('--patch <path>', 'extra patch-list overlay applied after the profile layer (repeatable)', collect)
+    .option('--safe', 'safe mode: boot without third-party plugins, optional bundles or MCP servers; no profile file is edited')
     .option('--dump-config', 'print the composed profile tree and exit')
     .option('--dump-config-schema', 'print JSON Schema for profile entries and patches without mounting')
     .option('--dump-default-config', 'print the profile tree without its user layer or --patch overlays and exit')

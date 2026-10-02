@@ -22,6 +22,7 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-plugin-manager/types'
 import { PluginManagerPage } from './PluginManagerPage.tsx'
 import { PluginRefreshToast, type PluginRefreshToastFace } from './PluginRefreshToast.tsx'
+import { SafeModePill, type SafeModePillFace } from './SafeModePill.tsx'
 import { PluginsPanelIcon } from './PluginsPanelIcon.tsx'
 import { configLedgerSource } from './config-ledger.ts'
 import { PluginManagerController } from './manager-store.ts'
@@ -77,6 +78,8 @@ export function apply(ctx: ClientContext): void {
   const t = ctx.locale.bind(NS)
   const controller = new PluginManagerController(ctx)
   ctx.effect(() => () => { controller.dispose() }, 'ui-plugin-manager: controller')
+  // Safe mode is fixed at launch, so one read at start and one after a reconnect is enough.
+  void controller.readSafeMode()
   // The Host says when what is installed, enabled, or composed changed — from
   // this page, the CLI, or another browser — and streams install output.
   ctx.effect(() => {
@@ -88,7 +91,7 @@ export function apply(ctx: ClientContext): void {
       ctx.remote.$on('plugin-manager/changed', refresh),
       ctx.remote.$on('plugin-manager/install-log', (chunk) => { controller.appendLog(chunk) }),
       ctx.remote.$on('plugin-manager/install-state', (progress) => { controller.installProgress(progress) }),
-      ctx.on('connection/reset', refresh),
+      ctx.on('connection/reset', () => { refresh(); void controller.readSafeMode() }),
     ]
     return () => { for (const dispose of disposers) dispose() }
   }, 'ui-plugin-manager: host invalidations')
@@ -106,6 +109,11 @@ export function apply(ctx: ClientContext): void {
       dismissNotice: face.dismissNotice,
     }),
   }, PluginRefreshToast))
+  // Registered after the toast: the always-visible safe mode indicator.
+  ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+    name: 'shell.overlay', id: 'plugin-manager.safe-mode-pill', locale: NS,
+    inject: (): SafeModePillFace => ({ hooks: { pluginManager: face.hooks.pluginManager } }),
+  }, SafeModePill))
   ctx.slots.inject('main', function* () {
     const handle = createNavigationStore(), instance = handle.create()
     const store: typeof handle = { ...handle, create: () => instance }
