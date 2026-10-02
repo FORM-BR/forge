@@ -161,8 +161,10 @@ function Ready({ graph, t }: { readonly graph: WorkspaceGitGraph; readonly t: Tr
         </p>
       </div>
       <Legend layout={layout} t={t} />
-      <div className={css.scroller} ref={scroller}>
-        <MapSvg layout={layout} graph={graph} t={t} />
+      <div className={css.frame}>
+        <div className={css.scroller} ref={scroller}>
+          <MapSvg layout={layout} graph={graph} t={t} />
+        </div>
       </div>
       <p className={css.hint}>{t('gitMap.hint')}</p>
     </>

@@ -128,12 +128,19 @@
   background: transparent;
 }
 
-.scroller {
+.frame {
   flex: none;
-  overflow-x: auto;
+  overflow: hidden;
   border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-lg);
   background: var(--dsw-alias-bg-layer-1);
+}
+
+/* Older history scrolls out to the left: fade it instead of cutting a name in half. */
+.scroller {
+  overflow-x: auto;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 28px);
+  mask-image: linear-gradient(to right, transparent 0, #000 28px);
 }
 
 .svg {
@@ -208,6 +215,11 @@
 .name {
   fill: var(--dsw-alias-label-secondary);
   font-size: 11px;
+  /* Halo in the card colour: branch names cross the dashed curves and must stay legible. */
+  stroke: var(--dsw-alias-bg-layer-1);
+  stroke-width: 3px;
+  paint-order: stroke;
+  stroke-linejoin: round;
 }
 
 .notice {

@@ -14,10 +14,10 @@ import type {
 
 /** Distance between consecutive stations on the main line. */
 export const STATION_SPACING = 48
-/** Left margin before the first station. */
-export const PAD_LEFT = 70
+/** Left margin before the first station: room for its rotated name. */
+export const PAD_LEFT = 110
 /** Width of the stretch right of the last station that carries the open branches. */
-export const BRANCH_RUN = 330
+export const BRANCH_RUN = 200
 /** Right margin after the open branches. */
 export const PAD_RIGHT = 36
 /** Vertical position of the topmost open branch. */
