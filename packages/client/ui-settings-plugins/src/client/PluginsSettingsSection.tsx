@@ -30,7 +30,7 @@ export type PluginsSettingsSectionProps =
   & InjectFace<PluginsSettingsSectionInjected>
 
 /** Render one Plugins page whose contents arrive from feature-owned tabs; one contribution shows as the page itself. */
-export function PluginsSettingsSection({ t, renderSlot, useTabs }: PluginsSettingsSectionProps) {
+export function PluginsSettingsSection({ t, renderSlot, useTabs, close }: PluginsSettingsSectionProps) {
   const tabsId = useId()
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
   const rows = useTabs(value => value)
@@ -55,7 +55,7 @@ export function PluginsSettingsSection({ t, renderSlot, useTabs }: PluginsSettin
       <h2 className={css.heading}>{t('title')}</h2>
       <p className={css.intro}>{t('intro')}</p>
       {rows.length === 0 ? <p className={css.empty}>{t('empty')}</p> : single !== undefined ? (
-        <div className={css.panel}>{renderSlot('settings.plugins.tab', {}, { only: single.id })}</div>
+        <div className={css.panel}>{renderSlot('settings.plugins.tab', { close }, { only: single.id })}</div>
       ) : (
         <>
           <div className={css.tabs} role="tablist" aria-label={t('tabs')}>
@@ -108,7 +108,7 @@ export function PluginsSettingsSection({ t, renderSlot, useTabs }: PluginsSettin
                   aria-labelledby={`${tabsId}-tab-${row.id}`}
                   hidden={!selected}
                 >
-                  {renderSlot('settings.plugins.tab', {}, { only: row.id })}
+                  {renderSlot('settings.plugins.tab', { close }, { only: row.id })}
                 </div>
               )
             })}

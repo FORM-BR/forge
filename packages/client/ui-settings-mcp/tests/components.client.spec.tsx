@@ -23,6 +23,8 @@ function props(list: McpSettingsTabInjected['list']): McpSettingsTabProps {
   return { t, list } as McpSettingsTabProps
 }
 
+const READ_ONLY = { writable: false, readOnlyReason: 'no-profile' } as const
+
 const SNAPSHOT: McpStatusSnapshot = {
   servers: [
     { key: 'docs', serverName: 'docs', transport: 'stdio', state: 'connected', toolCount: 3 },
@@ -39,6 +41,7 @@ const SNAPSHOT: McpStatusSnapshot = {
     { key: 'off', serverName: 'off', transport: 'stdio', state: 'disabled', toolCount: 0 },
     { key: 'bad', serverName: 'bad', transport: null, state: 'error', toolCount: 0, halted: 'load-failed' },
   ],
+  management: READ_ONLY,
 }
 
 const row = (name: string): HTMLElement => {
@@ -87,6 +90,7 @@ describe('McpSettingsTab', () => {
   ] as const)('explains the %s halt', async (halted, text) => {
     render(<McpSettingsTab {...props(async () => ({
       servers: [{ key: 'x', serverName: 'x', transport: 'stdio', state: 'error', toolCount: 0, halted }],
+      management: READ_ONLY,
     }))}
     />)
     await screen.findByText('1 server')
@@ -94,7 +98,7 @@ describe('McpSettingsTab', () => {
   })
 
   it('shows a useful empty state with where to configure a server', async () => {
-    render(<McpSettingsTab {...props(async () => ({ servers: [] }))} />)
+    render(<McpSettingsTab {...props(async () => ({ servers: [], management: READ_ONLY }))} />)
     const empty = await waitFor(() => {
       const element = document.querySelector('[data-mcp-empty]')
       if (element === null) throw new Error('not rendered yet')
@@ -103,13 +107,14 @@ describe('McpSettingsTab', () => {
     expect(empty.textContent).toContain(en.emptyTitle)
     expect(empty.textContent).toContain('cordis.patch.yml')
     expect(empty.querySelector('pre')?.textContent).toContain('@deepseek-ai/dsh-mcp-client')
-    expect(screen.queryByRole('button', { name: en.refreshLabel })).toBeNull()
+    expect(screen.queryByRole('button', { name: en.addServer })).toBeNull()
+    expect(empty.textContent).toContain(en.emptyBodyReadOnly)
   })
 
   it('refreshes on demand without blanking the list', async () => {
     const list = vi.fn<McpSettingsTabInjected['list']>()
-      .mockResolvedValueOnce({ servers: [{ key: 'a', serverName: 'a', transport: 'stdio', state: 'connected', toolCount: 1 }] })
-      .mockResolvedValueOnce({ servers: [{ key: 'a', serverName: 'a', transport: 'stdio', state: 'connected', toolCount: 5 }] })
+      .mockResolvedValueOnce({ servers: [{ key: 'a', serverName: 'a', transport: 'stdio', state: 'connected', toolCount: 1 }], management: READ_ONLY })
+      .mockResolvedValueOnce({ servers: [{ key: 'a', serverName: 'a', transport: 'stdio', state: 'connected', toolCount: 5 }], management: READ_ONLY })
     render(<McpSettingsTab {...props(list)} />)
     await screen.findByText('1 tool')
     fireEvent.click(screen.getByRole('button', { name: en.refreshLabel }))
@@ -121,7 +126,7 @@ describe('McpSettingsTab', () => {
   it('shows a loading status, then an error with a working retry', async () => {
     const list = vi.fn<McpSettingsTabInjected['list']>()
       .mockRejectedValueOnce(new Error('remote down'))
-      .mockResolvedValueOnce({ servers: [] })
+      .mockResolvedValueOnce({ servers: [], management: READ_ONLY })
     render(<McpSettingsTab {...props(list)} />)
     expect(screen.getByRole('status').textContent).toContain(en.loading)
     const alert = await screen.findByRole('alert')
@@ -133,8 +138,8 @@ describe('McpSettingsTab', () => {
 
   it('keeps reading in the background while a server is connecting, and stops once all settle', async () => {
     vi.useFakeTimers()
-    const connecting: McpStatusSnapshot = { servers: [{ key: 'a', serverName: 'a', transport: 'stdio', state: 'connecting', toolCount: 0 }] }
-    const settled: McpStatusSnapshot = { servers: [{ key: 'a', serverName: 'a', transport: 'stdio', state: 'connected', toolCount: 2 }] }
+    const connecting: McpStatusSnapshot = { servers: [{ key: 'a', serverName: 'a', transport: 'stdio', state: 'connecting', toolCount: 0 }], management: READ_ONLY }
+    const settled: McpStatusSnapshot = { servers: [{ key: 'a', serverName: 'a', transport: 'stdio', state: 'connected', toolCount: 2 }], management: READ_ONLY }
     const list = vi.fn<McpSettingsTabInjected['list']>()
       .mockResolvedValueOnce(connecting)
       .mockResolvedValueOnce(settled)
@@ -155,6 +160,7 @@ describe('McpSettingsTab', () => {
     vi.useFakeTimers()
     const list = vi.fn<McpSettingsTabInjected['list']>().mockResolvedValue({
       servers: [{ key: 'a', serverName: 'a', transport: 'stdio', state: 'error', toolCount: 0, halted: 'reconnect-disabled' }],
+      management: READ_ONLY,
     })
     render(<McpSettingsTab {...props(list)} />)
     await act(async () => { await vi.advanceTimersByTimeAsync(UNSETTLED_REFRESH_MS * 3) })
@@ -168,7 +174,7 @@ describe('McpSettingsTab', () => {
     const second = render(<McpSettingsTab {...props(() => failing.promise)} />)
     first.unmount()
     second.unmount()
-    pending.resolve({ servers: [] })
+    pending.resolve({ servers: [], management: READ_ONLY })
     failing.reject(new Error('late failure'))
     await act(async () => { await Promise.resolve() })
     expect(document.querySelector('[data-mcp-empty]')).toBeNull()

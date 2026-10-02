@@ -14,7 +14,7 @@ import { apply as hostApply } from '../src/index.ts'
 usePinnedBrowserLanguages('zh-CN')
 afterEach(cleanup)
 
-const EMPTY = { servers: [] }
+const EMPTY = { servers: [], management: { writable: false, readOnlyReason: 'no-profile' } } as const
 type ListResult =
   | { readonly ok: true; readonly value: typeof EMPTY }
   | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } }
@@ -32,8 +32,19 @@ async function bench() {
   }
   new RemoteService(ctx)
   const list = vi.fn<() => Promise<ListResult>>().mockResolvedValue({ ok: true, value: EMPTY })
-  ctx.provide('remote.mcpStatus', { list })
-  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, list }
+  const failure = { ok: false, error: { code: 'mcpStatus/invalid', message: 'bad name', details: { field: 'name' } } } as const
+  const save = vi.fn().mockResolvedValue({ ok: true, value: { outcome: 'applied', id: 'mcp-x' } })
+  const setEnabled = vi.fn().mockResolvedValue({ ok: true, value: { outcome: 'pending', id: 'mcp-x' } })
+  const remove = vi.fn().mockResolvedValue({ ok: false, error: { code: 'mcpStatus/not-found', message: 'gone', details: {} } })
+  const openConfigFile = vi.fn().mockResolvedValue({ ok: true, value: { opened: true } })
+  save.mockResolvedValueOnce(failure)
+  ctx.provide('remote.mcpStatus', { list, save, setEnabled, removeServer: remove, openConfigFile })
+  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, list, save, setEnabled, remove, openConfigFile }
+}
+
+function faceOf(value: Record<string, unknown> | undefined): McpSettingsTabInjected {
+  if (value === undefined || typeof value['list'] !== 'function') throw new Error('the tab registers no face')
+  return value as typeof value & McpSettingsTabInjected
 }
 
 function declare(slots: SlotRegistry): () => void {
@@ -73,6 +84,43 @@ describe('ui-settings-mcp browser plugin', () => {
     expect(b.list).toHaveBeenCalledOnce()
     b.list.mockResolvedValueOnce({ ok: false, error: { code: 'REMOTE_ERROR', message: 'unavailable' } })
     await expect(injected.list()).rejects.toThrow('mcpStatus.list failed: REMOTE_ERROR: unavailable')
+    await b.ctx.fiber.dispose()
+  })
+
+  it('wraps the write Remotes, turning a refusal into an action error with its field', async () => {
+    const b = await bench()
+    declare(b.slots)
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const injected = faceOf(b.slots.entries('settings.plugins.tab')[0]!.inject?.())
+    const draft = { name: 'x', transport: 'stdio' as const, command: 'y' }
+
+    await expect(injected.save(draft, undefined)).rejects.toMatchObject({ code: 'mcpStatus/invalid', field: 'name', message: 'bad name' })
+    await expect(injected.save(draft, 'mcp-x')).resolves.toEqual({ outcome: 'applied', id: 'mcp-x' })
+    expect(b.save).toHaveBeenLastCalledWith(draft, 'mcp-x')
+    await expect(injected.setEnabled('mcp-x', false)).resolves.toEqual({ outcome: 'pending', id: 'mcp-x' })
+    expect(b.setEnabled).toHaveBeenCalledWith('mcp-x', false)
+    await expect(injected.remove('mcp-x')).rejects.toMatchObject({ code: 'mcpStatus/not-found' })
+    await expect(injected.openFile('home')).resolves.toBeUndefined()
+    expect(b.openConfigFile).toHaveBeenCalledWith('home')
+    expect(injected.askAgent).toBeUndefined()
+    await b.ctx.fiber.dispose()
+  })
+
+  it('offers the assistant only while the agent-preset launcher exists and starts the shipped mcp preset', async () => {
+    const b = await bench()
+    declare(b.slots)
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const entry = b.slots.entries('settings.plugins.tab')[0]!
+    const start = vi.fn()
+    let available = false
+    b.ctx.provide('agentPresetLauncher', { available: () => available, start })
+    const first = faceOf(entry.inject?.())
+    expect(first.askAgent?.available).toBe(false)
+    available = true
+    const second = faceOf(entry.inject?.())
+    expect(second.askAgent?.available).toBe(true)
+    second.askAgent?.start()
+    expect(start).toHaveBeenCalledWith('mcp')
     await b.ctx.fiber.dispose()
   })
 

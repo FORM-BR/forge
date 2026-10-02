@@ -847,6 +847,30 @@ describe('ui-agent-preset apply', () => {
     conversation()
   })
 
+  it('lets another surface start a session on a shipped preset through the launcher', async () => {
+    const { ctx, slots } = await bench()
+    declareRoot(slots)
+    const conversation = declareConversation(slots)
+    ctx.provide('conversation', {} as never)
+    ctx.provide('sessions', sessionsDouble(ctx, { byId: {} }) as never)
+    const uiWorkspace = uiWorkspaceDouble()
+    ctx.provide('uiWorkspace', uiWorkspace as never)
+    expect(ctx.get('agentPresetLauncher')).toBeUndefined()
+    await ctx.plugin({ inject: [...inject, 'conversation', 'sessions', 'uiWorkspace'], apply }).await()
+    const injectSeat: unknown = slots.entries('conversation.hero.agentPreset')[0]!.inject
+    if (typeof injectSeat !== 'function') throw new Error('the hero chip registers no face')
+    const seat = (injectSeat as (sessionId?: SessionId) => AgentPresetSeatInjected)()
+
+    const launcher = ctx.get('agentPresetLauncher')
+    expect(launcher?.available()).toBe(true)
+    launcher?.start('mcp')
+
+    expect(seat.hooks.agentPresetSeat.getSnapshot().current).toBe('mcp')
+    expect(seat.hooks.agentPresetSeat.getSnapshot().introduce).toBe(true)
+    expect(uiWorkspace.starts).toHaveLength(1)
+    conversation()
+  })
+
   it('applies the creator preset to an existing blank main Session', async () => {
     const { ctx, slots, calls } = await bench()
     declareRoot(slots)

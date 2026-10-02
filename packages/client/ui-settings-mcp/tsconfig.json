@@ -21,6 +21,9 @@
       "path": "../ui-settings/tsconfig.client.json"
     },
     {
+      "path": "../ui-agent-preset"
+    },
+    {
       "path": "../ui-primitives"
     },
     {

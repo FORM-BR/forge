@@ -98,9 +98,10 @@ export interface SettingsGeneralItemOwnerProps {
   children?: never
 }
 
-/** Owner share of a Plugins tab (the section supplies nothing). */
+/** Owner share of a Plugins tab: the section's `close`, for tabs that leave settings (starting a session). */
 export interface SettingsPluginsTabOwnerProps {
-  /** Marker field: tab owner props are intentionally empty. */
+  /** Close the settings panel (the shell owns the open state). */
+  close: () => void
   children?: never
 }
 

@@ -109,6 +109,7 @@
       "@deepseek-ai/dsh-api-cost-report/types": ["./packages/api/cost-report/src/types.ts"],
       "@deepseek-ai/dsh-api-mcp-status": ["./packages/api/mcp-status/src/index.ts"],
       "@deepseek-ai/dsh-api-mcp-status/types": ["./packages/api/mcp-status/src/types.ts"],
+      "@deepseek-ai/dsh-api-mcp-status/tool": ["./packages/api/mcp-status/src/tool.ts"],
       "@deepseek-ai/dsh-api-costs-controller": ["./packages/api/costs-controller/src/index.ts"],
       "@deepseek-ai/dsh-api-costs-controller/types": ["./packages/api/costs-controller/src/types.ts"],
       "@deepseek-ai/dsh-api-workspace-controller": ["./packages/api/workspace-controller/src/index.ts"],

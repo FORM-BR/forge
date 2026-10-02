@@ -1,5 +1,5 @@
 ---
-description: "MCP 服务器连接状态的 Host Remote 负责方：通过生成的 mcpStatus 命名空间提供每个已配置 MCP 服务器的无密钥摘要（状态、传输方式、主机、工具数量、最近一次错误），并作为 dsh-mcp-client 插件上报状态的注册表。"
+description: "已配置 MCP 服务器的 Host Remote 负责方：通过生成的 mcpStatus 命名空间提供每个服务器的无密钥摘要（状态、传输方式、主机、工具数量、最近一次错误、隐藏取值的定义），在配置档补丁中添加、修改、启停和删除 dsh-mcp-client 条目，并作为 dsh-mcp-client 插件上报状态的注册表。"
 kind: "package-reference"
 ---
 
@@ -7,11 +7,11 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-该 Remote BFF 运行在 Host 进程中，只提供实时状态的只读投影；它不会启动、停止或重新配置任何服务器。
+该 Remote BFF 运行在 Host 进程中。读取是实时状态的投影；写入只会通过配置编辑器修改配置档补丁中的 `dsh-mcp-client` 条目。
 
 ## 概述
 
-MCP 状态 Remote BFF 让浏览器能够看到当前接入了什么。它暴露一个 Typert 命名空间 `mcpStatus`，其 `list` 方法为每个已配置的 MCP 服务器返回一条摘要：名称、传输方式、端点主机、四种状态之一（`connecting`、`connected`、`error`、`disabled`）、已同步的工具数量，以及最近一次失败信息。同一个服务也是 `mcpServerStatus` 注册表，每个 [`dsh-mcp-client`](../../mcp/mcp-client/README.zh.md) 插件都向它上报状态。摘要中从不包含 `env`、`headers`、参数、命令行，也不包含主机之外的任何 URL 部分。
+MCP 状态 Remote BFF 让浏览器能够看到当前接入了什么。它暴露一个 Typert 命名空间 `mcpStatus`，其 `list` 方法为每个已配置的 MCP 服务器返回一条摘要：名称、传输方式、端点主机、四种状态之一（`connecting`、`connected`、`error`、`disabled`）、已同步的工具数量，以及最近一次失败信息。同一个服务也是 `mcpServerStatus` 注册表，每个 [`dsh-mcp-client`](../../mcp/mcp-client/README.zh.md) 插件都向它上报状态。摘要中从不包含 `env` 或 header 的取值、形似密钥的参数，也不包含 URL 凭据和查询值。同一命名空间还能在配置档补丁中添加、修改、启停和删除服务器（`save`、`setEnabled`、`removeServer`），并用文本编辑器打开补丁文件（`openConfigFile`）；密钥只会流向 Host，已保存的值从不返回。
 
 ## 目录
 
@@ -43,6 +43,24 @@ MCP 状态 Remote BFF 让浏览器能够看到当前接入了什么。它暴露�
 
 失败信息在产生它的 `dsh-mcp-client` 内部就已脱敏：配置中的 env、header 与 URL 查询值、URL 凭据、路径与查询，以及 `Bearer`、`Basic` 凭据都会被替换，文本截断为 240 个字符。
 
+### 定义存放在哪里
+
+`list()` 还会读取补丁文件，并按 `serverName` 把每个 `dsh-mcp-client` 条目与对应服务器合并。摘要随之带有 `source`（`profile` 或 `home`；来自内置包或命令行层时缺省）、已保存但 Loader 尚未挂载的条目的 `pendingRestart`，以及 `config`：条目 `id`、`disabled`、表单能否编辑、命令、参数、URL，以及环境变量和请求头的**名称**。凭据名选项之后的参数、凭据名的 `NAME=value` 赋值和形似凭据的令牌都会替换为圆点，URL 的用户信息、查询值和不透明路径段也一样。`management` 说明配置档能否编辑（`writable`，或 `safe-mode`、`no-profile` 之一的 `readOnlyReason`），并给出两个文件路径（主目录以缩写显示）。
+
+### 在面板中编辑
+
+只有配置档补丁中的条目可写；定义在用户级 `~/.dsh/cordis.patch.yml`、内置包或命令行叠加层中的服务器是只读的，会返回 `mcpStatus/read-only`。
+
+- `save(draft, id)` 添加服务器（不带 `id`），作为独立的 `insert` 项，id 为 `mcp-<名称>`；或替换已有条目中由表单负责的字段。取值为 `null` 的 env 或 header、`null` 的 URL，以及以 `{ keep: index }` 发送的参数会保留已存的节点，因此未改动的密钥无需重新输入；草稿中省略的键会被移除。名称须匹配 `[A-Za-z0-9_-]{1,32}` 且未被占用；不合法的提交返回 `mcpStatus/invalid` 并指出字段。
+- `setEnabled(id, enabled)` 设置或清除条目的 `disabled`；`removeServer(id)` 删除条目，并删除因此变空的 `insert` 项。条目已不存在时返回 `mcpStatus/not-found`。
+- `openConfigFile('profile' | 'home')` 用原生编辑器打开文件。
+
+每次写入都经由 `ctx.configEditor.editDocument`：它持有配置档锁和 HMR 互斥，原子写入文件，并就地重新加载配置档。重新加载失败会回滚，并返回 `mcpStatus/apply-failed` 及已清除所提交密钥的原因。结果为 `applied`；若约八秒后服务器仍在启动则为 `pending`（重新加载在后台完成，失败时仍会回滚）；Host 无法就地重新加载时为 `restart-required`。编辑会保留注释以及表单不负责的所有字段，例如 `cwd`、`reconnect` 和 `!!js` 表达式；表单字段中含表达式的条目只能启停或删除，不能编辑。
+
+### Agent 工具
+
+`@deepseek-ai/dsh-api-mcp-status/tool` 入口注册 `mcp_servers`，这是一个只读工具，返回与 `list()` 相同的快照。随附的 `mcp` Agent 预设挂载了它，使其助手能读取面板所显示的状态。
+
 -----
 
 <a id="understand-the-implementation"></a>
@@ -57,8 +75,11 @@ MCP 状态 Remote BFF 让浏览器能够看到当前接入了什么。它暴露�
 
 | 文件 | 作用 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `McpStatusService`：注册表、`list` Remote 以及与 Loader 的合并 |
-| [`src/types.ts`](src/types.ts) | 线路类型：`McpServerSummary`、`McpStatusSnapshot`、`McpServerState`、`McpServerHalt` |
+| [`src/index.ts`](src/index.ts) | `McpStatusService`：注册表、`list`、`save`、`setEnabled`、`removeServer`、`openConfigFile` 这些 Remote，以及与 Loader 和补丁文件的合并 |
+| [`src/patch-file.ts`](src/patch-file.ts) | 对补丁文件文本中 `dsh-mcp-client` 条目的纯函数式、保留注释的编辑 |
+| [`src/mask.ts`](src/mask.ts) | 参数与 URL 的显示脱敏，以及从消息中清除所提交的密钥 |
+| [`src/tool.ts`](src/tool.ts) | `mcp_servers` Agent 工具 |
+| [`src/types.ts`](src/types.ts) | 线路类型：摘要、定义视图、草稿、管理状态与错误码 |
 
 </details>
 
@@ -78,11 +99,19 @@ MCP 状态 Remote BFF 让浏览器能够看到当前接入了什么。它暴露�
 <a id="model-experience"></a>
 ## 模型体验
 
-无。该包只向浏览器提供只读的连接状态，不注册任何提示、工具或会话事件。
+### MCP 服务器工具
+
+#### 模型看到什么
+
+[`mcp_servers` 工具](../../../docs/tool-catalog.zh.md#deepseek-aidsh-api-mcp-status)返回与设置面板相同的无密钥快照：每个服务器的状态、传输方式、工具数量、最近一次错误、定义来源，以及隐藏了所有密钥取值的配置视图。它不带参数，不改动任何内容，也不注入消息。只有挂载 `/tool` 入口的预设才带有它；随附的 `mcp` 预设就是如此。
+
+#### Token 影响
+
+装配工具消费者时提供工具声明；每次调用追加一份 JSON 快照，其大小随已配置服务器数量增长。
 
 #### KV Cache 影响
 
-无；该服务从不组装或发送模型提供方请求。
+工具声明是固定的，因此挂载它不会让各轮之间的缓存前缀发生移动。结果与其他工具结果一样追加到对话中。
 
 ## 已知限制与延期工作
 
@@ -92,7 +121,9 @@ MCP 状态 Remote BFF 让浏览器能够看到当前接入了什么。它暴露�
 这些限制是该包当前的约束，用来界定状态服务与其相邻包各自负责的范围。
 
 - **仅时点读取** — Remote 没有变更订阅；客户端需要重新读取才能看到状态转换。
-- **没有控制操作** — 该服务无法重连、启用或停用服务器。`dsh-mcp-client` 的监督器没有提供按需重连。
+- **没有重连操作** — 该服务可以关闭和重新开启配置档中的服务器，但无法就地重连；`dsh-mcp-client` 的监督器没有提供按需重连。
+- **仅限配置档条目** — 定义在用户级补丁、内置包或命令行叠加层中的服务器只读列出；要修改它们需要编辑对应文件。
+- **热重载需要根 Include 条目** — 没有该条目启动的 Host 会保留已写入的文件并返回 `restart-required`。
 - **失败条目的原因在 Host 日志中** — 加载失败的 Loader 条目只报告 `load-failed` 而没有信息，因为 Loader 不在 Fiber 上保留错误文本。
 - **Agent 作用域的服务器没有仅配置行** — 声明在 Agent 预设内的服务器连接后才会上报；已停用或失败时没有可列出的 Loader 条目。
 

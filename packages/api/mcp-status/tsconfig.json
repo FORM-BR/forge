@@ -15,7 +15,19 @@
       "path": "../../../vendor/loader"
     },
     {
+      "path": "../../boot/app-boot"
+    },
+    {
+      "path": "../../boot/config-editor"
+    },
+    {
+      "path": "../../core/tools"
+    },
+    {
       "path": "../../mcp/mcp-client"
+    },
+    {
+      "path": "../../util/native-command"
     },
     {
       "path": "../../typert/protocol"

@@ -18,6 +18,12 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
+/** How an in-place profile patch edit ended. */
+export type DocumentEditOutcome = 'applied' | 'pending' | 'restart-required'
+
+/** Default wait for a reload before `editDocument` answers `pending`. */
+const DOCUMENT_SETTLE_MS = 8000
+
 function flatten(rows: EntryOptions[]): EntryOptions[] {
   return rows.flatMap(row => [row, ...row.group && Array.isArray(row.config) ? flatten(row.config as EntryOptions[]) : []])
 }
@@ -151,6 +157,64 @@ export class ConfigEditor extends Service {
     }
     const hmr = this.ownerContext.get('hmr')
     await (hmr === undefined ? run() : hmr.runExclusive(run))
+  }
+
+  /**
+   * Rewrite the whole profile patch text and apply it through the normal Loader path,
+   * for edits that add, remove, or toggle rows rather than change one entry's config.
+   * The write is rolled back when the reload rejects it. A reload that outlives `settleMs`
+   * keeps the edit lock and finishes in the background; its failure rolls the file back and is logged.
+   * @param change Derive the next patch text from the current one; throwing aborts before any write.
+   * @param options.requiredIds Entry ids whose activation failure must reject the reload.
+   * @param options.settleMs How long to wait for the reload before answering `pending`.
+   * @returns `applied` after reconciliation, `pending` while it still runs, or `restart-required`
+   * when the host cannot reload the profile in place (the file is written either way).
+   */
+  async editDocument(
+    change: (before: string) => string,
+    options: { readonly requiredIds?: readonly string[]; readonly settleMs?: number } = {},
+  ): Promise<DocumentEditOutcome> {
+    const requiredIds = options.requiredIds ?? []
+    const run = async (): Promise<DocumentEditOutcome> => {
+      const profile = this.ownerContext.profileContext
+      const path = this.documentPath
+      return withFileLock(join(profile.dir, 'package.json'), async () => {
+        let before: string
+        try { before = await readFile(path, 'utf8') }
+        catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+          before = '[]\n'
+        }
+        const next = change(before)
+        if (next === before) return 'applied'
+        const beforePatches = readProfilePatches('dsh', profile)
+        await writeFileAtomic(path, next, { mode: 0o600 })
+        try {
+          await reconcileProfilePatches(this.ownerContext.root, readProfilePatches('dsh', profile), 'dsh', requiredIds)
+          return 'applied'
+        } catch (error) {
+          if (error instanceof Error && error.message.includes('profile reload requires the root Include entry')) return 'restart-required'
+          await writeFileAtomic(path, before, { mode: 0o600 })
+          await reconcileProfilePatches(this.ownerContext.root, beforePatches, 'dsh')
+          throw error
+        }
+      })
+    }
+    const hmr = this.ownerContext.get('hmr')
+    const work = hmr === undefined ? run() : hmr.runExclusive(run)
+    const outcome = await new Promise<DocumentEditOutcome>((resolve, reject) => {
+      const timer = setTimeout(() => { resolve('pending') }, options.settleMs ?? DOCUMENT_SETTLE_MS)
+      work.then(
+        (value) => { clearTimeout(timer); resolve(value) },
+        (error: unknown) => {
+          clearTimeout(timer)
+          reject(error instanceof Error ? error : new Error(String(error)))
+        },
+      )
+    })
+    // After a `pending` answer nobody awaits the work: its failure must still surface.
+    if (outcome === 'pending') work.catch((error: unknown) => { this.ownerContext.logger.warn('profile patch edit failed after the answer was sent', error) })
+    return outcome
   }
 }
 

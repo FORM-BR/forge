@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/api/mcp-status/README.md
 /:
-  en: cee356bfb843c89a
-  zh: f9c53ea76a8408eb
+  en: b42c976061985619
+  zh: e2204b55f825fd40
 /deepseek-ai-dsh-api-mcp-status:
-  en: b51c6a9044e5e147
-  zh: 5f148e3d7d3d3ffa
+  en: 0a19dbc7601123b5
+  zh: 32426c077c63b8ee
 /deepseek-ai-dsh-api-mcp-status/summary:
-  en: 76416b3f2a7f6f70
-  zh: 1b151e24235ddc5f
+  en: fc819a8c89515dbf
+  zh: 2ba0da09e6d5a45a
 /deepseek-ai-dsh-api-mcp-status/table-of-contents:
   en: d152484eb41ac6b4
   zh: 09388d293f9be9cb
@@ -24,23 +24,41 @@
   en: 59c3df1dc75f547c
   zh: bedd53351befdfc5
 /deepseek-ai-dsh-api-mcp-status/use-this-package/secrets:
-  en: 72650fb85b9425e7
-  zh: c79c9b2b27037e97
+  en: 4412412d6737f8c7
+  zh: acaee0ffd7366e73
+/deepseek-ai-dsh-api-mcp-status/use-this-package/where-a-definition-lives:
+  en: 95ea53a0b33dbffa
+  zh: b5bac26d3df3a787
+/deepseek-ai-dsh-api-mcp-status/use-this-package/edit-from-the-panel:
+  en: 8e4b2d24d34a4a59
+  zh: f1fd3541a48613dd
+/deepseek-ai-dsh-api-mcp-status/use-this-package/agent-tool:
+  en: 8a6f2b29ae0962a1
+  zh: d06b48cf2adf250f
 /deepseek-ai-dsh-api-mcp-status/understand-the-implementation:
-  en: 3a125b9df2aeabbb
-  zh: 13556e46a8d34954
+  en: fd7ff676baa2459f
+  zh: 60d013a2fa9e731c
 /deepseek-ai-dsh-api-mcp-status/further-exploration:
   en: af3ba830ad638287
   zh: 3e90fac39605e69c
 /deepseek-ai-dsh-api-mcp-status/model-experience:
-  en: c11e4df00bb5ba9d
-  zh: 34d1c4bdd0180980
-/deepseek-ai-dsh-api-mcp-status/model-experience/kv-cache-effect:
-  en: 9972fa08af2fb01f
-  zh: 4ba74e69c3ee4716
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-api-mcp-status/model-experience/mcp-servers-tool:
+  en: 1e17c7b8428b0d5f
+  zh: 2e1a1f010914d32f
+/deepseek-ai-dsh-api-mcp-status/model-experience/mcp-servers-tool/what-the-model-sees:
+  en: 14ffcad75f8745be
+  zh: 274690098b37a2e9
+/deepseek-ai-dsh-api-mcp-status/model-experience/mcp-servers-tool/token-effect:
+  en: eb7ea7f0cd3275e9
+  zh: 3064a59c12f24764
+/deepseek-ai-dsh-api-mcp-status/model-experience/mcp-servers-tool/kv-cache-effect:
+  en: f0e4703ef7b285a9
+  zh: bb62eb1c8f0739bf
 /deepseek-ai-dsh-api-mcp-status/known-limitations-and-deferred-work:
-  en: b6743ce16d686e5a
-  zh: 1c19e34ff5e9fb70
+  en: d54d0b46b0337282
+  zh: f958b1819bbe4fa6
 /deepseek-ai-dsh-api-mcp-status/known-limitations-and-deferred-work/dev-note:
   en: 43f851651151616d
   zh: 76b111a00d7769bf

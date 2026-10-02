@@ -31,15 +31,15 @@ function source(status: Partial<McpServerStatus> & { serverName: string }): McpS
 }
 
 describe('McpStatusService', () => {
-  it('publishes one direct list method under the mcpStatus namespace', async () => {
+  it('publishes the status read and the profile writes under the mcpStatus namespace', async () => {
     const { service } = await harness()
     expect(service.typertRemote).toMatchObject({ serviceKey: 'mcpServerStatus', namespace: 'mcpStatus' })
-    expect(remoteMethods(service)).toEqual([{ method: 'list', invocation: { kind: 'direct' } }])
+    expect(remoteMethods(service).map(entry => entry.method)).toEqual(['list', 'save', 'setEnabled', 'removeServer', 'openConfigFile'])
   })
 
   it('answers an empty list when nothing is configured', async () => {
     const { service } = await harness()
-    expect(service.list()).toEqual({ servers: [] })
+    expect(service.list()).toEqual({ servers: [], management: { writable: false, readOnlyReason: 'no-profile' } })
   })
 
   it('projects each registered connection on every call and drops it with its plugin', async () => {
