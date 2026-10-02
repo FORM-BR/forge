@@ -15,7 +15,7 @@ import type { WorkspaceBrowserInjected, WorkspacePickerInjected } from '@deepsee
 import {
   type ArchiveSessionInjected, type ForkSessionInjected, menuOpenStateFactory, type PinSessionInjected,
   type RenameSessionInjected, type RowToastInjected, type SessionArchiveConfirmInjected, type SessionRenameDialogInjected,
-  type WorkspaceViewStoreHandle,
+  type WorkspaceStatusInjected, type WorkspaceViewStoreHandle,
 } from '../src/client/contract/slots.ts'
 import { WorkspaceBrowser } from '../src/client/rows/WorkspaceBrowser.tsx'
 import { ArchiveSessionMenuItem, ArchiveSessionRowButton, SessionArchiveConfirmDialog } from '../src/client/session-actions/ArchiveSession.tsx'
@@ -23,6 +23,7 @@ import { ForkSessionMenuItem } from '../src/client/session-actions/ForkSession.t
 import { PinSessionMenuItem, PinSessionRowButton } from '../src/client/session-actions/PinSession.tsx'
 import { RenameSessionMenuItem, SessionRenameDialog } from '../src/client/session-actions/RenameSession.tsx'
 import { RowActionToast } from '../src/client/session-actions/RowActionToast.tsx'
+import { WorkspaceStatusLine } from '../src/client/status/WorkspaceStatusLine.tsx'
 import { WorkspacePicker } from '../src/client/WorkspacePicker.tsx'
 import { FLAT_SESSION_ORDER_KEY } from '../src/client/stores.ts'
 import { UNGROUPED_KEY } from '../src/client/tree.ts'
@@ -96,7 +97,11 @@ async function bench() {
   const subscribe = () => () => {}
   const workspacesSubscribe = vi.fn(subscribe)
   const initializeDefault = vi.fn(async (): Promise<WorkspaceView | undefined> => undefined)
+  const gitInfo = vi.fn(async (path: string) => ({
+    path, git: { repoName: 'repo', root: path, branch: 'main', detached: false },
+  }))
   ctx.provide('workspaces', {
+    gitInfo,
     list: { getSnapshot: () => workspaceSnapshot, subscribe: workspacesSubscribe },
     create,
     initializeDefault,
@@ -134,7 +139,7 @@ async function bench() {
   return {
     ctx, slots: ctx.get('slots') as SlotRegistry, locale, create, rename,
     retain, using, selectPanel, search, renameSession, binding, fork, pickDirectory, pinSession, unpinSession,
-    workspacesSubscribe, initializeDefault,
+    workspacesSubscribe, initializeDefault, gitInfo,
     setWorkspaces: (snapshot: WorkspaceSnapshot): void => { workspaceSnapshot = snapshot },
     setSessions: (snapshot: SessionListState): void => { sessionSnapshot = snapshot },
   }
@@ -221,6 +226,27 @@ describe('ui-workspace apply', () => {
     expect(after.slots.entries(MENU_ITEM)).toHaveLength(4)
     expect(after.slots.entries(ROW_ACTION)).toHaveLength(2)
     expect(after.slots.entries('shell.overlay')).toHaveLength(3)
+  })
+
+  it('registers the status line into the composer dock ahead of the stats pills and wires its git lookup', async () => {
+    const b = await bench()
+    onTestFinished(() => b.ctx.fiber.dispose())
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    // The dock is declared by ui-conversation, whenever that apply lands.
+    expect(b.slots.entries('conversation.composer.dock')).toHaveLength(0)
+    b.slots.register({
+      name: 'root', children: { 'conversation.composer.dock': { kind: 'list', scope: 'session' } },
+    } as never, () => null)
+    await Promise.resolve()
+    const dock = b.slots.entries('conversation.composer.dock')
+    expect(dock).toHaveLength(1)
+    expect(dock[0]!.component).toBe(WorkspaceStatusLine)
+    expect(dock[0]!.options).toMatchObject({ id: 'workspace-status', order: -100 })
+    expect(dock[0]!.locale).toBe('workspace')
+    const face = faceOf(dock[0]!) as WorkspaceStatusInjected
+    const signal = new AbortController().signal
+    await expect(face.gitInfo('/projects/alpha', signal)).resolves.toMatchObject({ git: { repoName: 'repo' } })
+    expect(b.gitInfo).toHaveBeenCalledWith('/projects/alpha', signal)
   })
 
   it('declares the two Session row lists and registers the shipped actions and overlay surfaces into them', async () => {

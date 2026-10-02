@@ -118,6 +118,10 @@ export const zh = {
   'time.months': '{n}个月',
   'time.years': '{n}年',
   'time.ago': '{t}前',
+  'statusLine.cwd': '工作目录：{path}',
+  'statusLine.repo': 'Git 仓库：{root}',
+  'statusLine.repoBranch': '{repo}（{branch}）',
+  'statusLine.repoDetached': '{repo}（{branch}，游离 HEAD）',
 } satisfies Record<string, string>
 
 /** The workspace namespace key union. */
@@ -237,4 +241,8 @@ export const en = {
   'time.months': '{n}mo',
   'time.years': '{n}y',
   'time.ago': '{t} ago',
+  'statusLine.cwd': 'Working directory: {path}',
+  'statusLine.repo': 'Git repository: {root}',
+  'statusLine.repoBranch': '{repo} ({branch})',
+  'statusLine.repoDetached': '{repo} ({branch}, detached HEAD)',
 } satisfies Record<WorkspaceKey, string>

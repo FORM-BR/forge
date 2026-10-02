@@ -4,7 +4,7 @@ import { Service, type Context } from '@deepseek-ai/cordis'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { RemoteFailure } from '@deepseek-ai/dsh-typert-protocol'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
-import type { WorkspaceView } from '../types.ts'
+import type { WorkspaceGitInfoValue, WorkspaceView } from '../types.ts'
 import type { ClientWorkspaceModel, WorkspaceSnapshot } from './model.ts'
 
 /** Structured create failure for callers that distinguish Host business errors. */
@@ -59,6 +59,14 @@ export interface IWorkspaces {
    * @returns the prepared Workspace, or undefined when first-use initialization is ineligible; rejects on preparation failure.
    */
   initializeDefault(signal?: AbortSignal): Promise<WorkspaceView | undefined>
+  /**
+   * Look up the git repository containing a Host directory, for status displays.
+   * @param path - fully qualified Host directory, typically a Session's cwd.
+   * @param signal - caller lifetime; abort cancels the Host lookup.
+   * @returns the echoed path, plus repository name, root, and branch when inside a repository.
+   * @throws when the Host refuses the path or the lookup is cancelled or lost.
+   */
+  gitInfo(path: string, signal?: AbortSignal): Promise<WorkspaceGitInfoValue>
   /**
    * Rename a Workspace.
    * @param workspaceId - target Workspace.
@@ -137,6 +145,12 @@ export class WorkspaceController extends Service implements IWorkspaces {
     const result = await this.model.initializeDefault(signal)
     if (!result.ok) throw new WorkspaceCreateError(result.error)
     return result.value?.workspace
+  }
+
+  async gitInfo(path: string, signal?: AbortSignal): Promise<WorkspaceGitInfoValue> {
+    const result = await this.model.gitInfo(path, signal)
+    if (!result.ok) throw commandError('git info', result.error)
+    return result.value
   }
 
   async rename(workspaceId: WorkspaceId, title: string): Promise<WorkspaceView> {
