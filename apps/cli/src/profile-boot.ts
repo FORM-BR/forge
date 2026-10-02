@@ -22,6 +22,7 @@ import {
   initProfile,
   installFailLoud,
   isSafeModeBundle,
+  readSafeReason,
   loadOverlayPatches,
   loadProfile,
   reportSkippedBundles,
@@ -287,6 +288,7 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
     })
 
     const safeMode = options.safeMode === true
+    const safeReason = safeMode ? readSafeReason(process.env) : undefined
     if (safeMode) {
       process.stderr.write(`${NAME}: safe mode: third-party plugins, optional bundles and MCP servers are not loaded; profile files are left untouched
 `)
@@ -303,6 +305,7 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
       cwd: process.cwd(), home: resolveDshHome(),
       overlays: composed.overlays, telemetryDisabledEnv: process.env.DSH_TELEMETRY_DISABLED,
       ...(safeMode ? { safeMode } : {}),
+      ...(safeReason === undefined ? {} : { safeReason }),
     }
     const ctx = await boot(NAME, rootConfig, readProfilePatches(NAME, profileContext, composed.profile), async (hostCtx) => {
       app.current = hostCtx

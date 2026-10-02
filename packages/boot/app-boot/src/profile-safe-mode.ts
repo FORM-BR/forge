@@ -32,6 +32,22 @@ const USER_EXTENSION_MODULES: ReadonlySet<string> = new Set([
   '@deepseek-ai/cordis-plugin-include',
 ])
 
+/** Environment variable the launcher sets, with a short human reason, when it fell back to safe mode by itself. */
+export const SAFE_REASON_ENV = 'FORGE_SAFE_REASON'
+
+/** Longest reason kept; anything past it is cut so a stack trace never reaches the UI. */
+const SAFE_REASON_MAX = 300
+
+/**
+ * Read the automatic-fallback reason from the launch environment.
+ * @param environment - the launch environment, read for {@link SAFE_REASON_ENV}.
+ * @returns a single-line reason, or undefined when none was given.
+ */
+export function readSafeReason(environment: Readonly<Record<string, string | undefined>>): string | undefined {
+  const line = (environment[SAFE_REASON_ENV] ?? '').replace(/\s+/g, ' ').trim().slice(0, SAFE_REASON_MAX)
+  return line === '' ? undefined : line
+}
+
 /**
  * Resolve whether a launch asks for safe mode.
  * @param flag - the `--safe` launcher flag.

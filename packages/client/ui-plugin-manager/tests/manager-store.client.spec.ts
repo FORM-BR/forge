@@ -114,7 +114,12 @@ describe('readSafeMode', () => {
     expect(state().safeMode).toBe(false)
     await controller.readSafeMode()
     expect(state().safeMode).toBe(true)
+    expect(state().safeReason).toBeNull()
     expect(plugins.listBundles).not.toHaveBeenCalled()
+
+    const automatic = bench({ safeMode: vi.fn(() => Promise.resolve(ok({ active: true, reason: 'plugin x falhou' }))) })
+    await automatic.controller.readSafeMode()
+    expect(automatic.state()).toMatchObject({ safeMode: true, safeReason: 'plugin x falhou' })
 
     const failing = bench({ safeMode: vi.fn(() => Promise.reject(new Error('offline'))) })
     await failing.controller.readSafeMode()

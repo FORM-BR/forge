@@ -88,6 +88,8 @@ it('reports whether the process booted in safe mode', async () => {
   expect(manager.safeMode()).toEqual({ active: false })
   ;(profile as { safeMode?: boolean }).safeMode = true
   expect(manager.safeMode()).toEqual({ active: true })
+  ;(profile as { safeReason?: string }).safeReason = 'plugin x falhou'
+  expect(manager.safeMode()).toEqual({ active: true, reason: 'plugin x falhou' })
 })
 
 it.each(['network', 'timeout'] as const)('stops a GitHub %s before pnpm and attributes it to the repository', async (kind) => {

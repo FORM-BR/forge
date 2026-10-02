@@ -33,6 +33,8 @@ export interface ProfileContext {
    * third-party plugins stay unmounted. Held for the whole process so every reload composes the same way.
    */
   readonly safeMode?: boolean
+  /** Why the launcher entered safe mode after a failed normal boot (`FORGE_SAFE_REASON`); absent when the user asked for it. */
+  readonly safeReason?: string
 }
 
 declare module '@deepseek-ai/cordis' {

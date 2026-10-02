@@ -76,6 +76,7 @@ const READY: PluginManagerState = {
   confirm: null,
   highlight: null,
   safeMode: false,
+  safeReason: null,
 }
 
 /**
@@ -203,7 +204,12 @@ describe('safe mode indicator', () => {
     expect(notice?.textContent).toContain(en.safeModeBannerTitle)
     expect(notice?.textContent).toContain('-Safe')
     expect(within(pill.container).getByRole('status').textContent).toContain(en.safeModePill)
-    b.set({ safeMode: false })
+    expect(pill.container.querySelector('[data-safe-mode-auto]')).toBeNull()
+    b.set({ safeReason: 'plugin dsh-at-file falhou ao carregar' })
+    expect(document.querySelector('[data-safe-mode-notice]')?.textContent).toContain('plugin dsh-at-file falhou ao carregar')
+    expect(pill.container.querySelector('[data-safe-mode-auto]')?.textContent).toContain(en.safeModePillAuto)
+    expect(pill.container.querySelector('[data-safe-mode-auto]')?.getAttribute('title')).toContain('dsh-at-file')
+    b.set({ safeMode: false, safeReason: null })
     expect(document.querySelector('[data-safe-mode-notice]')).toBeNull()
     expect(pill.container.querySelector('[data-safe-mode-pill]')).toBeNull()
   })

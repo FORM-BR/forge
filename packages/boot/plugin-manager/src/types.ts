@@ -111,6 +111,8 @@ export interface PackageResult {
 export interface SafeModeStatus {
   /** True when third-party bundles, rows and MCP servers were left out of this process's composition. */
   active: boolean
+  /** Present when the launcher entered safe mode by itself after a failed normal boot: why, as one line. */
+  reason?: string
 }
 
 /** Persisted change and independently observed application outcome. */

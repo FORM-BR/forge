@@ -1360,6 +1360,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
       {showsCards && state.safeMode ? (
         <div className={css.safeModeNotice} role="status" data-safe-mode-notice>
           <strong>{t('safeModeBannerTitle')}</strong>
+          {state.safeReason === null ? null : <p>{t('safeModeAutoReason', { reason: state.safeReason })}</p>}
           <p>{t('safeModeBannerBody')}</p>
           <p>{t('safeModeBannerHow')}</p>
         </div>

@@ -13,10 +13,12 @@ import {
   initProfile,
   isSafeModeBundle,
   isSafeModeRequested,
+  readSafeReason,
   PROFILE_PATCH_FILENAME,
   readProfilePatches,
   resolveProfileDir,
   SAFE_MODE_ENV,
+  SAFE_REASON_ENV,
   type ProfileContext,
 } from '../src/index.ts'
 
@@ -111,6 +113,15 @@ describe('safe mode request', () => {
     expect(isSafeModeBundle('@deepseek-ai/dsh-web-app')).toBe(true)
     expect(isSafeModeBundle('@deepseek-ai/dsh-experimental-auto-review')).toBe(false)
     expect(isSafeModeBundle('third-party-bundle')).toBe(false)
+  })
+})
+
+describe('safe mode reason', () => {
+  it('reads one trimmed line from FORGE_SAFE_REASON and ignores it when empty', () => {
+    expect(readSafeReason({})).toBeUndefined()
+    expect(readSafeReason({ [SAFE_REASON_ENV]: '   ' })).toBeUndefined()
+    expect(readSafeReason({ [SAFE_REASON_ENV]: ' plugin x\n  falhou  ' })).toBe('plugin x falhou')
+    expect(readSafeReason({ [SAFE_REASON_ENV]: 'a'.repeat(500) })).toHaveLength(300)
   })
 })
 

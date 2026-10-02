@@ -19,11 +19,18 @@ export type SafeModePillProps = InjectFace<SafeModePillFace> & PropsLocale<'plug
  */
 export function SafeModePill({ usePluginManager, t }: SafeModePillProps): ReactNode {
   const safeMode = usePluginManager(state => state.safeMode)
+  const reason = usePluginManager(state => state.safeReason)
   if (!safeMode) return null
   return (
-    <div className={css.pill} role="status" title={t('safeModePillTitle')} data-safe-mode-pill>
+    <div
+      className={css.pill}
+      role="status"
+      title={reason === null ? t('safeModePillTitle') : t('safeModeAutoReason', { reason })}
+      data-safe-mode-pill
+      data-safe-mode-auto={reason === null ? undefined : 'true'}
+    >
       <span className={css.dot} aria-hidden="true" />
-      {t('safeModePill')}
+      {t(reason === null ? 'safeModePill' : 'safeModePillAuto')}
     </div>
   )
 }

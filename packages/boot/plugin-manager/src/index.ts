@@ -230,7 +230,7 @@ export class PluginManager extends TypertRemoteService {
    */
   @Remote
   safeMode(): SafeModeStatus {
-    return { active: this.profile.safeMode === true }
+    return { active: this.profile.safeMode === true, ...this.profile.safeReason === undefined ? {} : { reason: this.profile.safeReason } }
   }
 
   /** Read exact plugin-version exemptions saved in this profile.
