@@ -336,6 +336,8 @@ describe('WorkspaceController', () => {
       path: '/work/created',
       git: { repoName: 'repo', root: '/work/created', branch: 'main', detached: false },
     })
+    await expect(controller.gitGraph({ path: '/work/created' }))
+      .resolves.toEqual({ path: '/work/created', state: 'no-repository' })
     await expect(controller.rename(wid('one'), 'renamed')).resolves.toMatchObject({ title: 'renamed' })
     await expect(controller.insertBefore(wid('one'))).resolves.toBeUndefined()
     await expect(controller.insertSessionBefore(wid('one'), sid('session'))).resolves.toMatchObject({
@@ -379,6 +381,9 @@ describe('WorkspaceController', () => {
     mock.remote.workspace.gitInfo.mockResolvedValueOnce(err(new RemoteError('gateway/bad-request', 'not absolute', {})))
     await expect(controller.gitInfo('relative'))
       .rejects.toThrow('workspace git info failed: gateway/bad-request: not absolute')
+    mock.remote.workspace.gitGraph.mockResolvedValueOnce(err(new RemoteError('gateway/bad-request', 'not absolute', {})))
+    await expect(controller.gitGraph({ path: 'relative' }))
+      .rejects.toThrow('workspace git graph failed: gateway/bad-request: not absolute')
     mock.remote.workspace.rename.mockResolvedValueOnce(err(missingWorkspace))
     await expect(controller.rename(wid('missing'), 'name')).rejects.toThrow('workspace rename failed: workspace/not-found: gone')
     mock.remote.workspace.delete.mockResolvedValueOnce(err(missingWorkspace))

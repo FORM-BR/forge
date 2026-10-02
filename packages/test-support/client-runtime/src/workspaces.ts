@@ -1,7 +1,8 @@
 /** Test-owned workspaces face: the renderer standard-kit observable plus recorded actions. */
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type {
-  IWorkspaces, WorkspaceGitInfoValue, WorkspaceId, WorkspaceSnapshot, WorkspaceView,
+  IWorkspaces, WorkspaceGitGraphRequest, WorkspaceGitGraphValue, WorkspaceGitInfoValue, WorkspaceId,
+  WorkspaceSnapshot, WorkspaceView,
 } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
@@ -118,6 +119,19 @@ export class TestWorkspaces implements IWorkspaces {
     const stub = this.stubs.get('gitInfo')
     if (stub !== undefined) return await (stub(path, signal) as Promise<WorkspaceGitInfoValue>)
     return { path }
+  }
+
+  /**
+   * Read the git history of a directory (recorded). The default answers that no repository was found.
+   * @param request - Host directory and station limit.
+   * @param signal - caller lifetime.
+   * @returns the stubbed answer, or `no-repository`.
+   */
+  async gitGraph(request: WorkspaceGitGraphRequest, signal?: AbortSignal): Promise<WorkspaceGitGraphValue> {
+    this.calls.push({ method: 'gitGraph', args: [request, signal] })
+    const stub = this.stubs.get('gitGraph')
+    if (stub !== undefined) return await (stub(request, signal) as Promise<WorkspaceGitGraphValue>)
+    return { path: request.path, state: 'no-repository' }
   }
 
   /**

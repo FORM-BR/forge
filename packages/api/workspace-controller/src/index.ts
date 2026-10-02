@@ -7,6 +7,7 @@ import { WorkspaceCommands } from './commands.ts'
 import { DirectoryPickerController } from './directory-picker.ts'
 import { WorkspaceFeed, workspaceView } from './feed.ts'
 import { defaultWorkspaceDirectory, validateDocumentsDirectory } from './default-directory.ts'
+import { isGitGraphPath, resolveGitGraph } from './git-graph.ts'
 import { isGitInfoPath, resolveGitInfo } from './git-info.ts'
 import { createWorktree } from './worktree.ts'
 import type {
@@ -17,6 +18,8 @@ import type {
   WorkspaceDeleteRequest,
   WorkspaceDeleteValue,
   WorkspaceFollowFrame,
+  WorkspaceGitGraphRequest,
+  WorkspaceGitGraphValue,
   WorkspaceGitInfoValue,
   WorkspaceInsertBeforeRequest,
   WorkspaceInsertSessionBeforeRequest,
@@ -44,10 +47,16 @@ export interface Config {
   documentsLookupTimeoutMs?: number
   /** Maximum duration of one git repository lookup. */
   gitLookupTimeoutMs?: number
+  /** Maximum duration of one git history lookup. */
+  gitGraphTimeoutMs?: number
 }
 
 /** Directory policy after schema defaults have been applied. */
-type ResolvedConfig = Config & { documentsLookupTimeoutMs: number; gitLookupTimeoutMs: number }
+type ResolvedConfig = Config & {
+  documentsLookupTimeoutMs: number
+  gitLookupTimeoutMs: number
+  gitGraphTimeoutMs: number
+}
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -64,6 +73,7 @@ export class WorkspaceController extends TypertRemoteService {
     documentsDirectory: z.string(),
     documentsLookupTimeoutMs: z.natural().min(1).default(10_000),
     gitLookupTimeoutMs: z.natural().min(1).default(3_000),
+    gitGraphTimeoutMs: z.natural().min(1).default(15_000),
   })
 
   private readonly config: ResolvedConfig
@@ -155,6 +165,30 @@ export class WorkspaceController extends TypertRemoteService {
     } catch (error: unknown) {
       if (signal.aborted) throw new RemoteError('gateway/cancelled', 'worktree creation was aborted', {}, { cause: error })
       throw error
+    }
+  }
+
+  /**
+   * Read the commit history of the git repository containing a directory, for
+   * the Git Map. Read-only: runs `git log`, `rev-list`, `for-each-ref`,
+   * `merge-base` and `rev-parse` against the path, never fetches and never
+   * writes. A directory outside a repository, a repository without commits,
+   * and a git error or expired deadline each answer with a state rather than
+   * failing.
+   * @param request - fully qualified Host directory and the number of main-line stations to read.
+   * @param signal - caller lifetime; abort terminates the running git children.
+   * @returns the echoed path, the lookup state, and the graph when ready.
+   */
+  @Remote('gitGraph')
+  async gitGraph(request: WorkspaceGitGraphRequest, signal: AbortSignal): Promise<WorkspaceGitGraphValue> {
+    if (!isGitGraphPath(request.path)) {
+      throw new RemoteError('gateway/bad-request', 'workspace.gitGraph requires a fully qualified path', {})
+    }
+    try {
+      return await resolveGitGraph(request.path, request.limit, signal, this.config.gitGraphTimeoutMs)
+    } catch (error: unknown) {
+      // resolveGitGraph rejects only when the caller's own signal aborted.
+      throw new RemoteError('gateway/cancelled', 'git history lookup was aborted', {}, { cause: error })
     }
   }
 

@@ -18,7 +18,9 @@ export type {
 export { WorkspaceArchiveError, WorkspaceController, WorkspaceCreateError } from './service.ts'
 export type { IWorkspaces, WorkspaceSource } from './service.ts'
 export type {
-  SessionActivity, SessionActivityItem, SessionActivityKind, SessionActivityKindMap, WorkspaceGitInfoValue,
+  SessionActivity, SessionActivityItem, SessionActivityKind, SessionActivityKindMap, WorkspaceGitGraph,
+  WorkspaceGitGraphBranch, WorkspaceGitGraphCommit, WorkspaceGitGraphCommitType, WorkspaceGitGraphRequest,
+  WorkspaceGitGraphStation, WorkspaceGitGraphValue, WorkspaceGitInfoValue,
   WorkspaceGitRepo, WorkspaceId, WorkspaceView,
 } from '../types.ts'
 

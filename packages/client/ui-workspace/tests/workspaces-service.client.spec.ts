@@ -196,6 +196,7 @@ class FakeWorkspaces implements IWorkspaces {
   declare readonly createWorktree: IWorkspaces['createWorktree']
   declare readonly rename: IWorkspaces['rename']
   declare readonly gitInfo: IWorkspaces['gitInfo']
+  declare readonly gitGraph: IWorkspaces['gitGraph']
   declare readonly delete: IWorkspaces['delete']
   declare readonly insertBefore: IWorkspaces['insertBefore']
   declare readonly insertSessionBefore: IWorkspaces['insertSessionBefore']

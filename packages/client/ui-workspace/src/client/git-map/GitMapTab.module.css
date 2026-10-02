@@ -1,0 +1,226 @@
+/* Git Map tab. Every colour is a theme token, so the map follows light and dark.
+   Commit classes: feature = brand blue, fix = warning amber, other = tertiary label. */
+
+.root {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  gap: 12px;
+  padding: 10px 12px 16px;
+  overflow: auto;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.select,
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.select:hover,
+.button:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.select:focus-visible,
+.button:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color);
+  outline-offset: 1px;
+}
+
+.button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.repo {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.swatchMerge {
+  width: 11px;
+  height: 11px;
+  border: 2.5px solid var(--dsw-alias-label-secondary);
+  background: transparent;
+}
+
+.swatchOpen {
+  width: 16px;
+  height: 0;
+  border-radius: 0;
+  border-top: 2px dashed var(--dsw-alias-border-l4);
+}
+
+.swatchHead {
+  border: 2px solid var(--dsw-alias-state-success-primary);
+  background: transparent;
+}
+
+.scroller {
+  flex: none;
+  overflow-x: auto;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-lg);
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.svg {
+  display: block;
+}
+
+.svg text {
+  font-family: var(--dsw-font-family, inherit);
+}
+
+.line {
+  stroke: var(--dsw-alias-label-secondary);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.lineTail {
+  stroke: var(--dsw-alias-label-secondary);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 1 7;
+}
+
+.curve,
+.branchPath,
+.bracket {
+  fill: none;
+  stroke: var(--dsw-alias-border-l4);
+  stroke-width: 2;
+}
+
+.branchPath {
+  stroke-dasharray: 5 4;
+}
+
+.bracket {
+  stroke-width: 1;
+}
+
+.mergeRing {
+  fill: var(--dsw-alias-bg-layer-1);
+  stroke: var(--dsw-alias-label-secondary);
+  stroke-width: 3;
+}
+
+.headRing {
+  fill: none;
+  stroke: var(--dsw-alias-state-success-primary);
+  stroke-width: 2;
+}
+
+.feat {
+  fill: var(--dsw-alias-state-business-primary);
+  background: var(--dsw-alias-state-business-primary);
+}
+
+.fix {
+  fill: var(--dsw-alias-state-warn-primary);
+  background: var(--dsw-alias-state-warn-primary);
+}
+
+.other {
+  fill: var(--dsw-alias-label-tertiary);
+  background: var(--dsw-alias-label-tertiary);
+}
+
+.label {
+  fill: var(--dsw-alias-label-primary);
+  font-size: 12px;
+}
+
+.name {
+  fill: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.hint {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+}

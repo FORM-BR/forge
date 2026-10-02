@@ -11,6 +11,8 @@ import type {
   WorkspaceCreateRequest,
   WorkspaceCreateValue,
   WorkspaceDeleteValue,
+  WorkspaceGitGraphRequest,
+  WorkspaceGitGraphValue,
   WorkspaceGitInfoValue,
   WorkspaceInsertSessionBeforeRequest,
   WorkspaceOrderValue,
@@ -136,6 +138,17 @@ export class ClientWorkspaceModel implements WorkspaceFollowSink {
    */
   gitInfo(path: string, signal?: AbortSignal): Promise<RemoteResult<WorkspaceGitInfoValue>> {
     return this.remote.gitInfo(path, signal)
+  }
+
+  /**
+   * Read the commit history of the git repository containing a Host directory.
+   * Read-only: the answer is not part of the Workspace projection and is never cached here.
+   * @param request - fully qualified Host directory and station limit.
+   * @param signal - caller lifetime; abort cancels the Host lookup.
+   * @returns generated Remote result.
+   */
+  gitGraph(request: WorkspaceGitGraphRequest, signal?: AbortSignal): Promise<RemoteResult<WorkspaceGitGraphValue>> {
+    return this.remote.gitGraph(request, signal)
   }
 
   /**

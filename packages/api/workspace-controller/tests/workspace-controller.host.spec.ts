@@ -552,3 +552,47 @@ describe('git info Remote', () => {
     expect(result.git).toMatchObject({ repoName: 'my-repo', branch: 'feat-x', detached: false })
   })
 })
+
+describe('git graph Remote', () => {
+  const gitAvailable = (() => {
+    try {
+      execFileSync('git', ['--version'], { stdio: 'ignore' })
+      return true
+    } catch {
+      // No git executable on this machine: the real-repository case is skipped.
+      return false
+    }
+  })()
+
+  it('refuses a relative path as a bad request', async () => {
+    const { controller } = await harness()
+    await expect(controller.gitGraph({ path: 'relative/dir' }, new AbortController().signal))
+      .rejects.toMatchObject({ code: 'gateway/bad-request' })
+  })
+
+  it('answers that a directory outside any repository has none', async () => {
+    const { controller, root } = await harness()
+    await expect(controller.gitGraph({ path: root }, new AbortController().signal))
+      .resolves.toEqual({ path: root, state: 'no-repository' })
+  })
+
+  it('maps the caller abort to gateway/cancelled', async () => {
+    const { controller, root } = await harness()
+    await expect(controller.gitGraph({ path: root }, AbortSignal.abort())).rejects.toMatchObject({ code: 'gateway/cancelled' })
+  })
+
+  it.skipIf(!gitAvailable)('reads the history of the repository containing a nested directory', async () => {
+    const { controller, root } = await harness()
+    const repo = stageDir(root, 'graph-repo')
+    const nested = stageDir(repo, 'src')
+    execFileSync('git', ['init', '--initial-branch=main', repo], { stdio: 'ignore' })
+    execFileSync('git', [
+      '-C', repo, '-c', 'user.name=T', '-c', 'user.email=t@example.com', '-c', 'commit.gpgsign=false',
+      '-c', 'core.hooksPath=', 'commit', '--allow-empty', '-m', 'feat: first',
+    ], { stdio: 'ignore' })
+    const result = await controller.gitGraph({ path: nested, limit: 5 }, new AbortController().signal)
+    expect(result.state).toBe('ready')
+    expect(result.graph).toMatchObject({ repoName: 'graph-repo', base: 'main', total: 1, merges: 0 })
+    expect(result.graph!.stations.map(station => [station.type, station.name])).toEqual([['feat', 'first']])
+  })
+})

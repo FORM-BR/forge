@@ -12,6 +12,7 @@ import type {
   WorkspaceDeleteSessionValue,
   WorkspaceDeleteValue,
   WorkspaceFollowFrame,
+  WorkspaceGitGraphValue,
   WorkspaceGitInfoValue,
   WorkspaceInsertBeforeRequest,
   WorkspaceInsertSessionBeforeRequest,
@@ -122,6 +123,9 @@ class FakeWorkspaceRemote implements WorkspaceRemote {
     branch: 'forge/work',
   }))
 
+  readonly gitGraph = vi.fn<WorkspaceRemote['gitGraph']>(async (request): Promise<RemoteResult<WorkspaceGitGraphValue>> =>
+    remoteOk({ path: request.path, state: 'no-repository' }))
+
   create(request: WorkspaceCreateRequest): Promise<RemoteResult<WorkspaceCreateValue>> {
     this.record('create', request)
     return this.onCreate(request)
@@ -226,6 +230,20 @@ describe('ClientWorkspaceModel', () => {
       value: { path: '/w/one', git: { repoName: 'repo', root: '/w/one', branch: 'main', detached: false } },
     })
     expect(remote.gitInfo).toHaveBeenCalledWith('/w/one', signal)
+    expect(model.getSnapshot()).toBe(before)
+  })
+
+  it('forwards a git history lookup to the Remote without touching the Workspace list', async () => {
+    const remote = new FakeWorkspaceRemote()
+    const model = modelFor(remote)
+    baseline(model, [workspace('one')])
+    const before = model.getSnapshot()
+    const signal = new AbortController().signal
+    await expect(model.gitGraph({ path: '/w/one', limit: 40 }, signal)).resolves.toEqual({
+      ok: true,
+      value: { path: '/w/one', state: 'no-repository' },
+    })
+    expect(remote.gitGraph).toHaveBeenCalledWith({ path: '/w/one', limit: 40 }, signal)
     expect(model.getSnapshot()).toBe(before)
   })
 

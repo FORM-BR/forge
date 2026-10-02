@@ -49,6 +49,103 @@ export interface WorkspaceGitInfoValue {
   readonly git?: WorkspaceGitRepo
 }
 
+/** Request for the commit history of the repository containing a directory. */
+export interface WorkspaceGitGraphRequest {
+  /** Fully qualified Host directory, typically a Session's cwd. */
+  readonly path: string
+  /** Most recent first-parent stations to read from the base branch; clamped to 1..100, default 18. */
+  readonly limit?: number
+}
+
+/** Conventional-commit class of one commit: `feat`, `fix`, or anything else. */
+export type WorkspaceGitGraphCommitType = 'feat' | 'fix' | 'other'
+
+/** One commit shown as a dot on the map. */
+export interface WorkspaceGitGraphCommit {
+  /** Full object name. */
+  readonly hash: string
+  /** Abbreviated object name (seven characters). */
+  readonly short: string
+  readonly type: WorkspaceGitGraphCommitType
+  /** Subject line. */
+  readonly message: string
+  /** Author date as `YYYY-MM-DD`. */
+  readonly date: string
+  readonly author: string
+}
+
+/** One step along the base branch's first-parent chain: a merge (station) or a direct commit. */
+export interface WorkspaceGitGraphStation {
+  readonly hash: string
+  readonly short: string
+  /** `merge` when the commit has more than one parent. */
+  readonly kind: 'merge' | 'commit'
+  /** `merge` for merges, otherwise the commit's own class. */
+  readonly type: WorkspaceGitGraphCommitType | 'merge'
+  /** Author date as `YYYY-MM-DD`. */
+  readonly date: string
+  readonly message: string
+  readonly author: string
+  /** `#<number>` when the subject names a pull request, otherwise the abbreviated hash. */
+  readonly label: string
+  /** Merged branch name, or the subject stripped of its type prefix and pull-request suffix. */
+  readonly name: string
+  /** The newest (up to three) non-merge commits of the merged branch, oldest first; empty for a direct commit. */
+  readonly commits: readonly WorkspaceGitGraphCommit[]
+  /** Number of non-merge commits the merge brought in. */
+  readonly commitCount: number
+}
+
+/** A branch not yet merged into the base branch. */
+export interface WorkspaceGitGraphBranch {
+  /** Local name when one exists, otherwise the remote-tracking name. */
+  readonly name: string
+  /** Further refs pointing at the same commit. */
+  readonly aliases: number
+  /** The newest (up to twelve) non-merge commits beyond the base branch, oldest first. */
+  readonly commits: readonly WorkspaceGitGraphCommit[]
+  /** Number of non-merge commits beyond the base branch. */
+  readonly commitCount: number
+  /** True when the checked-out commit is on this branch. */
+  readonly isHead: boolean
+}
+
+/** The history of one repository, shaped for the Git Map. */
+export interface WorkspaceGitGraph {
+  readonly repoName: string
+  /** Host path of the repository's top-level directory. */
+  readonly root: string
+  /** The branch whose first-parent chain forms the main line (`main`, `master`, or the remote default). */
+  readonly base: string
+  /** Full object name of the checked-out commit. */
+  readonly head: string
+  /** Checked-out branch name, or `HEAD` when detached. */
+  readonly headBranch: string
+  /** Commits reachable from any ref. */
+  readonly total: number
+  /** Merge commits reachable from any ref. */
+  readonly merges: number
+  /** Main-line steps, oldest first. */
+  readonly stations: readonly WorkspaceGitGraphStation[]
+  /** Unmerged branches, newest first, at most six; stacked branches appear once. */
+  readonly branches: readonly WorkspaceGitGraphBranch[]
+  /** Unmerged branches beyond those listed. */
+  readonly moreBranches: number
+}
+
+/**
+ * Answer to a git history lookup for one directory: `ready` carries the graph;
+ * the other states say why there is none.
+ */
+export interface WorkspaceGitGraphValue {
+  /** The directory the lookup was about, echoed from the request. */
+  readonly path: string
+  /** `no-repository`: not inside git (or git is missing); `no-commits`: unborn branch; `failed`: git errored or the deadline expired. */
+  readonly state: 'ready' | 'no-repository' | 'no-commits' | 'failed'
+  /** Present exactly when `state` is `ready`. */
+  readonly graph?: WorkspaceGitGraph
+}
+
 declare module '@deepseek-ai/dsh-typert-protocol' {
   interface RemoteErrorDetailsMap {
     /** The requested directory cannot back a Workspace. */
