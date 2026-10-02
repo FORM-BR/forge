@@ -282,7 +282,7 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
     // that placeholder is the composer's accessible name in this window. It
     // changes back as the queue drains, so later interactions address the
     // stable composer node instead.
-    await page.getByRole('textbox', { name: 'Cmd/Ctrl+Enter steers all queued messages' })
+    await page.getByRole('textbox', { name: 'Alt+Enter steers all queued messages' })
       .waitFor({ timeout: 15_000 })
     const input = page.locator('[data-composer-input]').first()
     expect(await input.isDisabled()).toBe(false)

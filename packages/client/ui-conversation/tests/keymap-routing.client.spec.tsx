@@ -63,12 +63,51 @@ describe('keymap keydown routing', () => {
     })
     fireEvent.keyDown(root, { key: 'Enter' })
     expect(submit).toHaveBeenCalledWith(false)
+    // The accelerated chord on the main Enter moved from Cmd/Ctrl to Alt:
+    // Ctrl/Cmd+Enter falls through to the native line break instead.
+    submit.mockClear()
     fireEvent.keyDown(root, { key: 'Enter', metaKey: true })
+    expect(submit).not.toHaveBeenCalled()
+    submit.mockClear()
+    fireEvent.keyDown(root, { key: 'Enter', ctrlKey: true })
+    expect(submit).not.toHaveBeenCalled()
+    submit.mockClear()
+    fireEvent.keyDown(root, { key: 'Enter', altKey: true })
     expect(submit).toHaveBeenCalledWith(true)
   })
 
+  it('keeps the legacy accelerated chord on the NumpadEnter', () => {
+    const editor = createEditor({ namespace: 'keymap-routing', onError: (e) => { throw e } })
+    const root = document.createElement('div')
+    root.contentEditable = 'true'
+    document.body.appendChild(root)
+    editor.setRootElement(root)
+    registerPlainText(editor)
+    const submit = vi.fn()
+    registerComposerKeymap(editor, {
+      arbitrate: () => 'pass',
+      space: () => false,
+      dismissPopup: () => {},
+      canSubmit: () => true,
+      submit,
+      intakeFiles: () => {},
+      pasteText: () => {},
+    })
+    fireEvent.keyDown(root, { key: 'Enter', code: 'NumpadEnter' })
+    expect(submit).toHaveBeenCalledWith(false)
+    submit.mockClear()
+    fireEvent.keyDown(root, { key: 'Enter', code: 'NumpadEnter', ctrlKey: true })
+    expect(submit).toHaveBeenCalledWith(true)
+    submit.mockClear()
+    fireEvent.keyDown(root, { key: 'Enter', code: 'NumpadEnter', metaKey: true })
+    expect(submit).toHaveBeenCalledWith(true)
+    submit.mockClear()
+    // The NumpadEnter keeps its own application-chord slot for Alt.
+    fireEvent.keyDown(root, { key: 'Enter', code: 'NumpadEnter', altKey: true })
+    expect(submit).not.toHaveBeenCalled()
+  })
+
   it.each([
-    { altKey: true },
     { altKey: true, metaKey: true },
     { altKey: true, ctrlKey: true },
     { ctrlKey: true, metaKey: true },
