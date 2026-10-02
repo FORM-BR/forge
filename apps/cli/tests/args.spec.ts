@@ -32,6 +32,15 @@ describe('parseDshArgs', () => {
       .toEqual({ mode: 'profile', profile: 'web', patches: ['web.yml'], args: [] })
   })
 
+  it('reads --safe as a launcher flag, ahead of the app flags', () => {
+    expect(parse(['web', '--safe'])).toEqual({ mode: 'profile', profile: 'web', patches: [], args: [], safe: true })
+    expect(parse(['--profile', 'web', '--safe', '--no-open']))
+      .toEqual({ mode: 'profile', profile: 'web', patches: [], args: ['--no-open'], safe: true })
+    // After the first app flag it belongs to the app, like every other launcher flag.
+    expect(parse(['web', '--no-open', '--safe']))
+      .toEqual({ mode: 'profile', profile: 'web', patches: [], args: ['--no-open', '--safe'] })
+  })
+
   it('ends the launcher flags at the first token it does not own', () => {
     // App flags, including its -h, and positionals reach the app verbatim.
     expect(parse(['--profile', 'tui', '--resume', 'abc']))

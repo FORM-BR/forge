@@ -21,6 +21,8 @@ import {
   createRuntimeResolution,
   initProfile,
   installFailLoud,
+  isSafeModeBundle,
+  readSafeReason,
   loadOverlayPatches,
   loadProfile,
   reportSkippedBundles,
@@ -232,6 +234,8 @@ export interface RunProfileOptions {
   args: readonly string[]
   /** Application-owned package runtime, scoped to plugin package operations. */
   packageManager?: ProfileContext['packageManager']
+  /** Boot in safe mode: shipped bundles only, no third-party plugins, nothing written to the profile. */
+  safeMode?: boolean | undefined
 }
 
 /**
@@ -283,15 +287,25 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
       await app.current?.fiber.dispose()
     })
 
+    const safeMode = options.safeMode === true
+    const safeReason = safeMode ? readSafeReason(process.env) : undefined
+    if (safeMode) {
+      process.stderr.write(`${NAME}: safe mode: third-party plugins, optional bundles and MCP servers are not loaded; profile files are left untouched
+`)
+    }
     const rootConfig = join(composed.profile.dir, PROFILE_ROOT_FILENAME)
     const profileContext: ProfileContext = {
       name: options.profile,
       ...(options.packageManager === undefined ? {} : { packageManager: options.packageManager }),
       dir: composed.profile.dir, patchPath: composed.profile.patchPath,
       installAnchor: options.resolvedProfile?.installAnchor ?? INSTALL_ANCHOR,
-      startedBundles: composed.profile.layers.map(layer => layer.packageName),
+      startedBundles: composed.profile.layers
+        .map(layer => layer.packageName)
+        .filter(packageName => !safeMode || isSafeModeBundle(packageName)),
       cwd: process.cwd(), home: resolveDshHome(),
       overlays: composed.overlays, telemetryDisabledEnv: process.env.DSH_TELEMETRY_DISABLED,
+      ...(safeMode ? { safeMode } : {}),
+      ...(safeReason === undefined ? {} : { safeReason }),
     }
     const ctx = await boot(NAME, rootConfig, readProfilePatches(NAME, profileContext, composed.profile), async (hostCtx) => {
       app.current = hostCtx

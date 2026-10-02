@@ -107,6 +107,14 @@ export interface PackageResult {
   incompatible?: IncompatiblePlugin[]
 }
 
+/** Whether this process booted in safe mode: shipped plugins only, third-party plugins not loaded. */
+export interface SafeModeStatus {
+  /** True when third-party bundles, rows and MCP servers were left out of this process's composition. */
+  active: boolean
+  /** Present when the launcher entered safe mode by itself after a failed normal boot: why, as one line. */
+  reason?: string
+}
+
 /** Persisted change and independently observed application outcome. */
 export interface ChangeResult {
   changed: boolean

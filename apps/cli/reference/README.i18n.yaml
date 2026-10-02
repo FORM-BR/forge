@@ -11,6 +11,9 @@
 /dsh-cli-behavior-reference/profile-boot/app-arguments:
   en: 241e5525aa09a33b
   zh: 398f853143097154
+/dsh-cli-behavior-reference/profile-boot/safe-mode:
+  en: 16e91420476a8e94
+  zh: 6947ebde81ee3915
 /dsh-cli-behavior-reference/profile-boot/config-schema-dump:
   en: a356f8a68f3b3685
   zh: c718713b5d709295

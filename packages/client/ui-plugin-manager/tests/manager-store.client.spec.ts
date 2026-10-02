@@ -107,6 +107,29 @@ function bench(overrides: Partial<Record<string, ReturnType<typeof vi.fn>>> = {}
   return { plugins, inventory, probe, controller, face, state, started, track }
 }
 
+describe('readSafeMode', () => {
+  it('publishes the Host answer, keeps it off when the Host cannot answer, and never touches the plugin list', async () => {
+    const safeMode = vi.fn(() => Promise.resolve(ok({ active: true })))
+    const { controller, state, plugins } = bench({ safeMode })
+    expect(state().safeMode).toBe(false)
+    await controller.readSafeMode()
+    expect(state().safeMode).toBe(true)
+    expect(state().safeReason).toBeNull()
+    expect(plugins.listBundles).not.toHaveBeenCalled()
+
+    const automatic = bench({ safeMode: vi.fn(() => Promise.resolve(ok({ active: true, reason: 'plugin x falhou' }))) })
+    await automatic.controller.readSafeMode()
+    expect(automatic.state()).toMatchObject({ safeMode: true, safeReason: 'plugin x falhou' })
+
+    const failing = bench({ safeMode: vi.fn(() => Promise.reject(new Error('offline'))) })
+    await failing.controller.readSafeMode()
+    expect(failing.state().safeMode).toBe(false)
+    const missing = bench()
+    await missing.controller.readSafeMode()
+    expect(missing.state().safeMode).toBe(false)
+  })
+})
+
 it('hands a custom page the shared configuration form of its entry', () => {
   const { face } = bench()
   expect(face.configForm('bundle#row')).toBe('form:bundle#row' as never)
