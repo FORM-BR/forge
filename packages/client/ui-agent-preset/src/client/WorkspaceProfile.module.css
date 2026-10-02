@@ -1,0 +1,43 @@
+/* Workspace business profile: a quiet badge after the Workspace title and the
+   inline failure line of its menu rows. */
+
+.badge {
+  flex: none;
+  max-width: 96px;
+  padding: 0 6px;
+  height: 18px;
+  border-radius: var(--dsw-radius-xs);
+  background: var(--dsw-alias-fill-tsp-secondary);
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The profile names a preset that is gone or failed to load: the badge stays,
+   struck through, so the stale association is visible instead of silent. */
+.missing {
+  text-decoration: line-through;
+}
+
+.heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 6px 8px 2px;
+  border-top: 0.5px solid var(--dsw-alias-border-l4);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.failure {
+  padding: 4px 8px;
+  max-width: 240px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--dsw-alias-state-error-primary);
+}

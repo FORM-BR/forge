@@ -102,7 +102,7 @@ The title model receives a fixed system instruction to return one concise unador
 
 #### Token effect
 
-The auxiliary request consumes tokens according to selected input size and `maxOutputTokens`. It is separate from the main agent request and does not add title text or framing to agent history. DeepSeek title calls disable thinking; the main conversation retains its configured thinking mode.
+The auxiliary request consumes tokens according to selected input size and `maxOutputTokens`. Reasoning models spend that cap on thinking before they write the title, so set it well above the title length (the shipped base profile uses 2048; the accepted title is still bounded by the title service's byte limit). The call also asks for the model's lowest declared reasoning effort (`off`, `none`, `minimal`, or `low`) and sends no effort for a model that declares none of them. A finish at the cap rejects with a message naming the route and the cap. It is separate from the main agent request and does not add title text or framing to agent history. DeepSeek title calls disable thinking; the main conversation retains its configured thinking mode.
 
 #### KV Cache effect
 

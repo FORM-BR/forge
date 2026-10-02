@@ -880,6 +880,14 @@ workspaceDesktop(): { name: string; available: boolean; fileManager: 'finder' | 
 @Remote('rename') rename(request: SessionRenameRequest): Promise<SessionRenameValue>
 
 /**
+ * Regenerate one Session title after explicitly resuming it.
+ * @param request - Session identity and whether a user-renamed (pinned) title is left untouched.
+ * @param signal - caller cancellation.
+ * @returns the accepted title, or why nothing changed.
+ */
+@Remote('refreshTitle') refreshTitle(request: SessionRefreshTitleRequest, signal: AbortSignal): Promise<SessionRefreshTitleValue>
+
+/**
  * Fork one cold-readable exact event prefix into a new Session. An omitted
  * boundary selects the latest completed-turn prefix; an open cut receives
  * synthetic fork closers.

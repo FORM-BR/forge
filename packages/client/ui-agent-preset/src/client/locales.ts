@@ -31,6 +31,11 @@ export type AgentPresetSettingsKey =
   | 'creatorDraft'
   | 'enableDevToolsToSetDefault'
   | 'enableDevToolsToCreate'
+  | 'workspaceProfileHeading'
+  | 'workspaceProfileNone'
+  | 'workspaceProfileFailed'
+  | 'workspaceProfileHint'
+  | 'workspaceProfileMissing'
 
 /** English copy. */
 export const en: Record<AgentPresetSettingsKey, string> = {
@@ -74,6 +79,12 @@ export const en: Record<AgentPresetSettingsKey, string> = {
 
   enableDevToolsToSetDefault: 'Turn on Coding Tools in General settings to choose a default',
   enableDevToolsToCreate: 'Turn on Coding Tools in General settings to start Creator mode',
+
+  workspaceProfileHeading: 'Workspace profile',
+  workspaceProfileNone: 'None (new task default)',
+  workspaceProfileFailed: 'Could not save the workspace profile: {reason}',
+  workspaceProfileHint: 'New tasks in this workspace start with {name}',
+  workspaceProfileMissing: '{name} is no longer available; new tasks in this workspace use the default',
 }
 
 /** Simplified Chinese copy. */
@@ -113,6 +124,12 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
 
   enableDevToolsToSetDefault: '请先在通用设置中开启代码工作工具，再设置默认值',
   enableDevToolsToCreate: '请先在通用设置中开启代码工作工具，再启动创造模式',
+
+  workspaceProfileHeading: '工作区方案',
+  workspaceProfileNone: '无（使用新任务默认）',
+  workspaceProfileFailed: '无法保存工作区方案：{reason}',
+  workspaceProfileHint: '此工作区的新任务将使用「{name}」启动',
+  workspaceProfileMissing: '「{name}」已不可用，此工作区的新任务将使用默认预设',
 }
 
 // The resolution itself is the shared fold in `dsh-agent-preset-registry/display`,

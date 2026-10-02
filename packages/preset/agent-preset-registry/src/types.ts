@@ -22,6 +22,11 @@ export interface AgentPresetRow {
 export interface AgentPresetRoster {
   /** Every current declaration, including activation failures. */
   readonly presets: readonly AgentPresetRow[]
+  /**
+   * Business profiles: Workspace directory path to the preset new sessions in
+   * that Workspace start with. A path absent here follows the default preset.
+   */
+  readonly workspacePresets?: Readonly<Record<string, string>>
 }
 
 /** One preset's declared composition, rendered for reading. */

@@ -65,7 +65,7 @@
         targetWords: 5
         targetCjkCharacters: 10
         maxInputBytes: 4096
-        maxOutputTokens: 64
+        maxOutputTokens: 2048
         timeoutMs: 60000
 
     - id: user-questions

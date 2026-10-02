@@ -3,7 +3,9 @@
  * all data and callbacks arrive via props. Hover swaps (folder->chevron,
  * time->ellipsis, action buttons) are CSS-only, and a session row's clipped
  * title marquees programmatically while the row is hovered. Workspace row
- * menus are visual-only except Rename/Delete. A Session row's "..." menu and
+ * menus carry Rename/Delete plus the rows of
+ * `sidebar.workspaces.workspace.menu.item`, and the header's title is followed
+ * by the `sidebar.workspaces.workspace.badge` seat. A Session row's "..." menu and
  * its hover buttons are the `sidebar.workspaces.session.menu.item` and
  * `sidebar.workspaces.session.row.action` lists, rendered through the
  * browser's `renderSlot` with the menu's open state as the occurrence's hook
@@ -18,7 +20,7 @@ import {
   HoverCard, IconArchiveOutlineRegular, IconEditOutlineRegular,
   IconEllipsisOutlineRegular, IconFolderCloseRegular, IconFolderOpenRegular,
   IconNewChatOutlineRegular, IconPinFillRegular, IconTrashOutlineRegular,
-  IconTriangleRightFillRegular, IconUnarchiveOutlineRegular, Menu, relativeTime, StateDot, Tooltip,
+  IconSparkleRegular, IconTriangleRightFillRegular, IconUnarchiveOutlineRegular, Menu, relativeTime, StateDot, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -43,6 +45,12 @@ type RowRenderSlots = PropsRenderSlots<
   | 'sidebar.session.row.leading'
   | 'sidebar.session.row.hover'
 >['renderSlot']
+
+/** Seats a real Workspace header renders: extra "..." menu rows and the title badge. */
+type WorkspaceRowSlots = Partial<PropsRenderSlots<
+  | 'sidebar.workspaces.workspace.menu.item'
+  | 'sidebar.workspaces.workspace.badge'
+>>
 
 /** Row display title: blank rows show the localized New Session label. */
 function displayTitle(node: SessionNode, t: RowTranslate): string {
@@ -213,30 +221,40 @@ function rowHalf(e: { clientY: number; currentTarget: HTMLElement }): 'before' |
  * @param props.onCreate - start a frontend Session inside this Workspace.
  * @param props.drag - optional workspace-row drag wiring.
  * @param props.home - host account home for POSIX hover-path abbreviation.
+ * @param props.renderSlot - child-seat renderer for the Workspace menu rows and title badge.
  * @param props.t - the browser root's locale seat.
  * @returns the row element.
  */
-export function ProjectRowItem({ group, containsCurrentDescendant = false, onToggle, onCreate, actions, drag, home, newShortcut, t }: {
+export function ProjectRowItem({
+  group, containsCurrentDescendant = false, onToggle, onCreate, actions, drag, home, newShortcut, renderSlot, t,
+}: {
   group: GroupNode
   newShortcut?: ShortcutCatalogEntry | undefined
   containsCurrentDescendant?: boolean
   onToggle: () => void
   onCreate: () => void
   /** Real-Workspace actions; absent for the ungrouped bucket (no menu shown). */
-  actions?: { rename: () => void; delete: () => void } | undefined
+  actions?: { rename: () => void; retitle: () => void; delete: () => void } | undefined
   /** Present only for real Workspace rows in the grouped view. */
   drag?: WorkspaceRowDragProps | undefined
   /** Host account home; POSIX home-rooted hover paths display as `~`. */
   home?: string | undefined
   t: RowTranslate
-}) {
+} & WorkspaceRowSlots) {
   const row = group
   // The ungrouped bucket has no workspace title: its label is dictionary copy.
   const label = row.workspaceId === undefined ? t('group.ungrouped') : row.label
   const active = containsCurrentDescendant || (group.expanded && group.containsCurrent)
   const [menuOpen, setMenuOpen] = useState(false)
+  // The menu's open state, bound into the extra rows' `useMenuOpenState` hook.
+  const menuOpenState = useMemo((): MenuOpenState => [menuOpen, setMenuOpen], [menuOpen])
+  // Seats exist only for a real Workspace: the ungrouped bucket has no identity to hand over.
+  const owner = row.workspaceId === undefined || row.cwd === undefined
+    ? undefined
+    : { workspaceId: row.workspaceId, path: row.cwd, title: row.label }
   const workspaceMenuItems = [
     { id: 'rename', label: t('rename'), icon: <IconEditOutlineRegular /> },
+    { id: 'retitle', label: t('retitle.workspace'), icon: <IconSparkleRegular /> },
     { id: 'delete', label: t('delete.workspace'), icon: <IconTrashOutlineRegular />, danger: true },
   ]
   const ownRow = (
@@ -264,6 +282,7 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
       </span>
       <span className={css.projectText}>
         <span className={css.title}>{label}</span>
+        {owner !== undefined && renderSlot?.('sidebar.workspaces.workspace.badge', owner)}
       </span>
       <span className={css.rowActions}>
         {actions !== undefined && (
@@ -275,9 +294,10 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
               setMenuOpen(false)
               // Unknown ids leave before the dispatch: a future menu row must
               // not inherit the destructive branch as an else fallback.
-              /* v8 ignore next -- Menu can emit only the rename and delete rows supplied above. */
-              if (id !== 'rename' && id !== 'delete') return
+              /* v8 ignore next -- Menu can emit only the rename, retitle, and delete rows supplied above. */
+              if (id !== 'rename' && id !== 'retitle' && id !== 'delete') return
               if (id === 'rename') actions.rename()
+              else if (id === 'retitle') actions.retitle()
               else actions.delete()
             }}
             portal
@@ -292,7 +312,13 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
                 <IconEllipsisOutlineRegular />
               </button>
             )}
-          />
+          >
+            {owner !== undefined && renderSlot?.(
+              'sidebar.workspaces.workspace.menu.item',
+              owner,
+              { hookContext: menuOpenState },
+            )}
+          </Menu>
         )}
         <Tooltip label={t('actions.newSession')} shortcutKeys={newShortcut?.keys} side="bottom" align="end" delayMs={500}>
           <button

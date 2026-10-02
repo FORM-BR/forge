@@ -29,6 +29,8 @@ Settings shows the built-in and custom card groups with default highlighting and
 
 Coding Tools in General Settings decide whether a mode can be chosen at all: with them off the new-session picker disappears and the cards refuse selection, while the saved default keeps composing new tasks. Choosing a healthy default also synchronizes the blank session on the current new-task surface. Creator starts a new task using the `cordis` preset. The same stage-and-start flow is published as `ctx.agentPresetLauncher` (`available()` and `start(presetId)`) for other surfaces that start a task on a shipped preset, such as the MCP servers tab; it exists only while the conversation flow does.
 
+A Workspace can carry a business profile: an Agent preset bound to its directory. A Workspace's "..." menu lists a "Workspace profile" group, and choosing None or one healthy preset there saves the binding. A badge after the Workspace title names the preset; a preset that has been removed or failed to load shows its id struck through. The next blank session opened in that Workspace starts on the profile's preset, the same way a pick on the new-session chip does. A pick made on the session wins over the profile for that session, a profile changed later reaches a session that is still blank and unpicked, and a profile naming an unusable preset leaves the default in place. The menu rows, the badge, and the profile's application follow the Coding Tools gate. The profile carries everything its preset composes — prompt persona rows, skills, and tools; the model, permission default, and plugin set stay deployment-wide.
+
 Known shipped presets offer mode details and usage examples in a read-only dialog. Its tabs preserve each page's scroll position; closing returns focus to the opening action. Help does not change the new-task default. The default badge replaces the card's group badge, and the preset id appears beside the title. Guide copy and examples belong to this package.
 
 <a id="understand-the-implementation"></a>
@@ -37,7 +39,7 @@ Known shipped presets offer mode details and usage examples in a read-only dialo
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-`agentPresets/list` supplies the roster and marks the current default, and `agentPresets/read` one declaration's YAML for the viewer; default changes write the `agent-preset-registry` settings namespace. The picker, blank-session synchronization and read-only session label use recorded preset identities. Connection resets and settings updates refresh the roster.
+`agentPresets/list` supplies the roster and marks the current default, and `agentPresets/read` one declaration's YAML for the viewer; default changes write the `agent-preset-registry` settings namespace. The picker, blank-session synchronization and read-only session label use recorded preset identities. Connection resets and settings updates refresh the roster. The roster also carries `workspacePresets`, the profile map from Workspace directory path to preset id; it lives in the `workspacePresets` volatile field of the same settings entry, and each change is one path-addressed `settings.mutate` write. The new-session seat resolves a session's Workspace from the Workspace snapshot (accounting first, `cwd` as fallback) and stages the profile like a pick; it remembers, per session, a person's pick and the last profile value applied, so a refusal is not retried. The menu rows and badge fill the `sidebar.workspaces.workspace.menu.item` and `sidebar.workspaces.workspace.badge` seats that the Workspace browser declares.
 
 </details>
 
@@ -61,6 +63,7 @@ Selection changes affect only later tasks; existing plugins and prompts remain u
 
 <a id="known-limitations-and-deferred-work"></a>
 
+- A profile selects a preset and nothing else: model, permission default, and installed plugins stay global, so third-party plugins cannot differ per Workspace. It applies where a blank session opens in the Web UI; sessions created by other callers start on the default.
 - Web creates and edits no preset: the configuration viewer is read-only, and a bundle installed through Creator mode declares a new preset or overrides a shipped one by row id, replacing its complete child list.
 
 <a id="dev-note"></a>

@@ -39,10 +39,11 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 // Type-only: pulls the Session root standard-hook merge.
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import {
-  type ArchiveSessionInjected, type ForkSessionInjected, menuOpenStateFactory, type PinSessionInjected,
+  type ArchiveSessionInjected, type ForkSessionInjected, type RetitleSessionInjected, menuOpenStateFactory, type PinSessionInjected,
   type SessionArchiveConfirmInjected, type SessionArchiveConfirmRequest,
   type RenameSessionInjected, type RowToast, type RowToastInjected, type RowToastState, type SessionRenameDialogInjected,
   type WorkspaceBrowserInjected, type WorkspacePickerInjected, type WorkspaceStatusInjected,
+  workspaceMenuOpenStateFactory,
 } from './contract/slots.ts'
 import { createWorkspaceShortcutControls, installWorkspaceShortcuts } from './shortcuts.ts'
 import { UiWorkspaceService } from './navigation.ts'
@@ -53,6 +54,7 @@ import { derive } from './session-actions/derived.ts'
 import { ForkSessionMenuItem } from './session-actions/ForkSession.tsx'
 import { PinSessionMenuItem, PinSessionRowButton } from './session-actions/PinSession.tsx'
 import { RenameSessionMenuItem, SessionRenameDialog } from './session-actions/RenameSession.tsx'
+import { RetitleSessionMenuItem } from './session-actions/RetitleSession.tsx'
 import { RowActionToast } from './session-actions/RowActionToast.tsx'
 import { HeroGitChip } from './status/HeroGitChip.tsx'
 import { WorkspaceStatusLine } from './status/WorkspaceStatusLine.tsx'
@@ -63,7 +65,7 @@ export type { UiWorkspace } from './navigation.ts'
 export type {
   DirectoryFlowOwnerProps, DirectoryFlowSlotName, DirectoryPickingHooks, DirectoryPickingInjected,
   MenuOpenState, RowToast, SessionRenameTarget, SessionRowOwnerProps, UseMenuOpenState, WorkspaceBrowserInjected,
-  SessionRowScheduleOwnerProps,
+  SessionRowScheduleOwnerProps, WorkspaceRowOwnerProps,
   WorkspaceBrowserProps,
   WorkspacePickerInjected, WorkspacePickerProps,
 } from './contract/slots.ts'
@@ -233,6 +235,62 @@ export function apply(ctx: Context): void {
     undoArchive: unarchiveSession,
     showArchived: () => { viewInstance.actions.setArchivedFilter('show') },
   })
+  // Title regeneration (one Session, or a Workspace in bulk) is single-flight:
+  // a request while one runs is ignored. The bulk run is sequential (one
+  // auxiliary model call at a time); the Host skips pinned (user-renamed) titles
+  // there, and archived and blank rows are never sent. The single-Session action
+  // replaces any title, since the user asked for that Session explicitly.
+  let retitling = false
+  const retitleInjected = (): RetitleSessionInjected => ({
+    retitleSession: (sessionId) => {
+      if (retitling) return
+      retitling = true
+      notify({ kind: 'retitleSessionStarted' })
+      // No skipPinned: the user asked for this Session, so a hand-set title is replaced too.
+      sessions.refreshTitle(sessionId).then((outcome) => {
+        notify({ kind: 'retitleSessionDone', title: outcome.status === 'refreshed' ? outcome.title : '' })
+      }).catch((error: unknown) => {
+        console.warn('session title refresh rejected:', error)
+        notify({ kind: 'retitleSessionFailed', reason: error instanceof Error ? error.message : String(error) })
+      }).finally(() => { retitling = false })
+    },
+  })
+  const retitleWorkspaceSessions: WorkspaceBrowserInjected['retitleWorkspaceSessions'] = (workspaceId) => {
+    if (retitling) return
+    const snapshot = workspaces.list.getSnapshot()
+    const workspace = snapshot.items.find(item => item.workspaceId === workspaceId)
+    if (workspace === undefined) return
+    const archived = new Set<SessionId>(snapshot.archivedSessionIds)
+    const rows = sessions.list.getSnapshot().byId
+    const targets = workspace.sessionIds.filter((id) => {
+      const row = rows[id]
+      return row !== undefined && !row.blank && !archived.has(id)
+    })
+    if (targets.length === 0) {
+      notify({ kind: 'retitleDone', refreshed: 0, skipped: 0, failed: 0, reason: '' })
+      return
+    }
+    retitling = true
+    notify({ kind: 'retitleStarted', total: targets.length })
+    void (async () => {
+      let refreshed = 0
+      let skipped = 0
+      let failed = 0
+      let reason = ''
+      for (const id of targets) {
+        try {
+          const outcome = await sessions.refreshTitle(id, { skipPinned: true })
+          if (outcome.status === 'refreshed') refreshed++
+          else skipped++
+        } catch (error: unknown) {
+          failed++
+          if (reason === '') reason = error instanceof Error ? error.message : String(error)
+          console.warn('session title refresh rejected:', error)
+        }
+      }
+      notify({ kind: 'retitleDone', refreshed, skipped, failed, reason })
+    })().finally(() => { retitling = false })
+  }
   const browserInjected = (): WorkspaceBrowserInjected => ({
     // Explicit group actions keep their target; unscoped New Session inherits
     // the current Session Workspace before the recent-Workspace fallback.
@@ -244,6 +302,7 @@ export function apply(ctx: Context): void {
     notifyArchivedNotOpenable: () => { notify({ kind: 'archivedNotOpenable' }) },
     renameWorkspace: async (workspaceId, title) => { await workspaces.rename(workspaceId, title) },
     deleteWorkspace: async (workspaceId) => { await workspaces.delete(workspaceId) },
+    retitleWorkspaceSessions,
     insertWorkspaceBefore: async (workspaceId, beforeWorkspaceId) => {
       await workspaces.insertBefore(workspaceId, beforeWorkspaceId)
     },
@@ -277,6 +336,10 @@ export function apply(ctx: Context): void {
           kind: 'list', scope: 'root', inject: { hooks: { menuOpenState: menuOpenStateFactory, shortcuts: ctx.shortcuts.catalog } },
         },
         'sidebar.workspaces.session.row.action': { kind: 'list', scope: 'root' },
+        'sidebar.workspaces.workspace.menu.item': {
+          kind: 'list', scope: 'root', inject: { hooks: { menuOpenState: workspaceMenuOpenStateFactory } },
+        },
+        'sidebar.workspaces.workspace.badge': { kind: 'list', scope: 'root' },
         'sidebar.session.row.leading': { kind: 'list', scope: 'root' },
         'sidebar.session.row.hover': { kind: 'list', scope: 'root' },
       },
@@ -293,6 +356,7 @@ export function apply(ctx: Context): void {
   ctx.slots.inject('sidebar.workspaces.session.menu.item', function* () {
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'pin', order: 100, locale: NS, inject: pinInjected }, PinSessionMenuItem)
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'rename', order: 200, locale: NS, inject: renameInjected }, RenameSessionMenuItem)
+    yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'retitle', order: 250, locale: NS, inject: retitleInjected }, RetitleSessionMenuItem)
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'fork', order: 300, locale: NS, inject: forkInjected }, ForkSessionMenuItem)
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'archive', order: 400, locale: NS, inject: archiveInjected }, ArchiveSessionMenuItem)
   })

@@ -32,6 +32,11 @@
  * client plugin's action lands beside them by `order` and needs nothing from
  * the browser beyond the row identity.
  *
+ * A real Workspace header carries the same two seats: extra rows for its "..."
+ * menu (`sidebar.workspaces.workspace.menu.item`, after Rename and Delete) and
+ * a badge after its title (`sidebar.workspaces.workspace.badge`). Both take
+ * the Workspace identity, path and title; the ungrouped bucket mounts neither.
+ *
  * The browser entry additionally declares two `list` seats per Session row
  * (`sidebar.session.row.leading` / `sidebar.session.row.hover`) for ambient
  * row decorations. Both take the row's Session identity and nothing else: a
@@ -101,6 +106,26 @@ export type UseMenuOpenState = () => MenuOpenState
  * @returns the hook the entry calls.
  */
 export const menuOpenStateFactory: SlotHookFactory<'sidebar.workspaces.session.menu.item', UseMenuOpenState> =
+  (_standard, state) => () => state
+
+/** Owner share of one Workspace header occurrence: the real Workspace the row belongs to. */
+export interface WorkspaceRowOwnerProps {
+  /** Workspace the header shows. */
+  workspaceId: WorkspaceId
+  /** Canonical Host directory path of the Workspace. */
+  path: string
+  /** Workspace display title. */
+  title: string
+}
+
+/**
+ * Bind the Workspace row's render occurrence into the entries' `useMenuOpenState` hook:
+ * the owner supplies its open-state pair as the occurrence's `hookContext`.
+ * @param _standard - framework standard props (unused).
+ * @param state - the Workspace menu's open-state pair from the render occurrence.
+ * @returns the hook the entry calls.
+ */
+export const workspaceMenuOpenStateFactory: SlotHookFactory<'sidebar.workspaces.workspace.menu.item', UseMenuOpenState> =
   (_standard, state) => () => state
 
 /**
@@ -184,6 +209,30 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * handling to keep the row from opening.
      */
     'sidebar.workspaces.session.row.action': { kind: 'list'; scope: 'root'; owner: SessionRowOwnerProps }
+    /**
+     * Extra rows of one real Workspace's "..." menu, in ascending `order`,
+     * rendered after the shipped Rename and Delete rows. The ungrouped bucket
+     * has no menu and mounts none. The row contract is the Session menu's: one
+     * `role="menuitem"` `<button>` per row (ui-primitives' `MenuItemButton`),
+     * dismissing the menu through the injected `useMenuOpenState` hook after
+     * acting. Rows mount only while the menu is open.
+     */
+    'sidebar.workspaces.workspace.menu.item': {
+      kind: 'list'
+      scope: 'root'
+      owner: WorkspaceRowOwnerProps
+      hookContext: MenuOpenState
+      inject: { hooks: {
+        menuOpenState: SlotHookFactory<'sidebar.workspaces.workspace.menu.item', UseMenuOpenState>
+      } }
+    }
+    /**
+     * Ambient decoration after one real Workspace header's title, in ascending
+     * `order` (a small badge naming something about the Workspace). Mounted by
+     * every real Workspace header, so an occupant reads only what it needs and
+     * renders nothing when it has nothing to say.
+     */
+    'sidebar.workspaces.workspace.badge': { kind: 'list'; scope: 'root'; owner: WorkspaceRowOwnerProps }
   }
 }
 
@@ -271,6 +320,12 @@ export type WorkspaceBrowserInjected = {
   unarchiveSession: (sessionId: SessionId) => Promise<void>
   /** Adopt a picked host directory as a real Workspace before targeting a Session. */
   createWorkspace: (input: { path: string }) => Promise<WorkspaceView>
+  /**
+   * Regenerate the titles of one Workspace's Sessions (a "..." menu action).
+   * Pinned (user-renamed), archived, and blank Sessions are left alone; progress
+   * and the outcome surface as notices, so the call never rejects.
+   */
+  retitleWorkspaceSessions: (workspaceId: WorkspaceId) => void
 }
 
 /** The browser's declared viewing store handle, shared with the row actions that write view state. */
@@ -302,6 +357,19 @@ export type RowToast =
    * a report can be searched by it — and any other failure's own message.
    */
   | { kind: 'createFailed'; message: string }
+  /** One Session's title regeneration began. */
+  | { kind: 'retitleSessionStarted' }
+  /** One Session's title regeneration finished; an empty `title` means it had no text to title. */
+  | { kind: 'retitleSessionDone'; title: string }
+  /** One Session's title regeneration failed; `reason` is the untranslated message. */
+  | { kind: 'retitleSessionFailed'; reason: string }
+  /** A bulk title regeneration began over `total` Sessions. */
+  | { kind: 'retitleStarted'; total: number }
+  /**
+   * A bulk title regeneration finished; `failed` counts Sessions whose provider call failed and
+   * `reason` is the first failure's untranslated message (empty when none failed).
+   */
+  | { kind: 'retitleDone'; refreshed: number; skipped: number; failed: number; reason: string }
 
 /** The notice on display; `seq` keys remounts so a repeated notice restarts its hold. */
 export type RowToastState = RowToast & { seq: number }
@@ -384,6 +452,16 @@ export interface SessionArchiveConfirmInjected {
 export interface ForkSessionInjected {
   /** Fork a Session at its last completed turn; the child arrives through the Host list. */
   forkSession: (sessionId: SessionId) => void
+}
+
+/** Retitle action share. */
+export interface RetitleSessionInjected {
+  /**
+   * Regenerate one Session's title, including a hand-renamed one (the explicit
+   * request unpins it). Progress and the outcome surface as notices, so the
+   * call never rejects.
+   */
+  retitleSession: (sessionId: SessionId) => void
 }
 
 /** Rename action share: the row only raises the request; the dialog entry answers it. */
@@ -482,6 +560,8 @@ export type WorkspaceBrowserProps =
     | 'sidebar.workspaces.directoryFlow'
     | 'sidebar.workspaces.session.menu.item'
     | 'sidebar.workspaces.session.row.action'
+    | 'sidebar.workspaces.workspace.menu.item'
+    | 'sidebar.workspaces.workspace.badge'
     | 'sidebar.session.row.leading'
     | 'sidebar.session.row.hover'
   >
