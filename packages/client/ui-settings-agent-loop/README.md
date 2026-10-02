@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Open **Plugins** in the sidebar and select **Agent loop** in the Official group to set how many parallel-safe tool calls one step may run at once. The page stages what is typed and writes it only on save, marks a value the user overrode, and offers to reset it to the deployment's default. The page exists while the Host serves the `agent-loop` namespace.
+Open **Plugins** in the sidebar and select **Agent loop** in the Official group to set how many parallel-safe tool calls one step may run at once and to switch direct mode on or off. The page stages what is typed and writes it only on save, marks a value the user overrode, and offers to reset it to the deployment's default. The page exists while the Host serves the `agent-loop` namespace.
 
 ## Table of Contents
 
@@ -25,7 +25,7 @@ Open **Plugins** in the sidebar and select **Agent loop** in the Official group 
 <a id="use-this-package"></a>
 ## Use this package
 
-The **Agent loop** card in the Official group opens the page. **Parallel tool calls** bounds the calls the loop runs at once within one step; the field renders the effective value, and once overridden carries an **Overridden** badge with **Reset to default** beside it. Nothing is written until **Save**; leaving the page drops the draft, an empty field saves as a reset, and text that is not a number blocks the save and says so under the field.
+The **Agent loop** card in the Official group opens the page. **Parallel tool calls** bounds the calls the loop runs at once within one step; the field renders the effective value, and once overridden carries an **Overridden** badge with **Reset to default** beside it. **Direct mode** is a switch that asks the Agent for concise answers and the fewest tool calls, with no subagents for trivial tasks; it is off by default, is staged like the other field, and takes effect from the Agent's next step once saved. The saved value lives in the user settings document, so it survives a restart. Nothing is written until **Save**; leaving the page drops the draft, an empty field saves as a reset, and text that is not a number blocks the save and says so under the field.
 
 -----
 
@@ -64,7 +64,7 @@ None; this package neither assembles nor sends a provider request.
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **One field of the namespace** — the Host section carries only the parallel cap; the composed `agents` array is boot composition, not a user setting, and has no field here.
+- **Two fields of the namespace** — the Host section carries only the parallel cap and the direct-mode switch; the composed `agents` array is boot composition, not a user setting, and has no field here.
 - **Runtime invariant:** No companion is published. The page holds no owned relationship of its own: what it shows derives from the settings mirror, and what it writes the Host validates.
 
 <a id="dev-note"></a>

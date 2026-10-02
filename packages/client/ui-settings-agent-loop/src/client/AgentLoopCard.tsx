@@ -1,8 +1,9 @@
-/** The agent loop's settings page: how many tool calls one step may run at once. */
+/** The agent loop's settings page: how many tool calls one step may run at once, and the direct-mode switch. */
 
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import { SettingsForm, SettingsValueField } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import { DirectModeField } from './DirectModeField.tsx'
 import { formLabels } from './locales.ts'
 import type { AgentLoopCardFace } from './agent-loop-card-controller.ts'
 
@@ -35,6 +36,16 @@ export function AgentLoopCard(props: AgentLoopCardProps) {
         {...state.maxParallelToolCalls}
         onEdit={(text) => { props.edit('maxParallelToolCalls', text) }}
         onReset={() => { props.resetField('maxParallelToolCalls') }}
+      />
+      <DirectModeField
+        label={t('directMode')}
+        hint={t('directModeHint')}
+        overriddenLabel={t('overridden')}
+        resetLabel={t('reset')}
+        disabled={!state.writable}
+        state={state.directMode}
+        onEdit={(text) => { props.edit('directMode', text) }}
+        onReset={() => { props.resetField('directMode') }}
       />
     </SettingsForm>
   )

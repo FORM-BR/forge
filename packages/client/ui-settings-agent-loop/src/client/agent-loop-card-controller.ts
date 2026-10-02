@@ -3,7 +3,8 @@
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import {
   SettingsFormModel, settingsNumberField,
-  type SettingsFieldState, type SettingsFormActions, type SettingsFormScope, type SettingsFormShell,
+  type SettingsFieldSpec, type SettingsFieldState, type SettingsFormActions, type SettingsFormScope,
+  type SettingsFormShell,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 
 /**
@@ -13,18 +14,41 @@ import {
 export const AGENT_LOOP_NS = 'agent-loop'
 
 /**
- * The agent-loop fields this page edits. The Host section carries only this
- * field — the composed `agents` array is deliberately not part of it.
+ * The agent-loop fields this page edits. The Host section carries only these
+ * fields — the composed `agents` array is deliberately not part of it.
  */
 export interface AgentLoopSettings {
   /** Upper bound on parallel-safe tool calls in flight per step. */
   maxParallelToolCalls?: number
+  /** Whether the direct-mode prompt policy is on. */
+  directMode?: boolean
 }
 
 /** What the agent-loop page renders. */
 export interface AgentLoopCardState extends SettingsFormShell {
   /** Parallel tool-call cap. */
   maxParallelToolCalls: SettingsFieldState
+  /** Direct-mode switch; the draft text is `'true'` or `'false'`. */
+  directMode: SettingsFieldState
+}
+
+/**
+ * A boolean field staged as the text `'true'` or `'false'`. An empty draft
+ * clears the field; any other text blocks the save.
+ * @param field - field name inside the namespace section.
+ * @returns the field's conversion spec.
+ */
+export function settingsBooleanField(field: string): SettingsFieldSpec {
+  return {
+    field,
+    format: value => typeof value === 'boolean' ? String(value) : '',
+    parse: (text) => {
+      const trimmed = text.trim()
+      if (trimmed === '') return { kind: 'clear' }
+      if (trimmed === 'true' || trimmed === 'false') return { kind: 'set', value: trimmed === 'true' }
+      return undefined
+    },
+  }
 }
 
 /** The registration-side face the agent-loop page's slot entry injects. */
@@ -42,12 +66,16 @@ export class AgentLoopCardController {
 
   /** @param scope - the bound settings scope for the `agent-loop` namespace. */
   constructor(scope: SettingsFormScope<AgentLoopSettings>) {
-    this.form = new SettingsFormModel(scope, [settingsNumberField('maxParallelToolCalls')])
+    this.form = new SettingsFormModel(scope, [settingsNumberField('maxParallelToolCalls'), settingsBooleanField('directMode')])
     this.store = this.form.bind(() => this.projection())
   }
 
   private projection(): AgentLoopCardState {
-    return { ...this.form.shell(), maxParallelToolCalls: this.form.field('maxParallelToolCalls') }
+    return {
+      ...this.form.shell(),
+      maxParallelToolCalls: this.form.field('maxParallelToolCalls'),
+      directMode: this.form.field('directMode'),
+    }
   }
 
   /**
