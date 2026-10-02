@@ -54,34 +54,34 @@ describe('layoutGitMap', () => {
     const layout = layoutGitMap(graph())
     // Two open branches plus the "not shown" note push the line down: 26 + 2 * 32 + 20 + 36.
     expect(layout.lineY).toBe(146)
-    expect(layout.lineEnd).toBe(70 + 2 * 48)
-    expect(layout.width).toBe(166 + 330 + 36)
+    expect(layout.lineEnd).toBe(110 + 2 * 48)
+    expect(layout.width).toBe(206 + 200 + 36)
     expect(layout.height).toBe(146 + 175)
     expect(layout.stations.map(item => [item.kind, item.x, item.y])).toEqual([
-      ['commit', 70, 146], ['merge', 118, 146], ['merge', 166, 146],
+      ['commit', 110, 146], ['merge', 158, 146], ['merge', 206, 146],
     ])
     expect(layout.stations.map(item => item.label)).toEqual([
-      { x: 70, y: 128, text: 'aaaaaaa', rotate: 0 },
-      { x: 118, y: 128, text: '#7', rotate: 0 },
-      { x: 166, y: 128, text: '#7', rotate: 0 },
+      { x: 110, y: 128, text: 'aaaaaaa', rotate: 0 },
+      { x: 158, y: 128, text: '#7', rotate: 0 },
+      { x: 206, y: 128, text: '#7', rotate: 0 },
     ])
-    expect(layout.stations[0]!.name).toEqual({ x: 66, y: 196, text: 'name aaaaaaa', rotate: -38 })
+    expect(layout.stations[0]!.name).toEqual({ x: 106, y: 196, text: 'name aaaaaaa', rotate: -38 })
   })
 
   it('draws a commit station as one dot and a merge station as a ring over a curve of its branch commits', () => {
     const [direct, merge, head] = layoutGitMap(graph()).stations
     expect(direct!.curve).toBeUndefined()
     expect(direct!.commits).toEqual([])
-    expect(direct!.dot).toMatchObject({ x: 70, y: 146, r: 6.5, type: 'feat', isHead: false })
+    expect(direct!.dot).toMatchObject({ x: 110, y: 146, r: 6.5, type: 'feat', isHead: false })
     expect(direct!.dot!.commit).toEqual({ hash: FIRST.hash, short: 'aaaaaaa', message: 'msg aaaaaaa', author: 'Ada' })
 
     expect(merge!.dot).toBeUndefined()
-    expect(merge!.curve).toBe('M74 146 C76 176 80 176 84 176 H110 C114 176 116 171 118 146')
-    expect(merge!.commits.map(dot => [dot.x, dot.y, dot.r, dot.type])).toEqual([[93, 176, 4.5, 'feat'], [103, 176, 4.5, 'fix']])
+    expect(merge!.curve).toBe('M114 146 C116 176 120 176 124 176 H150 C154 176 156 171 158 146')
+    expect(merge!.commits.map(dot => [dot.x, dot.y, dot.r, dot.type])).toEqual([[133, 176, 4.5, 'feat'], [143, 176, 4.5, 'fix']])
     expect(merge!.isHead).toBe(false)
     expect(merge!.station.commitCount).toBe(5)
 
-    expect(head!.commits.map(dot => [dot.x, dot.type])).toEqual([[146, 'other']])
+    expect(head!.commits.map(dot => [dot.x, dot.type])).toEqual([[186, 'other']])
     expect(head!.isHead).toBe(true)
   })
 
@@ -97,20 +97,20 @@ describe('layoutGitMap', () => {
   it('stacks open branches upward, newest commit at the right end, and counts what it leaves out', () => {
     const layout = layoutGitMap(graph())
     const [long, short] = layout.branches
-    expect(long!.path).toBe('M166 146 C206 146 206 26 246 26 H496')
+    expect(long!.path).toBe('M206 146 C246 146 246 26 286 26 H406')
     expect(long!.dots).toHaveLength(8)
-    expect(long!.dots.map(dot => dot.x)).toEqual([398, 412, 426, 440, 454, 468, 482, 496])
+    expect(long!.dots.map(dot => dot.x)).toEqual([308, 322, 336, 350, 364, 378, 392, 406])
     expect(long!.dots.every(dot => dot.y === 26 && dot.r === 5)).toBe(true)
     // 10 commits on the branch, 8 drawn.
     expect(long!.extra).toBe(2)
     expect(long!.aliases).toBe(1)
     expect(long!.isHead).toBe(true)
-    expect([long!.labelX, long!.labelY]).toEqual([386, 17])
-    expect(short!.path).toBe('M166 146 C206 146 206 58 246 58 H496')
-    expect(short!.dots.map(dot => [dot.x, dot.type])).toEqual([[482, 'fix'], [496, 'other']])
+    expect([long!.labelX, long!.labelY]).toEqual([296, 17])
+    expect(short!.path).toBe('M206 146 C246 146 246 58 286 58 H406')
+    expect(short!.dots.map(dot => [dot.x, dot.type])).toEqual([[392, 'fix'], [406, 'other']])
     expect(short!.extra).toBe(0)
     expect(short!.isHead).toBe(false)
-    expect(layout.more).toEqual({ x: 496, y: 90, count: 1 })
+    expect(layout.more).toEqual({ x: 406, y: 90, count: 1 })
   })
 
   it('draws only the newest eight commits of a long branch', () => {
@@ -126,8 +126,8 @@ describe('layoutGitMap', () => {
   it('groups consecutive stations of one day under one bracket', () => {
     const layout = layoutGitMap(graph())
     expect(layout.days).toEqual([
-      { key: '2026-01-10@70', path: 'M50 281 V286 H136 V281', x: 93, y: 302, text: '10/01' },
-      { key: '2026-01-11@166', path: 'M146 281 V286 H184 V281', x: 165, y: 302, text: '11/01' },
+      { key: '2026-01-10@110', path: 'M90 281 V286 H176 V281', x: 133, y: 302, text: '10/01' },
+      { key: '2026-01-11@206', path: 'M186 281 V286 H224 V281', x: 205, y: 302, text: '11/01' },
     ])
     expect(layoutGitMap(graph(), { dayLabel: iso => `<${iso}>` }).days.map(day => day.text))
       .toEqual(['<2026-01-10>', '<2026-01-11>'])
@@ -151,7 +151,7 @@ describe('layoutGitMap', () => {
 
   it('handles a history with no station', () => {
     const layout = layoutGitMap(graph({ stations: [], branches: [], moreBranches: 0 }))
-    expect(layout.lineEnd).toBe(70)
+    expect(layout.lineEnd).toBe(110)
     expect(layout.stations).toEqual([])
     expect(layout.days).toEqual([])
     expect(layout.counts).toEqual({ feat: 0, fix: 0, other: 0, merge: 0 })
