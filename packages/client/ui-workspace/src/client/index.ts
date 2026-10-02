@@ -39,7 +39,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 // Type-only: pulls the Session root standard-hook merge.
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import {
-  type ArchiveSessionInjected, type ForkSessionInjected, menuOpenStateFactory, type PinSessionInjected,
+  type ArchiveSessionInjected, type ForkSessionInjected, type RetitleSessionInjected, menuOpenStateFactory, type PinSessionInjected,
   type SessionArchiveConfirmInjected, type SessionArchiveConfirmRequest,
   type RenameSessionInjected, type RowToast, type RowToastInjected, type RowToastState, type SessionRenameDialogInjected,
   type WorkspaceBrowserInjected, type WorkspacePickerInjected, type WorkspaceStatusInjected,
@@ -53,6 +53,7 @@ import { derive } from './session-actions/derived.ts'
 import { ForkSessionMenuItem } from './session-actions/ForkSession.tsx'
 import { PinSessionMenuItem, PinSessionRowButton } from './session-actions/PinSession.tsx'
 import { RenameSessionMenuItem, SessionRenameDialog } from './session-actions/RenameSession.tsx'
+import { RetitleSessionMenuItem } from './session-actions/RetitleSession.tsx'
 import { RowActionToast } from './session-actions/RowActionToast.tsx'
 import { HeroGitChip } from './status/HeroGitChip.tsx'
 import { WorkspaceStatusLine } from './status/WorkspaceStatusLine.tsx'
@@ -233,10 +234,26 @@ export function apply(ctx: Context): void {
     undoArchive: unarchiveSession,
     showArchived: () => { viewInstance.actions.setArchivedFilter('show') },
   })
-  // Bulk title regeneration is sequential (one auxiliary model call at a time)
-  // and single-flight: a second request while one runs is ignored. The Host
-  // skips pinned (user-renamed) titles; archived and blank rows are never sent.
+  // Title regeneration (one Session, or a Workspace in bulk) is single-flight:
+  // a request while one runs is ignored. The bulk run is sequential (one
+  // auxiliary model call at a time); the Host skips pinned (user-renamed) titles
+  // there, and archived and blank rows are never sent. The single-Session action
+  // replaces any title, since the user asked for that Session explicitly.
   let retitling = false
+  const retitleInjected = (): RetitleSessionInjected => ({
+    retitleSession: (sessionId) => {
+      if (retitling) return
+      retitling = true
+      notify({ kind: 'retitleSessionStarted' })
+      // No skipPinned: the user asked for this Session, so a hand-set title is replaced too.
+      sessions.refreshTitle(sessionId).then((outcome) => {
+        notify({ kind: 'retitleSessionDone', title: outcome.status === 'refreshed' ? outcome.title : '' })
+      }).catch((error: unknown) => {
+        console.warn('session title refresh rejected:', error)
+        notify({ kind: 'retitleSessionFailed', reason: error instanceof Error ? error.message : String(error) })
+      }).finally(() => { retitling = false })
+    },
+  })
   const retitleWorkspaceSessions: WorkspaceBrowserInjected['retitleWorkspaceSessions'] = (workspaceId) => {
     if (retitling) return
     const snapshot = workspaces.list.getSnapshot()
@@ -334,6 +351,7 @@ export function apply(ctx: Context): void {
   ctx.slots.inject('sidebar.workspaces.session.menu.item', function* () {
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'pin', order: 100, locale: NS, inject: pinInjected }, PinSessionMenuItem)
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'rename', order: 200, locale: NS, inject: renameInjected }, RenameSessionMenuItem)
+    yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'retitle', order: 250, locale: NS, inject: retitleInjected }, RetitleSessionMenuItem)
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'fork', order: 300, locale: NS, inject: forkInjected }, ForkSessionMenuItem)
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'archive', order: 400, locale: NS, inject: archiveInjected }, ArchiveSessionMenuItem)
   })

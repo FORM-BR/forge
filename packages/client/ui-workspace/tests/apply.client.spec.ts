@@ -13,7 +13,7 @@ import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply, inject } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { WorkspaceBrowserInjected, WorkspacePickerInjected } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import {
-  type ArchiveSessionInjected, type ForkSessionInjected, menuOpenStateFactory, type PinSessionInjected,
+  type ArchiveSessionInjected, type ForkSessionInjected, type RetitleSessionInjected, menuOpenStateFactory, type PinSessionInjected,
   type RenameSessionInjected, type RowToastInjected, type SessionArchiveConfirmInjected, type SessionRenameDialogInjected,
   type WorkspaceStatusInjected, type WorkspaceViewStoreHandle,
 } from '../src/client/contract/slots.ts'
@@ -22,6 +22,7 @@ import { ArchiveSessionMenuItem, ArchiveSessionRowButton, SessionArchiveConfirmD
 import { ForkSessionMenuItem } from '../src/client/session-actions/ForkSession.tsx'
 import { PinSessionMenuItem, PinSessionRowButton } from '../src/client/session-actions/PinSession.tsx'
 import { RenameSessionMenuItem, SessionRenameDialog } from '../src/client/session-actions/RenameSession.tsx'
+import { RetitleSessionMenuItem } from '../src/client/session-actions/RetitleSession.tsx'
 import { RowActionToast } from '../src/client/session-actions/RowActionToast.tsx'
 import { HeroGitChip } from '../src/client/status/HeroGitChip.tsx'
 import { WorkspaceStatusLine } from '../src/client/status/WorkspaceStatusLine.tsx'
@@ -226,7 +227,7 @@ describe('ui-workspace apply', () => {
     await Promise.resolve()
     expect(after.slots.entries('conversation.hero.workspace')[0]!.component).toBe(WorkspacePicker)
     // The row actions follow the browser's own declaration, whenever it lands.
-    expect(after.slots.entries(MENU_ITEM)).toHaveLength(4)
+    expect(after.slots.entries(MENU_ITEM)).toHaveLength(5)
     expect(after.slots.entries(ROW_ACTION)).toHaveLength(2)
     expect(after.slots.entries('shell.overlay')).toHaveLength(3)
   })
@@ -286,6 +287,7 @@ describe('ui-workspace apply', () => {
     expect(rows(MENU_ITEM)).toEqual([
       ['pin', 100, PinSessionMenuItem, 'workspace'],
       ['rename', 200, RenameSessionMenuItem, 'workspace'],
+      ['retitle', 250, RetitleSessionMenuItem, 'workspace'],
       ['fork', 300, ForkSessionMenuItem, 'workspace'],
       ['archive', 400, ArchiveSessionMenuItem, 'workspace'],
     ])
@@ -344,6 +346,39 @@ describe('ui-workspace apply', () => {
     expect(pin.hooks.pinned.getSnapshot()).toEqual(new Set(['one', 'two']))
     expect(pin.hooks.pinned.getSnapshot()).not.toBe(pinned)
     expect(archive.hooks.archived.getSnapshot()).toEqual(new Set())
+  })
+
+  it('regenerates one session title without skipPinned, with start, success, empty, and failure notices', async () => {
+    const b = await bench()
+    b.setWorkspaces(workspaceState([workspace('alpha', ['one'])]))
+    b.setSessions(sessionState([summary('one', 1)]))
+    declare(b.slots, 'sidebar.workspaces', 'shell.overlay')
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const retitle = faceOf(entry(b.slots, MENU_ITEM, 'retitle')) as RetitleSessionInjected
+    const toast = faceOf(entry(b.slots, 'shell.overlay', 'workspace.row-toast')) as RowToastInjected
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    onTestFinished(() => { warn.mockRestore() })
+
+    b.refreshTitle.mockResolvedValueOnce({ status: 'refreshed', title: 'Novo titulo', seq: 2 })
+    retitle.retitleSession(sid('one'))
+    expect(toast.hooks.toast.getSnapshot()).toMatchObject({ kind: 'retitleSessionStarted' })
+    await vi.waitFor(() => {
+      expect(toast.hooks.toast.getSnapshot()).toMatchObject({ kind: 'retitleSessionDone', title: 'Novo titulo' })
+    })
+    // The explicit action replaces a hand-set title: no pin policy is sent.
+    expect(b.refreshTitle).toHaveBeenLastCalledWith('one')
+
+    b.refreshTitle.mockResolvedValueOnce({ status: 'no-input' })
+    retitle.retitleSession(sid('one'))
+    await vi.waitFor(() => {
+      expect(toast.hooks.toast.getSnapshot()).toMatchObject({ kind: 'retitleSessionDone', title: '' })
+    })
+
+    b.refreshTitle.mockRejectedValueOnce(new Error('model offline'))
+    retitle.retitleSession(sid('one'))
+    await vi.waitFor(() => {
+      expect(toast.hooks.toast.getSnapshot()).toMatchObject({ kind: 'retitleSessionFailed', reason: 'model offline' })
+    })
   })
 
   it('regenerates the titles of a workspace one by one, skipping archived and blank rows, and reports the outcome', async () => {
@@ -677,7 +712,7 @@ describe('ui-workspace apply', () => {
     declare(b.slots, 'sidebar.workspaces', 'conversation.hero.workspace', 'conversation.empty.workspace', 'shell.overlay')
     const fiber = b.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    expect(b.slots.entries(MENU_ITEM)).toHaveLength(4)
+    expect(b.slots.entries(MENU_ITEM)).toHaveLength(5)
     expect(b.slots.entries(ROW_ACTION)).toHaveLength(2)
     expect(b.slots.entries('shell.overlay')).toHaveLength(3)
     await fiber.dispose()

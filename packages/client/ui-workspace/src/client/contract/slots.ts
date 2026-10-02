@@ -308,6 +308,12 @@ export type RowToast =
    * a report can be searched by it — and any other failure's own message.
    */
   | { kind: 'createFailed'; message: string }
+  /** One Session's title regeneration began. */
+  | { kind: 'retitleSessionStarted' }
+  /** One Session's title regeneration finished; an empty `title` means it had no text to title. */
+  | { kind: 'retitleSessionDone'; title: string }
+  /** One Session's title regeneration failed; `reason` is the untranslated message. */
+  | { kind: 'retitleSessionFailed'; reason: string }
   /** A bulk title regeneration began over `total` Sessions. */
   | { kind: 'retitleStarted'; total: number }
   /**
@@ -397,6 +403,16 @@ export interface SessionArchiveConfirmInjected {
 export interface ForkSessionInjected {
   /** Fork a Session at its last completed turn; the child arrives through the Host list. */
   forkSession: (sessionId: SessionId) => void
+}
+
+/** Retitle action share. */
+export interface RetitleSessionInjected {
+  /**
+   * Regenerate one Session's title, including a hand-renamed one (the explicit
+   * request unpins it). Progress and the outcome surface as notices, so the
+   * call never rejects.
+   */
+  retitleSession: (sessionId: SessionId) => void
 }
 
 /** Rename action share: the row only raises the request; the dialog entry answers it. */

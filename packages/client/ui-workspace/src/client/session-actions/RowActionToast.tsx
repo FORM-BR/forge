@@ -53,6 +53,32 @@ export function RowActionToast({ useToast, useStore, dismissToast, undoArchive, 
       />
     )
   }
+  if (toast.kind === 'retitleSessionStarted') {
+    return <Toast key={`toast-${String(toast.seq)}`} text={t('toast.retitleSessionStarted')} onDone={dismissToast} />
+  }
+  if (toast.kind === 'retitleSessionDone') {
+    return toast.title === ''
+      ? <Toast key={`toast-${String(toast.seq)}`} text={t('toast.retitleSessionEmpty')} onDone={dismissToast} />
+      : (
+        <Toast
+          key={`toast-${String(toast.seq)}`}
+          text={t('toast.retitleSessionDone', { title: toast.title })}
+          tone="success"
+          onDone={dismissToast}
+        />
+      )
+  }
+  if (toast.kind === 'retitleSessionFailed') {
+    return (
+      <Toast
+        key={`toast-${String(toast.seq)}`}
+        text={t('toast.retitleSessionFailed', { reason: toast.reason })}
+        icon={<IconWarningOutlineRegular />}
+        holdMs={LONG_TOAST_HOLD_MS}
+        onDone={dismissToast}
+      />
+    )
+  }
   if (toast.kind === 'retitleDone') {
     const counts = { refreshed: toast.refreshed, skipped: toast.skipped, failed: toast.failed, reason: toast.reason }
     return toast.failed > 0
@@ -98,7 +124,7 @@ export function RowActionToast({ useToast, useStore, dismissToast, undoArchive, 
 
 /** The copy of one plain warning, keyed by the notice kind the union closes over. */
 function plainNoticeText(
-  toast: Exclude<RowToastState, { kind: 'archived' | 'stoppedAndArchived' | 'createFailed' | 'retitleStarted' | 'retitleDone' }>,
+  toast: Exclude<RowToastState, { kind: 'archived' | 'stoppedAndArchived' | 'createFailed' | 'retitleStarted' | 'retitleDone' | 'retitleSessionStarted' | 'retitleSessionDone' | 'retitleSessionFailed' }>,
   t: RowToastProps['t'],
 ): string {
   switch (toast.kind) {
