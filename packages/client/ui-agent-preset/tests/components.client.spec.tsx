@@ -26,6 +26,7 @@ const ROSTER_READY: AgentPresetSettingsState = {
   status: 'ready',
   error: null,
   options: [{ id: 'standard' }, { id: 'mine' }],
+  workspacePresets: {},
 }
 
 const SEAT_READY: AgentPresetSeatState = {

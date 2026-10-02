@@ -152,6 +152,12 @@ export interface Config {
   default: string
   /** User-selected default; edited through Settings. */
   selectedDefault: Volatile<string | undefined>
+  /**
+   * Business profile per Workspace: Workspace directory path to the preset new
+   * sessions in that Workspace start with. Edited through Settings; an absent
+   * path leaves the Workspace on the default preset.
+   */
+  workspacePresets: Volatile<Record<string, string> | undefined>
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-agent-preset-registry -->

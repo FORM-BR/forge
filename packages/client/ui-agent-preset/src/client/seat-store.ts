@@ -7,7 +7,12 @@
  * which is why staging cannot simply ride along on `sessions.create`.
  *
  * The stage is forgotten once applied. The next new session starts from the
- * Host-effective default again.
+ * Host-effective default again — unless its Workspace has a business profile:
+ * then the profile's preset is staged for it, the same way a person's pick
+ * is. A person's own pick on a session always wins over the profile, and a
+ * profile applies at most once per session and per profile value, so
+ * changing the profile later reaches a still-blank session while a
+ * hand-picked one is left alone.
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -61,6 +66,15 @@ export class AgentPresetSeatController {
    */
   private fallback = ''
 
+  /** Business profiles from the last roster read: Workspace directory path to preset id. */
+  private profiles: Readonly<Record<string, string>> = {}
+  /** The staged id came from a Workspace profile rather than a person's pick. */
+  private profileStaged = false
+  /** Sessions where a person picked: the profile never overrides them. */
+  private readonly picked = new Set<string>()
+  /** Profile preset last applied per session, so one profile value is not retried after a refusal. */
+  private readonly profileApplied = new Map<string, string>()
+
   /** Only the newest roster read may publish after overlapping refreshes. */
   private loadGeneration = 0
   /** Completion of the active Host selection; Settings choices wait before staging. */
@@ -74,6 +88,8 @@ export class AgentPresetSeatController {
       'id' | 'blank' | 'projectionValues'
     > | undefined,
     private readonly staged: AgentPresetStage = { id: undefined, introduce: false },
+    /** The Workspace directory path the session belongs to, when it has one. */
+    private readonly workspacePathOf: (sessionId: SessionSummary['id']) => string | undefined = () => undefined,
   ) {}
 
   private set(patch: Partial<AgentPresetSeatState>): void {
@@ -83,6 +99,23 @@ export class AgentPresetSeatController {
   private clearStage(): void {
     this.staged.id = undefined
     this.staged.introduce = false
+    this.profileStaged = false
+  }
+
+  /**
+   * The preset a blank session's Workspace profile asks for, when it still has
+   * something to say: a healthy preset the session does not already run, not
+   * yet applied for this profile value, on a session no person picked for.
+   * @param session - the session the staged choice would land on.
+   * @returns the preset id to start the session with, or undefined.
+   */
+  private profileFor(session: Pick<SessionSummary, 'id' | 'blank' | 'projectionValues'>): string | undefined {
+    if (!session.blank || this.picked.has(session.id)) return undefined
+    const path = this.workspacePathOf(session.id)
+    const wanted = path === undefined ? undefined : this.profiles[path]
+    if (wanted === undefined || wanted === presetOf(session) || wanted === this.profileApplied.get(session.id)) return undefined
+    // A removed or broken preset cannot compose a session; leave the default in place.
+    return this.store.getSnapshot().options.some(option => option.id === wanted) ? wanted : undefined
   }
 
   /** Developer tools are the single gate over preset selection. */
@@ -106,6 +139,7 @@ export class AgentPresetSeatController {
     // A stage outlives the screen that made it; Developer tools may have gone off since.
     if (!this.selectionAvailable()) this.clearStage()
     this.fallback = presets.find(preset => preset.isDefault)?.id ?? presets[0]?.id ?? ''
+    this.profiles = roster.value.workspacePresets ?? {}
     const session = this.currentSession()
     this.set({
       options: presetOptions(presets),
@@ -152,6 +186,7 @@ export class AgentPresetSeatController {
    * chip should announce itself on the session it lands on.
    */
   stage(id: string, introduce = false): void {
+    this.profileStaged = false
     this.staged.id = id
     this.staged.introduce = introduce
     this.set({ current: id, error: null, introduce })
@@ -204,8 +239,17 @@ export class AgentPresetSeatController {
     const available = this.selectionAvailable()
     // A stage made while Developer tools were on must not outlive them.
     if (!available) this.clearStage()
-    const staged = this.staged.id
     const session = this.currentSession()
+    // A Workspace profile is staged exactly like a person's pick, so it takes
+    // the same apply path (and the same refusal handling) below.
+    if (available && this.staged.id === undefined && session !== undefined) {
+      const profile = this.profileFor(session)
+      if (profile !== undefined) {
+        this.stage(profile)
+        this.profileStaged = true
+      }
+    }
+    const staged = this.staged.id
     if (staged === undefined) {
       const current = session === undefined ? this.fallback : presetOf(session) ?? ''
       const shown = this.store.getSnapshot()
@@ -219,9 +263,17 @@ export class AgentPresetSeatController {
     // A started session's history was produced under its own composition; the
     // host refuses the swap, so the stage is no longer meaningful.
     if (!session.blank || presetOf(session) === staged) {
+      // A pick that changes nothing is still the person's word on this session
+      // (a profile is only staged for a blank session that differs from it).
+      this.picked.add(session.id)
       this.clearStage()
       return
     }
+    // The choice is consumed by this session: a person's pick shields it from
+    // the profile for good, a profile's own application is remembered so a
+    // refusal is not retried on every list change.
+    if (this.profileStaged) this.profileApplied.set(session.id, staged)
+    else this.picked.add(session.id)
     const completion = Promise.withResolvers<undefined>()
     this.pendingSelection = completion.promise
     this.clearStage()

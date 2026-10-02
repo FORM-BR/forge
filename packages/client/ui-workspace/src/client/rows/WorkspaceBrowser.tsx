@@ -221,6 +221,8 @@ type SessionTreeProps = Pick<
 > & PropsRenderSlots<
   | 'sidebar.workspaces.session.menu.item'
   | 'sidebar.workspaces.session.row.action'
+  | 'sidebar.workspaces.workspace.menu.item'
+  | 'sidebar.workspaces.workspace.badge'
   | 'sidebar.session.row.leading'
   | 'sidebar.session.row.hover'
 > & {
@@ -498,6 +500,7 @@ function SessionTree({
           group={group}
           containsCurrentDescendant={currentAncestors.has(group.key)}
           home={home}
+          renderSlot={renderSlot}
           t={t}
           onToggle={() => {
             if (group.expanded) {

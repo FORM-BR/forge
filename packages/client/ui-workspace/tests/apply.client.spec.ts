@@ -13,7 +13,7 @@ import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply, inject } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { WorkspaceBrowserInjected, WorkspacePickerInjected } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import {
-  type ArchiveSessionInjected, type ForkSessionInjected, menuOpenStateFactory, type PinSessionInjected,
+  type ArchiveSessionInjected, type ForkSessionInjected, menuOpenStateFactory, type PinSessionInjected, workspaceMenuOpenStateFactory,
   type RenameSessionInjected, type RowToastInjected, type SessionArchiveConfirmInjected, type SessionRenameDialogInjected,
   type WorkspaceViewStoreHandle,
 } from '../src/client/contract/slots.ts'
@@ -221,6 +221,22 @@ describe('ui-workspace apply', () => {
     expect(after.slots.entries(MENU_ITEM)).toHaveLength(4)
     expect(after.slots.entries(ROW_ACTION)).toHaveLength(2)
     expect(after.slots.entries('shell.overlay')).toHaveLength(3)
+  })
+
+  it('declares the Workspace menu and badge seats, binding the menu open state into the rows', async () => {
+    const b = await bench()
+    declare(b.slots, 'sidebar.workspaces', 'shell.overlay')
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    expect(b.slots.spec('sidebar.workspaces.workspace.menu.item')).toEqual({
+      kind: 'list', scope: 'root', inject: { hooks: { menuOpenState: workspaceMenuOpenStateFactory } },
+    })
+    expect(b.slots.spec('sidebar.workspaces.workspace.badge')).toEqual({ kind: 'list', scope: 'root' })
+    // The shipped package registers nothing into them: plugins fill the seats.
+    expect(b.slots.entries('sidebar.workspaces.workspace.menu.item')).toHaveLength(0)
+    expect(b.slots.entries('sidebar.workspaces.workspace.badge')).toHaveLength(0)
+    const openState = [true, () => {}] as const
+    const factory = workspaceMenuOpenStateFactory as unknown as (standard: object, state: typeof openState) => () => typeof openState
+    expect(factory({}, openState)()).toBe(openState)
   })
 
   it('declares the two Session row lists and registers the shipped actions and overlay surfaces into them', async () => {

@@ -29,8 +29,11 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: pulls the settings shell's SlotMap merge (the 'settings.section' entry).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
-// Type-only: pulls the Workspace UI navigation service merge (ctx.uiWorkspace).
+// Type-only: pulls the Workspace UI navigation service merge (ctx.uiWorkspace)
+// and the SlotMap merge of the Workspace menu and badge seats.
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
+// Type-only: pulls the Workspace Controller service merge (ctx.workspaces).
+import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { AgentPresetLabel } from './AgentPresetLabel.tsx'
 import type { AgentPresetLabelInjected } from './AgentPresetLabel.tsx'
@@ -40,6 +43,8 @@ import { AgentPresetSection } from './AgentPresetSection.tsx'
 import type { AgentPresetSectionInjected } from './AgentPresetSection.tsx'
 import { AgentPresetSeatController, type AgentPresetStage } from './seat-store.ts'
 import { AgentPresetSectionController } from './section-store.ts'
+import { WorkspaceProfileBadge, WorkspaceProfileMenuItems } from './WorkspaceProfile.tsx'
+import type { WorkspaceProfileInjected } from './WorkspaceProfile.tsx'
 import { en, zh, type AgentPresetSettingsKey } from './locales.ts'
 import { AGENT_PRESET_SETTINGS_NS, AgentPresetSettingsController } from './settings-store.ts'
 
@@ -56,7 +61,8 @@ export type { AgentPresetSectionInjected, AgentPresetSectionProps } from './Agen
 export type { AgentPresetSeatState } from './seat-store.ts'
 export type { AgentPresetSectionState, PresetView } from './section-store.ts'
 export type { AgentPresetOption, AgentPresetSettingsState } from './settings-store.ts'
-export { AGENT_PRESET_SETTINGS_NS, writeDefaultPreset } from './settings-store.ts'
+export type { WorkspaceProfileInjected } from './WorkspaceProfile.tsx'
+export { AGENT_PRESET_SETTINGS_NS, WORKSPACE_PRESETS_FIELD, writeDefaultPreset, writeWorkspacePreset } from './settings-store.ts'
 
 /** Required services (cordis fiber inject). */
 export const inject = [
@@ -75,6 +81,20 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => async () => {
     await Promise.all([...boundSeatDisposers].map(dispose => dispose()))
   }, 'ui-agent-preset: bound selections')
+  /**
+   * The Workspace directory a session belongs to: the Workspace that accounts
+   * it, else the one whose directory is the session's own (a session can be
+   * listed a moment before the Workspace snapshot accounts it).
+   * @param sessionId - the session to place.
+   * @returns the Workspace's canonical directory path, or undefined outside every Workspace.
+   */
+  const workspacePathOf = (sessionId: SessionId): string | undefined => {
+    const items = ctx.get('workspaces')?.list.getSnapshot().items ?? []
+    const member = items.find(workspace => workspace.sessionIds.includes(sessionId))
+    if (member !== undefined) return member.path
+    const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd
+    return cwd === undefined ? undefined : items.find(workspace => workspace.path === cwd)?.path
+  }
   const unboundSeat = new AgentPresetSeatController(ctx, () => undefined, staged)
   const seatFor = (binding: SessionBinding): AgentPresetSeatController => {
     const existing = seats.get(binding)
@@ -86,12 +106,16 @@ export function apply(ctx: ClientContext): void {
         && (ctx.sessions.retainInfo(binding.sessionId).getSnapshot().retainedBy.mainView ?? 0) > 0
         ? summary
         : undefined
-    }, staged)
+    }, staged, workspacePathOf)
     seats.set(binding, seat)
     const dispose = binding.ctx.effect(() => {
       const stop = ctx.sessions.list.subscribe(() => { void seat.apply() })
+      // A Workspace profile can become known after the session does: the
+      // Workspace snapshot accounts the new session a moment later.
+      const stopWorkspaces = ctx.get('workspaces')?.list.subscribe(() => { void seat.apply() })
       return () => {
         stop()
+        stopWorkspaces?.()
         seats.delete(binding)
         boundSeatDisposers.delete(dispose)
       }
@@ -217,6 +241,30 @@ export function apply(ctx: ClientContext): void {
     ...creatorDraft === undefined ? {} : { startCreatorDraft: creatorDraft },
     makeDefault: (id: string) => section.makeDefault(id, captureBlankSessionSync()),
   })
+
+  // Business profiles: a preset bound to a Workspace directory, chosen from
+  // the Workspace's "..." menu and shown as a badge after its title. The seats
+  // are declared by ui-workspace's browser; `slots.inject` waits for them.
+  const profileInjected = (): WorkspaceProfileInjected => ({
+    hooks: { agentPresets: controller.store, developerTools: ctx.configForms.developerTools.enabled },
+    load: () => controller.load(),
+    select: (workspacePath, id) => controller.setWorkspacePreset(workspacePath, id),
+  })
+  ctx.slots.inject('sidebar.workspaces.workspace.menu.item', () => ctx.slots.register({
+    name: 'sidebar.workspaces.workspace.menu.item',
+    id: 'agent-preset-profile',
+    // After the shipped Rename and Delete rows.
+    order: 500,
+    locale: 'settings.agentPreset',
+    inject: profileInjected,
+  }, WorkspaceProfileMenuItems))
+  ctx.slots.inject('sidebar.workspaces.workspace.badge', () => ctx.slots.register({
+    name: 'sidebar.workspaces.workspace.badge',
+    id: 'agent-preset-profile',
+    order: 100,
+    locale: 'settings.agentPreset',
+    inject: profileInjected,
+  }, WorkspaceProfileBadge))
 
   // Ordered after Models: choosing a model is routine, and composing an
   // agent is the deployment-shaping act behind it.

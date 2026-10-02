@@ -15,6 +15,9 @@ import type { AgentPresetRoster } from '@deepseek-ai/dsh-agent-preset-registry/t
 /** The agent-preset settings namespace on the host wire. */
 export const AGENT_PRESET_SETTINGS_NS = 'agent-preset-registry'
 
+/** The settings field holding the business profile (preset) of each Workspace, keyed by directory path. */
+export const WORKSPACE_PRESETS_FIELD = 'workspacePresets'
+
 /**
  * Persist one preset as the default for sessions created later.
  *
@@ -30,6 +33,32 @@ export async function writeDefaultPreset(
   id: string,
 ): Promise<string | undefined> {
   const response = await ctx.remote.settings.update(AGENT_PRESET_SETTINGS_NS, { selectedDefault: id }, undefined)
+  return response.ok ? undefined : response.error.message
+}
+
+/**
+ * Persist (or clear) the business profile of one Workspace: the preset new
+ * sessions started in that Workspace begin with.
+ *
+ * Keyed by the Workspace's canonical directory path, so a Workspace that is
+ * removed and added again finds its profile waiting. One path-addressed write,
+ * so profiles of other Workspaces are never rewritten from a stale snapshot.
+ * @param ctx - the browser plugin context carrying the Remote namespaces.
+ * @param workspacePath - the Workspace's canonical Host directory path.
+ * @param id - the preset to start new sessions with, or undefined to remove the profile.
+ * @returns the failure message, or undefined once the write landed.
+ */
+export async function writeWorkspacePreset(
+  ctx: ClientContext,
+  workspacePath: string,
+  id: string | undefined,
+): Promise<string | undefined> {
+  const path = [WORKSPACE_PRESETS_FIELD, workspacePath]
+  const response = await ctx.remote.settings.mutate(
+    AGENT_PRESET_SETTINGS_NS,
+    [id === undefined ? { op: 'unset', path } : { op: 'set', path, value: id }],
+    undefined,
+  )
   return response.ok ? undefined : response.error.message
 }
 
@@ -120,12 +149,15 @@ export interface AgentPresetSettingsState {
   status: 'idle' | 'loading' | 'ready' | 'unavailable' | 'error'
   error: string | null
   options: readonly AgentPresetOption[]
+  /** Business profiles: Workspace directory path to the preset new sessions there start with. */
+  workspacePresets: Readonly<Record<string, string>>
 }
 
 const INITIAL: AgentPresetSettingsState = {
   status: 'idle',
   error: null,
   options: [],
+  workspacePresets: {},
 }
 
 /** Reads the roster for the surfaces that only display it. */
@@ -155,14 +187,28 @@ export class AgentPresetSettingsController {
     if (roster === undefined) return
     const { presets } = roster
     if (presets.length === 0) {
-      this.set({ status: 'unavailable', options: [] })
+      this.set({ status: 'unavailable', options: [], workspacePresets: {} })
       return
     }
     this.set({
       status: 'ready',
       error: null,
       options: presetOptions(presets),
+      workspacePresets: roster.workspacePresets ?? {},
     })
+  }
+
+  /**
+   * Set or clear one Workspace's business profile, then refresh the roster so
+   * every surface reads the Host-confirmed mapping.
+   * @param workspacePath - the Workspace's canonical Host directory path.
+   * @param id - the preset to start new sessions with, or undefined to clear the profile.
+   * @returns the failure message, or undefined once the write landed.
+   */
+  async setWorkspacePreset(workspacePath: string, id: string | undefined): Promise<string | undefined> {
+    const failure = await writeWorkspacePreset(this.ctx, workspacePath, id)
+    await this.load()
+    return failure
   }
 
 }

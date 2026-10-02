@@ -22,6 +22,8 @@ import type { AgentPresetSectionInjected } from '../src/client/AgentPresetSectio
 import { AgentPresetSeat } from '../src/client/AgentPresetSeat.tsx'
 import type { AgentPresetSeatInjected } from '../src/client/AgentPresetSeat.tsx'
 import { AgentPresetSeatController } from '../src/client/seat-store.ts'
+import { WorkspaceProfileBadge, WorkspaceProfileMenuItems } from '../src/client/WorkspaceProfile.tsx'
+import type { WorkspaceProfileInjected } from '../src/client/WorkspaceProfile.tsx'
 import { apply as hostApply } from '../src/index.ts'
 
 // These specs assert the shipped Chinese copy. The lane has no jsdom `window`,
@@ -66,11 +68,15 @@ async function bench(options: {
   failSettingsUpdate?: boolean
   selectGate?: Promise<void>
   settingsRosterGate?: Promise<undefined>
+  /** Business profiles the host reports with the roster (and the authored preset they name). */
+  profiles?: Record<string, string>
 } = {}) {
   const ctx = new Context()
   // The host's answer, mutable so a spec can move the default the way the
   // settings surface does and watch who re-reads it.
-  let ROSTER: typeof ROSTER_ONE | typeof ROSTER_MOVED | typeof ROSTER_AUTHORED = ROSTER_ONE
+  let ROSTER: typeof ROSTER_ONE | typeof ROSTER_MOVED | typeof ROSTER_AUTHORED = options.profiles === undefined
+    ? ROSTER_ONE
+    : ROSTER_AUTHORED
   const moveDefault = (): void => { ROSTER = ROSTER_MOVED }
   await ctx.plugin(SlotRegistry).await()
   const locale = new LocaleRuntime(ctx)
@@ -102,6 +108,10 @@ async function bench(options: {
         }],
       },
     }),
+    mutate: (_ns: string, ops: unknown) => {
+      calls.push(`mutate:${JSON.stringify(ops)}`)
+      return Promise.resolve({ ok: true as const, value: { ns: 'agent-preset-registry' } })
+    },
     update: (_ns: string, patch: { selectedDefault?: unknown }) => {
       calls.push(`settings:${JSON.stringify(patch)}`)
       if (options.failSettingsUpdate === true) {
@@ -132,7 +142,9 @@ async function bench(options: {
         settingsRosterStarted.resolve(undefined)
         if (options.settingsRosterGate !== undefined) return options.settingsRosterGate.then(() => ROSTER)
       }
-      return Promise.resolve(ROSTER)
+      return Promise.resolve(options.profiles === undefined
+        ? ROSTER
+        : { ...ROSTER, value: { ...ROSTER.value, workspacePresets: options.profiles } })
     },
     read: (id: string) => Promise.resolve({
       ok: true as const,
@@ -174,6 +186,7 @@ function declareRoot(slots: SlotRegistry): () => void {
       'settings.general.item': { kind: 'list', scope: 'root' },
       'settings.section': { kind: 'list', scope: 'root' },
       conversation: { kind: 'single', scope: 'root' },
+      'sidebar.workspaces': { kind: 'single', scope: 'root' },
     },
   } as never, () => null)
 }
@@ -187,6 +200,33 @@ function declareConversation(slots: SlotRegistry): () => void {
       'conversation.session.header.actions': { kind: 'list', scope: 'session' },
     },
   } as never, () => null)
+}
+
+/** The Workspace browser's own declarations of the menu-row and badge seats. */
+function declareWorkspaceSeats(slots: SlotRegistry): () => void {
+  return slots.register({
+    name: 'sidebar.workspaces',
+    children: {
+      'sidebar.workspaces.workspace.menu.item': { kind: 'list', scope: 'root' },
+      'sidebar.workspaces.workspace.badge': { kind: 'list', scope: 'root' },
+    },
+  } as never, () => null)
+}
+
+/** A Workspace service double whose snapshot accounts sessions to directories. */
+function workspacesDouble(items: { path: string; sessionIds: string[] }[]) {
+  const listeners = new Set<() => void>()
+  return {
+    list: {
+      getSnapshot: () => ({ items }),
+      subscribe: (fn: () => void) => {
+        listeners.add(fn)
+        return () => listeners.delete(fn)
+      },
+    },
+    notify: () => { for (const fn of listeners) fn() },
+    listenerCount: () => listeners.size,
+  }
 }
 
 /** A Workspace UI double recording new-session starts. */
@@ -445,6 +485,68 @@ describe('ui-agent-preset apply', () => {
     expect(slots.entries('conversation.session.header.actions')).toHaveLength(0)
     expect(slots.entries('settings.section')).toHaveLength(0)
     conversation()
+  })
+
+  it('registers the Workspace menu rows and badge once the browser declares them, and drops both on disposal', async () => {
+    const { ctx, slots, calls } = await bench()
+    ctx.provide('sessions', sessionsDouble(ctx, { byId: {} }) as never)
+    declareRoot(slots)
+    const workspaces = declareWorkspaceSeats(slots)
+    const fiber = ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+
+    const row = slots.entries('sidebar.workspaces.workspace.menu.item')[0]!
+    expect(row.component).toBe(WorkspaceProfileMenuItems)
+    expect(row.options).toMatchObject({ id: 'agent-preset-profile', order: 500 })
+    const badge = slots.entries('sidebar.workspaces.workspace.badge')[0]!
+    expect(badge.component).toBe(WorkspaceProfileBadge)
+    const injected = (row.inject as unknown as () => WorkspaceProfileInjected)()
+    await injected.load()
+    expect(injected.hooks.agentPresets.getSnapshot()).toMatchObject({ status: 'ready' })
+    await expect(injected.select('/w/form', 'standard')).resolves.toBeUndefined()
+    expect(calls).toContain('mutate:[{"op":"set","path":["workspacePresets","/w/form"],"value":"standard"}]')
+    await fiber.dispose()
+    expect(slots.entries('sidebar.workspaces.workspace.menu.item')).toHaveLength(0)
+    expect(slots.entries('sidebar.workspaces.workspace.badge')).toHaveLength(0)
+    workspaces()
+  })
+
+  it('starts a blank session on the profile of the Workspace that accounts it, and follows the Workspace snapshot', async () => {
+    const { ctx, slots, calls } = await bench({ profiles: { '/w/form': 'mine' } })
+    declareRoot(slots)
+    declareConversation(slots)
+    ctx.provide('conversation', {} as never)
+    const state: {
+      current?: string
+      byId: Record<string, { id: string; blank: boolean; cwd?: string; projectionValues?: { agentPreset?: string | null } }>
+    } = { byId: {} }
+    const sessions = sessionsDouble(ctx, state)
+    ctx.provide('sessions', sessions as never)
+    ctx.provide('uiWorkspace', uiWorkspaceDouble() as never)
+    // The Workspace snapshot has not accounted the new session yet: its cwd is the fallback.
+    const items = [{ path: '/w/form', sessionIds: [] as string[] }, { path: '/w/other', sessionIds: [] as string[] }]
+    const workspaces = workspacesDouble(items)
+    ctx.provide('workspaces', workspaces as never)
+    await ctx.plugin({ inject: [...inject, 'conversation', 'sessions', 'uiWorkspace'], apply }).await()
+    const injectSeat = slots.entries('conversation.hero.agentPreset')[0]!
+      .inject as unknown as (sessionId?: SessionId) => AgentPresetSeatInjected
+
+    state.current = 's1'
+    state.byId['s1'] = { id: 's1', blank: true, cwd: '/w/form', projectionValues: { agentPreset: 'standard' } }
+    sessions.notify()
+    await injectSeat(SessionId('s1')).load()
+    await vi.waitFor(() => { expect(calls).toContain('select:mine') })
+    expect(workspaces.listenerCount()).toBe(1)
+
+    // A session of another Workspace, accounted by membership rather than cwd, is left alone.
+    items[1]!.sessionIds.push('s2')
+    state.current = 's2'
+    state.byId['s2'] = { id: 's2', blank: true, projectionValues: { agentPreset: 'standard' } }
+    sessions.notify()
+    await injectSeat(SessionId('s2')).load()
+    workspaces.notify()
+    await vi.waitFor(() => { expect(calls.filter(call => call === 'list').length).toBeGreaterThan(1) })
+    expect(calls.filter(call => call.startsWith('select:'))).toEqual(['select:mine'])
   })
 
   it('moves the chip when the default changes on the settings surface', async () => {
