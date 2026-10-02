@@ -143,10 +143,24 @@ function Legend({ layout, t }: { readonly layout: GitMapLayout; readonly t: Tran
 function Ready({ graph, t }: { readonly graph: WorkspaceGitGraph; readonly t: Translate }): ReactNode {
   const layout = useMemo(() => layoutGitMap(graph, { dayLabel: iso => localDayLabel(iso) }), [graph])
   const scroller = useRef<HTMLDivElement>(null)
-  // The newest history is at the right: open scrolled to it.
+  // The newest history is at the right: open scrolled to it, and stay there while
+  // the pane is resized or finishes opening, until the reader scrolls away.
   useEffect(() => {
     const element = scroller.current
-    if (element !== null) element.scrollLeft = element.scrollWidth
+    if (element === null) return undefined
+    let pinned = true
+    const toEnd = (): void => { element.scrollLeft = element.scrollWidth }
+    const onScroll = (): void => { pinned = element.scrollWidth - element.clientWidth - element.scrollLeft < 4 }
+    toEnd()
+    const frame = requestAnimationFrame(toEnd)
+    element.addEventListener('scroll', onScroll)
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(() => { if (pinned) toEnd() })
+    observer?.observe(element)
+    return () => {
+      cancelAnimationFrame(frame)
+      element.removeEventListener('scroll', onScroll)
+      observer?.disconnect()
+    }
   }, [layout])
   const open = graph.branches.length + graph.moreBranches
   return (
