@@ -480,7 +480,7 @@ describe('workspace browser rows', () => {
     }
     render(<ProjectRowItem
       group={group} onToggle={vi.fn()} onCreate={vi.fn()}
-      actions={{ rename: vi.fn(), delete: vi.fn() }} renderSlot={renderSlot} t={t}
+      actions={{ rename: vi.fn(), retitle: vi.fn(), delete: vi.fn() }} renderSlot={renderSlot} t={t}
     />)
     const owner = { workspaceId: wid('project'), path: '/projects/project', title: 'Project' }
     expect(screen.getByText('Profile badge')).toBeTruthy()
