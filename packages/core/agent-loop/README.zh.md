@@ -46,6 +46,7 @@ kind: "package-reference"
 | 字段 | 默认值 | 含义 |
 |---|---|---|
 | `maxParallelToolCalls` | `10` | 每个步骤同时在途的并行安全工具调用数；`1` 为串行 |
+| `directMode` | `false` | 为 `true` 时，每个 agent 的系统提示词都会带一段简短的直接模式政策（简洁作答、尽量少调用工具、简单任务不启动子 agent、用用户的语言回复）；仅为建议，不改变任何上限 |
 | `agents[].id` | 必填 | 稳定标签；未设置 `sessionId` 时，全新会话会生成 `${id}-session-<uuid>` |
 | `agents[].provider` / `agents[].model` | — | 模型路由；分发前两者都必须存在 |
 | `agents[].reasoningEffort` | — | 非空的初始推理强度；`agent/request` 可以覆盖它 |
@@ -54,7 +55,7 @@ kind: "package-reference"
 | `agents[].sessionId` | — | 确切身份：首次使用创建，重新挂载时恢复已实体化的历史 |
 | `agents[].resumeSessionId` | — | 加载这个持久化会话而不是创建新会话；与 `sessionId` 互斥 |
 
-生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-agent-loop) 列出所有接受的字段。`maxParallelToolCalls` 是在下一个工具组开始时读取的 volatile Config 字段；`agents` 仍是启动配置。
+生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-agent-loop) 列出所有接受的字段。`maxParallelToolCalls` 是在下一个工具组开始时读取的 volatile Config 字段，`directMode` 是在下一个步骤组装提示词时读取的 volatile Config 字段；`agents` 仍是启动配置。
 
 ### 以编程方式创建或恢复 agent
 
@@ -103,7 +104,7 @@ const handle = await ctx.agents.create({
 | [`src/inbox.ts`](src/inbox.ts) | 包内部的 `ReactLoopInbox`：持久投影、结构化命令与仅供循环使用的领取状态 |
 | [`src/tool-calls.ts`](src/tool-calls.ts) | 工具调度：独占屏障与有界并行池 |
 | [`src/runtime-context.ts`](src/runtime-context.ts) | 逐步骤运行时上下文快照处理 |
-| [`src/constants.ts`](src/constants.ts) | `DEFAULT_MAX_PARALLEL_TOOL_CALLS` |
+| [`src/constants.ts`](src/constants.ts) | `DEFAULT_MAX_PARALLEL_TOOL_CALLS`、直接模式的段落名与政策文本 |
 | [`src/invariant.ts`](src/invariant.ts) | 不变式配套：从会话日志重建请求 |
 
 ### 创建与拆除
@@ -153,7 +154,7 @@ const handle = await ctx.agents.create({
 
 #### 模型看到什么
 
-每个步骤中，循环会发送会话的派生消息与可见工具 schema。非空的 `system/message` 节点承载提示词，最新一条是有效版本；空渲染文本会从派生历史中清除所有提示词版本。它提供 `provider`、`model` 与 `cwd` 变量值，但不添加固定文案。 请求头始终记录当前有效工具。将其名称与前一请求头比较后，添加和移除合并为一条 `developer/message`，不依赖模型能力；添加记录引用新请求头。请求还携带 `Session.toolHistory()`，供 LLM 运行时构造提供方声明。
+每个步骤中，循环会发送会话的派生消息与可见工具 schema。非空的 `system/message` 节点承载提示词，最新一条是有效版本；空渲染文本会从派生历史中清除所有提示词版本。它提供 `provider`、`model` 与 `cwd` 变量值，但不添加固定文案，下文的直接模式段落除外。 请求头始终记录当前有效工具。将其名称与前一请求头比较后，添加和移除合并为一条 `developer/message`，不依赖模型能力；添加记录引用新请求头。请求还携带 `Session.toolHistory()`，供 LLM 运行时构造提供方声明。
 
 #### Token 影响
 
@@ -162,6 +163,20 @@ const handle = await ctx.agents.create({
 #### KV Cache 影响
 
 前缀复用要求在同一提供方与模型路由下，此前消息和声明保持逐字节一致。渲染后的提示词未变时，缓存前缀得以保留，除非不具备能力的路由或新请求序列必须归并保留的历史内系统节点。原地替换某个系统节点的提示词变更会使请求从该节点的第一个 token 起就不同——该节点是第 0 号节点时则整个请求都不同——因此提供方前缀缓存从那里开始未命中；当已准备调用声明 `systemPromptUpdate: 'in-history'` 时，同一请求序列延续期间的非空提示词变更会追加到已缓存历史之后，因此直到该历史末尾的前缀仍可复用。更改保留工具的定义或重建声明，会从第一个改变的请求 token 起使复用失效。
+
+### 直接模式政策
+
+#### 模型看到什么
+
+`directMode` 为 `true` 时，`agent-loop:direct-mode` 提示词段会渲染一段简短的英文政策：简洁作答、简单任务保持简短推理、尽量少调用工具、琐碎工作不启动子 agent 或工作流、仅在被阻塞时才提问，并使用用户书写的语言回复。它只是建议，不改变任何循环上限、工具目录或轮次预算。为 `false` 时该段渲染为空，提示词保持不变。
+
+#### Token 影响
+
+开启期间每个步骤增加约八十个词的系统文本；更少的探索步骤和更短的回答通常能抵消这部分开销。
+
+#### KV Cache 影响
+
+切换该设置会使渲染后的提示词改变一次，因此上文的提示词变更规则在下一个步骤生效；设置不变时前缀保持稳定。
 
 ### 保留的消息历史
 

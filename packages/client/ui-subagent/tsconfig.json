@@ -51,6 +51,15 @@
       "path": "../ui-slots"
     },
     {
+      "path": "../../llm/cost-meter"
+    },
+    {
+      "path": "../../session/session-turn-outline"
+    },
+    {
+      "path": "../../todo/tool-todo"
+    },
+    {
       "path": "../../llm/token-meter"
     },
     {

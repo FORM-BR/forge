@@ -288,6 +288,10 @@ export interface PluginManagerState {
   readonly confirm: ConfirmState | null
   /** The package the list scrolls to and marks, once an install enabled it. */
   readonly highlight: string | null
+  /** Whether the Host booted in safe mode (third-party plugins not loaded); fixed for the Host's lifetime. */
+  readonly safeMode: boolean
+  /** Why the launcher entered safe mode by itself after a failed normal boot; null when the person asked for it. */
+  readonly safeReason: string | null
 }
 
 /** The registration-side face the tab's slot entry injects. */
@@ -525,7 +529,7 @@ export class PluginManagerController {
   ) {
     this.store = createSnapshotStore<PluginManagerState>({
       status: 'idle', refreshStatus: 'idle', packages: [], busy: [], notice: null,
-      install: IDLE_INSTALL, confirm: null, highlight: null,
+      install: IDLE_INSTALL, confirm: null, highlight: null, safeMode: false, safeReason: null,
     })
   }
 
@@ -535,6 +539,24 @@ export class PluginManagerController {
    */
   getSnapshot(): PluginManagerState {
     return this.store.getSnapshot()
+  }
+
+  /**
+   * Ask the Host whether it booted in safe mode. Independent of the plugin list so the indicator shows
+   * without opening the Plugins page; a Host that cannot answer leaves the flag off.
+   */
+  async readSafeMode(): Promise<void> {
+    try {
+      const answer = await this.ctx.remote.pluginManager.safeMode()
+      if (!answer.ok) return
+      const reason = answer.value.active ? answer.value.reason ?? null : null
+      const current = this.getSnapshot()
+      if (answer.value.active !== current.safeMode || reason !== current.safeReason) {
+        this.patch({ safeMode: answer.value.active, safeReason: reason })
+      }
+    } catch {
+      // No answer means no indicator; the plugin list reports its own failures.
+    }
   }
 
   /** Stop publishing and drop every late settlement. */

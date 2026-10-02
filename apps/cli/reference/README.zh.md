@@ -53,6 +53,10 @@ dsh --profile web --patch ./extra.yml --dump-config
 `--dump-default-config` 只打印组合包各层；`--dump-config` 额外加上 profile 的 `cordis.patch.yml`、home 级的 `$DSH_HOME/cordis.patch.yml` 和 `--patch` overlay。两者都会打印注释，标明每行由哪个文件提供，以及哪些 overlay 修改过它；`!!js` 表达式保持未求值，插入行中的相对插件名以各自 patch 文件所在目录解析，找不到目标的 patch 会报告到 stderr。dump 操作会初始化缺失的 profile 文件。它不会运行应用的命令行参数提供方，因此展示的是解析任何应用参数之前的组合配置树；如果调用中包含应用参数，dump 会拒绝该调用。
 
 <a id="config-schema-dump"></a>
+### 安全模式
+
+`dsh --profile <name> --safe`（或 `dsh <name> --safe`，或在环境中设置 `FORGE_SAFE_MODE=1`）只用随附组合包启动 profile。启动器保留随附模板选择的组合包层；对于 profile、home 和 `--patch` 层，只保留两类 patch：配置已由这些组合包挂载的 row（例如 provider 设置、disabled 标记），或插入模块为随附模块（`@deepseek-ai/*`）的 row。树外组合包和可选组合包、指向其他模块的 row、MCP 客户端连接以及嵌套 include 会在内存中从组合里剔除。不会写入任何文件：`cordis.patch.yml`、`package.json` 和已安装的包保持原样，不带该 flag 再次启动即可恢复一切。该 flag 属于启动器 flag，必须写在应用参数之前（`dsh web --safe --no-open`）。运行中的进程通过插件管理器的 `safeMode()` Remote 报告该状态，Web UI 据此显示徽标并在插件页给出说明；该进程之后的每次 profile 重新加载都按相同方式组合。如果启动器在正常启动失败后自行回退到安全模式，会把 `FORGE_SAFE_REASON` 设为一行原因；宿主通过同一个 Remote 报告它，UI 会说明该模式是自动打开的。
+
 ### 配置 schema dump
 
 `--dump-config-schema` 使用与 `--dump-config` 相同的组合包、profile、home 和 argv patch 层，支持可重复的 `--patch` 与 `--from-default-profile`。三种 dump flag 互斥，并拒绝应用参数和保留的 `desktop` profile。组合成功后，stdout 输出一份缩进排版的 JSON Schema 2020-12 文档。根 schema 描述 `--dump-config` 输出经解析后的 entry list；`$defs.patchList` 单独描述 profile/home/CLI overlay。验证该片段时应保留文档的 `$defs`。准备、patch 解析/组合或解析器设置失败时，以非零退出码结束，不输出 schema。收集或投影失败时保留部分输出并退出 1；诊断也会输出到 stderr。即使 stdout 中的 schema 有效且可用，`partial` 投影或省略非 JSON 注释也适用此退出码。schema dump 的未匹配目标警告不包含层标签；需要来源标签时，使用相同配置层运行 `--dump-config`。

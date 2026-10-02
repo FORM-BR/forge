@@ -48,7 +48,9 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { SessionSearchResultItem } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { RemoteHostFacts } from '@deepseek-ai/dsh-api-remotes/client'
-import type { SessionActivity, WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type {
+  SessionActivity, WorkspaceGitInfoValue, WorkspaceId, WorkspaceView,
+} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { WorkspaceShortcutState } from '../shortcuts.ts'
@@ -402,6 +404,29 @@ export interface RenameSessionInjected {
   /** Ask for the rename dialog, seeded with the row's current title. */
   requestSessionRename: (sessionId: SessionId, currentTitle: string) => void
 }
+
+/** Status line share: the Host git lookup for the Session's working directory. */
+export interface WorkspaceStatusInjected {
+  /**
+   * Look up the git repository containing a directory.
+   * @param path - the Session's working directory.
+   * @param signal - lifetime of the lookup; abort cancels the Host call.
+   * @returns the echoed path plus repository facts when inside a repository; rejects when the Host refuses or the call is lost.
+   */
+  gitInfo: (path: string, signal: AbortSignal) => Promise<WorkspaceGitInfoValue>
+}
+
+/** Props of the git chip entry in `conversation.hero.workspace.status`. */
+export type HeroGitChipProps =
+  PropsRuntime<'conversation.hero.workspace.status'>
+  & PropsLocale<'workspace'>
+  & InjectFace<WorkspaceStatusInjected>
+
+/** Props of the status line entry in `conversation.composer.dock`. */
+export type WorkspaceStatusProps =
+  PropsRuntime<'conversation.composer.dock'>
+  & PropsLocale<'workspace'>
+  & InjectFace<WorkspaceStatusInjected>
 
 /** A Session rename the rename action asked for; the dialog entry opens on it. */
 export interface SessionRenameTarget {

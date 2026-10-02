@@ -365,3 +365,27 @@
 .refresh:hover {
   background: var(--dsw-alias-interactive-bg-hover);
 }
+
+.mapLink {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 3px 3px;
+  padding: 6px 8px;
+  border: 0;
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-lg);
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 17px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mapLink:hover,
+.mapLink:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}

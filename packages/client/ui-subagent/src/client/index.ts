@@ -8,6 +8,8 @@ import {
   SubagentReadOnlyComposer, type SubagentReadOnlyMatch,
 } from './SubagentReadOnlyComposer.tsx'
 import { registerSidebarChat, subagentChatAddress } from './sidebar-chat/index.tsx'
+import { AGENT_MAP_KIND, registerAgentMap } from './agent-map/register.ts'
+import type { AgentMapInjected } from './agent-map/AgentMapTab.tsx'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
@@ -29,6 +31,10 @@ export type {
 export type {
   SubagentReadOnlyComposerProps, SubagentReadOnlyMatch,
 } from './SubagentReadOnlyComposer.tsx'
+export type { AgentMapInjected, AgentMapTabProps } from './agent-map/AgentMapTab.tsx'
+export type {
+  AgentMapBranch, AgentMapMode, AgentMapNode, AgentMapState, AgentMapSubtree, AgentMapTeamRole,
+} from './agent-map/model.ts'
 
 /** Required services for subagent presentation and navigation. */
 export const inject = ['sessions', 'uiWorkspace', 'slots', 'locale', 'sidebarRight']
@@ -57,7 +63,7 @@ export function apply(ctx: ClientContext): void {
   ctx.inject(['resources', 'sidebarRightTabs'], (scope) => {
     registerSidebarChat(scope, ctx.locale.bind(NS))
   })
-  const catalogActions = (_parentSessionId: SessionId): SubagentCatalogInjected => ({
+  const actions: SubagentCatalogInjected = {
     openChild(address: SubagentAddress) {
       ctx.uiWorkspace.openSession(address)
     },
@@ -70,6 +76,18 @@ export function apply(ctx: ClientContext): void {
     refreshProjection(parentSessionId: SessionId) {
       void ctx.sessions.refreshProjections(parentSessionId)
     },
+    openMap() {
+      ctx.sidebarRight.openTab(AGENT_MAP_KIND)
+    },
+  }
+  const catalogActions = (_parentSessionId: SessionId): SubagentCatalogInjected => actions
+  ctx.inject(['sidebarRightTabs'], (scope) => {
+    registerAgentMap(scope, ctx.locale.bind(NS), (): AgentMapInjected => ({
+      ...actions,
+      openRoot(sessionId: SessionId) {
+        ctx.uiWorkspace.openSession(sessionId)
+      },
+    }))
   })
   ctx.slots.inject(
     'conversation.session.header.lineage',

@@ -9,8 +9,10 @@ export const zh = {
   'defaultWorkspace.failed': '无法创建默认工作区，请通过“选择工作区”选择文件夹',
   'group.ungrouped': '未分组',
   'session.new': '新会话',
+  'session.resume': '继续最近的会话',
   'session.untitled': '未命名',
   'shortcut.noSession': '请先选择一个会话',
+  'shortcut.noResumable': '没有可继续的会话',
   'shortcut.noPicker': '目录选择器不可用',
   'shortcut.directoryBusy': '正在选择或添加工作区',
   'shortcut.noCompletedTurn': '当前会话没有已结束的轮次',
@@ -122,6 +124,10 @@ export const zh = {
   'time.months': '{n}个月',
   'time.years': '{n}年',
   'time.ago': '{t}前',
+  'statusLine.cwd': '工作目录：{path}',
+  'statusLine.repo': 'Git 仓库：{root}',
+  'statusLine.repoBranch': '{repo}（{branch}）',
+  'statusLine.repoDetached': '{repo}（{branch}，游离 HEAD）',
 } satisfies Record<string, string>
 
 /** The workspace namespace key union. */
@@ -132,8 +138,10 @@ export const en = {
   'defaultWorkspace.failed': 'Unable to create default workspace. Use Choose workspace to select a folder.',
   'group.ungrouped': 'Ungrouped',
   'session.new': 'New Session',
+  'session.resume': 'Resume last session',
   'session.untitled': 'Untitled',
   'shortcut.noSession': 'Select a session first',
+  'shortcut.noResumable': 'No session to resume',
   'shortcut.noPicker': 'Directory picker unavailable',
   'shortcut.directoryBusy': 'Selecting or adding a workspace',
   'shortcut.noCompletedTurn': 'This session has no completed turn',
@@ -245,4 +253,8 @@ export const en = {
   'time.months': '{n}mo',
   'time.years': '{n}y',
   'time.ago': '{t} ago',
+  'statusLine.cwd': 'Working directory: {path}',
+  'statusLine.repo': 'Git repository: {root}',
+  'statusLine.repoBranch': '{repo} ({branch})',
+  'statusLine.repoDetached': '{repo} ({branch}, detached HEAD)',
 } satisfies Record<WorkspaceKey, string>

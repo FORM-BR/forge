@@ -192,6 +192,7 @@ class FakeWorkspaces implements IWorkspaces {
 
   declare readonly create: IWorkspaces['create']
   declare readonly rename: IWorkspaces['rename']
+  declare readonly gitInfo: IWorkspaces['gitInfo']
   declare readonly delete: IWorkspaces['delete']
   declare readonly insertBefore: IWorkspaces['insertBefore']
   declare readonly insertSessionBefore: IWorkspaces['insertSessionBefore']
@@ -729,6 +730,35 @@ describe('UiWorkspaceService', () => {
     await vi.waitFor(() => {
       expect(missingMember.sessions.create).toHaveBeenCalledWith({ workspaceId: wid('newer') })
     })
+  })
+
+  it('finds the latest resumable Session in the current, explicit, or most recent Workspace', () => {
+    const older = summary('older', { updatedAt: 1 })
+    const newer = summary('newer', { updatedAt: 5 })
+    const blank = summary('blank', { updatedAt: 50, blank: true })
+    const child = summary('child', { updatedAt: 60, origin: 'subagent' })
+    const archived = summary('archived', { updatedAt: 70 })
+    const main = summary('main', { updatedAt: 9 })
+    const other = summary('other', { updatedAt: 99 })
+    const catalogs = {
+      sessions: sessionState([older, newer, blank, child, archived, main, other]),
+      workspaces: workspaceState([
+        workspace('w1', [older.id, newer.id, blank.id, child.id, archived.id, main.id, sid('missing')]),
+        workspace('w2', [other.id]),
+      ], [archived.id]),
+    }
+    const b = bench(catalogs)
+
+    expect(b.uiWorkspace.latestSession()).toBe(other.id)
+    b.uiWorkspace.openSession(main.id)
+    expect(b.uiWorkspace.latestSession()).toBe(newer.id)
+    expect(b.uiWorkspace.latestSession(wid('w2'))).toBe(other.id)
+    expect(b.uiWorkspace.latestSession(wid('unknown'))).toBeUndefined()
+    expect(bench({ ...catalogs, sessions: sessionState([older], 'pending') }).uiWorkspace.latestSession()).toBeUndefined()
+    expect(bench({ ...catalogs, workspaces: workspaceState([], [], 'pending') }).uiWorkspace.latestSession()).toBeUndefined()
+    expect(bench({
+      sessions: sessionState([blank]), workspaces: workspaceState([workspace('w1', [blank.id])]),
+    }).uiWorkspace.latestSession()).toBeUndefined()
   })
 
   it('opens nothing when a New Session request has no Workspace to open', () => {

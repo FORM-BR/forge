@@ -9,8 +9,8 @@
   en: 930db612ece65ad4
   zh: ad7e9d9afb4545ac
 /deepseek-ai-dsh-client-ui-subagent/summary:
-  en: 50f267d55833a683
-  zh: 89d6b827576baa8b
+  en: 4a44642474439b6e
+  zh: 4250036415e94850
 /deepseek-ai-dsh-client-ui-subagent/table-of-contents:
   en: d152484eb41ac6b4
   zh: 09388d293f9be9cb
@@ -24,8 +24,11 @@
   en: 876e7152c8b9c4a6
   zh: f89f5e2a812e8451
 /deepseek-ai-dsh-client-ui-subagent/use-this-package/the-reference-source:
-  en: 6a5f91b7dfcefafe
-  zh: 2d11441952cfea53
+  en: 265c4ca9996fbde5
+  zh: 0bb3d1644bdae85b
+/deepseek-ai-dsh-client-ui-subagent/use-this-package/agent-map:
+  en: 0ff0d40227116e17
+  zh: 4e9aabd1bce1be36
 /deepseek-ai-dsh-client-ui-subagent/understand-the-implementation:
   en: 8dc3c556cd57bdd8
   zh: f5c86a690bba7f7d
@@ -35,12 +38,15 @@
 /deepseek-ai-dsh-client-ui-subagent/understand-the-implementation/duration-completion-and-tokens:
   en: b817e9907392f59c
   zh: e42feb97d572a989
+/deepseek-ai-dsh-client-ui-subagent/understand-the-implementation/agent-map-derivation:
+  en: 747d15d801b56502
+  zh: e27b93a32adb5923
 /deepseek-ai-dsh-client-ui-subagent/understand-the-implementation/composer-election:
   en: 1c15af4dd7c0b791
   zh: f789737ab4dd8cb2
 /deepseek-ai-dsh-client-ui-subagent/further-exploration:
-  en: 3b9b3cb4ad8f65f6
-  zh: 63a2c10a4613cca1
+  en: 6c3183f5ed24afe9
+  zh: de1e48affc59af74
 /deepseek-ai-dsh-client-ui-subagent/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -57,8 +63,8 @@
   en: de2762a99572475f
   zh: 9b41107ad14ebf8a
 /deepseek-ai-dsh-client-ui-subagent/known-limitations-and-deferred-work:
-  en: ee310ff3cd487639
-  zh: 23793aa1c28a23af
+  en: 39728d1e48e3886e
+  zh: 0bf354f5be1177ec
 /deepseek-ai-dsh-client-ui-subagent/known-limitations-and-deferred-work/dev-note:
   en: 3dd148cecbb1a4df
   zh: 626cc5ed9f65c72a

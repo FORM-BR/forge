@@ -26,6 +26,7 @@ type Locale = PropsLocale<'shortcuts'>
 const coreActionOrder = new Map<string, number>([
   'shortcuts.open',
   'session.new',
+  'session.resume',
   'sidebar.left.toggle',
   'session.search',
   'workspace.add',

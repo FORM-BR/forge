@@ -48,7 +48,7 @@ async function bench(runtime: 'web' | 'desktop' = 'desktop') {
   locale.setLocale('en')
   ctx.provide('locale', locale)
   const navigation = {
-    startSession: vi.fn(), forkSession: vi.fn(async () => 'fork-child' as SessionId), archiveSession: vi.fn(async (_sessionId: SessionId) => {}),
+    startSession: vi.fn(), latestSession: vi.fn((): SessionId | undefined => undefined), openSession: vi.fn(), forkSession: vi.fn(async () => 'fork-child' as SessionId), archiveSession: vi.fn(async (_sessionId: SessionId) => {}),
   }
   const controls = createWorkspaceShortcutControls()
   const fiber = ctx.plugin((scoped) => {
@@ -74,15 +74,15 @@ describe('workspace shortcut ownership', () => {
     b.controls.add()
     expect(b.controls.state.getSnapshot().addRequested).toBe(false)
   })
-  it('registers six commands with Desktop and Web defaults and removes registrations with the plugin', async () => {
+  it('registers seven commands with Desktop and Web defaults and removes registrations with the plugin', async () => {
     const b = await bench()
     expect(b.registry.catalog.getSnapshot().map(row => row.id)).toEqual([
-      'session.new', 'session.search', 'workspace.add', 'session.rename', 'session.fork', 'session.archive',
+      'session.new', 'session.resume', 'session.search', 'workspace.add', 'session.rename', 'session.fork', 'session.archive',
     ])
     expect(b.registry.catalog.getSnapshot().every(row => row.keys.length > 0)).toBe(true)
     const web = await bench('web')
     expect(web.registry.catalog.getSnapshot().map(row => row.aria)).toEqual([
-      'Alt+Meta+N', 'Alt+Meta+K', 'Alt+Meta+O', 'Shift+Meta+R', 'Shift+Meta+F', 'Alt+Meta+A',
+      'Alt+Meta+N', 'Shift+Meta+L', 'Alt+Meta+K', 'Alt+Meta+O', 'Shift+Meta+R', 'Shift+Meta+F', 'Alt+Meta+A',
     ])
     await b.fiber.dispose()
     expect(b.registry.catalog.getSnapshot()).toEqual([])
@@ -141,6 +141,17 @@ describe('workspace shortcut ownership', () => {
     if (resolution.status !== 'handled') throw new Error('nonblank Session was unavailable')
     resolution.run()
     expect(b.navigation.forkSession).toHaveBeenCalledWith('a')
+  })
+
+  it('resumes the Session the owner resolves and stays blocked while none is resumable', async () => {
+    const b = await bench()
+    expect(b.commands.get('session.resume')!.resolve(context)).toMatchObject({ status: 'blocked', reason: en['shortcut.noResumable'] })
+    b.navigation.latestSession.mockReturnValue(sid('b'))
+    const resolution = b.commands.get('session.resume')!.resolve(context)
+    if (resolution.status !== 'handled') throw new Error('resumable Session was unavailable')
+    expect(b.navigation.openSession).not.toHaveBeenCalled()
+    resolution.run()
+    expect(b.navigation.openSession).toHaveBeenCalledExactlyOnceWith('b')
   })
 
   it('blocks absent or blank Sessions and permits retry while running after the Host refuses a fork', async () => {

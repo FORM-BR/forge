@@ -62,6 +62,14 @@ export interface UiWorkspace {
    */
   startSession(workspaceId?: WorkspaceId): void
   /**
+   * Find the most recently updated Session to continue, without opening it.
+   * Blank, archived, and subagent-origin Sessions and the Session already
+   * shown in the main view are skipped.
+   * @param workspaceId - explicit Workspace; absent inherits the current or most recent Workspace.
+   * @returns the Session to continue, or undefined when the Workspace has no other candidate.
+   */
+  latestSession(workspaceId?: WorkspaceId): SessionId | undefined
+  /**
    * Archive a Session and clear it when it is the current selection.
    * @param sessionId - Session to archive.
    * @param options - `stopActivity` asks the Host to stop the Session's running work instead of refusing.
@@ -238,6 +246,29 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     void this.openWorkspace(target).catch(
       (reason: unknown) => { console.warn('new session failed:', reason) },
     )
+  }
+
+  latestSession(workspaceId?: WorkspaceId): SessionId | undefined {
+    const workspaces = this.workspaces.list.getSnapshot()
+    const sessions = this.sessions.list.getSnapshot()
+    const current = this.mainReference?.sessionId
+    const target = workspaceId
+      ?? workspaces.items.find(item => current !== undefined && item.sessionIds.includes(current))?.workspaceId
+      ?? (workspaces.phase === 'ready' && sessions.phase === 'ready' ? recentWorkspace(workspaces.items, sessions.byId) : undefined)
+    const workspace = workspaces.items.find(item => item.workspaceId === target)
+    if (workspace === undefined) return undefined
+    let latest: SessionId | undefined
+    let latestTime = Number.NEGATIVE_INFINITY
+    for (const id of workspace.sessionIds) {
+      const summary = sessions.byId[id]
+      if (summary === undefined || id === current || summary.blank || summary.origin === 'subagent'
+        || workspaces.archivedSessionIds.includes(id)) continue
+      if (summary.updatedAt > latestTime) {
+        latest = id
+        latestTime = summary.updatedAt
+      }
+    }
+    return latest
   }
 
   async archiveSession(sessionId: SessionId, options: { readonly stopActivity?: boolean } = {}): Promise<void> {

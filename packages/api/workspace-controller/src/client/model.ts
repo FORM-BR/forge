@@ -11,6 +11,7 @@ import type {
   WorkspaceCreateRequest,
   WorkspaceCreateValue,
   WorkspaceDeleteValue,
+  WorkspaceGitInfoValue,
   WorkspaceInsertSessionBeforeRequest,
   WorkspaceOrderValue,
   WorkspacePinSessionRequest,
@@ -110,6 +111,17 @@ export class ClientWorkspaceModel implements WorkspaceFollowSink {
     const result = await this.remote.initializeDefault(signal)
     if (result.ok && result.value !== undefined) this.upsert(result.value.workspace)
     return result
+  }
+
+  /**
+   * Look up the git repository containing a Host directory. Read-only: the
+   * answer is not part of the Workspace projection and is never cached here.
+   * @param path - fully qualified Host directory.
+   * @param signal - caller lifetime; abort cancels the Host lookup.
+   * @returns generated Remote result.
+   */
+  gitInfo(path: string, signal?: AbortSignal): Promise<RemoteResult<WorkspaceGitInfoValue>> {
+    return this.remote.gitInfo(path, signal)
   }
 
   /**

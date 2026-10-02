@@ -26,6 +26,8 @@ Host 控制器会串行执行正确性取决于当前注册表状态的变更，
 
 Client 入口提供 `ClientWorkspaceModel` 和 `createWorkspaceStateStream()`。该模型拥有 Workspace 行、registry 顺序、归档与置顶会话身份、一元变更回显，以及流与一元调用的竞态处理。较新的 Host 行按 `updatedAt` 获胜；已提交的流顺序优先于较旧的一元响应；已经移除的 Workspace id 不会被延迟数据复活。置顶快照仅在会话身份或顺序变化时更新。该包公开与框架无关的快照和订阅，把导航策略与 React 钩子留给 UI owner。`WorkspaceController.archiveSession(sessionId, { stopActivity })` 抛出携带 Host `rpcError` 的 `WorkspaceArchiveError`，界面因此能区分"仍有工作在跑"的拒绝与会话缺失或载体故障，并提议停止这些工作。
 
+`workspace.gitInfo(path, signal)` 是供状态显示使用的只读查询：它在完全限定的 Host 目录中运行 `git`，返回回显的路径；位于仓库内时还返回仓库名（顶层目录的 basename）、仓库根目录、当前分支，以及 HEAD 是否游离（此时分支字段为缩写提交）。目录不在任何仓库内、目录不存在、缺少 `git` 可执行文件、以及超时，都只返回路径；相对路径以 `gateway/bad-request` 失败，调用方中止则以 `gateway/cancelled` 失败。Client 服务将其暴露为 `workspaces.gitInfo(path, signal?)`，Host 失败时会 reject。
+
 <a id="first-use-workspace"></a>
 ### 首次使用工作区
 
@@ -39,6 +41,7 @@ Client 入口提供 `ClientWorkspaceModel` 和 `createWorkspaceStateStream()`。
 | --- | --- | --- |
 | `documentsDirectory` | 系统 Documents 目录 | 完全限定的 Host 目录覆盖值 |
 | `documentsLookupTimeoutMs` | `10000` | 操作系统目录查询的正数最大时长，单位为毫秒 |
+| `gitLookupTimeoutMs` | `3000` | 单次 `workspace.gitInfo` 查询的正数最大时长，单位为毫秒 |
 
 Documents 查询占用注册表变更队列，因此其他 Workspace 变更（包括登记已选目录）最多可能等待 `documentsLookupTimeoutMs`。取消可以停止查询；解析成功后，取消不会回滚创建或登记。
 

@@ -15,6 +15,7 @@ import type {
   WorkspaceDeleteRequest,
   WorkspaceDeleteValue,
   WorkspaceFollowFrame,
+  WorkspaceGitInfoValue,
   WorkspaceId,
   WorkspaceInsertBeforeRequest,
   WorkspaceInsertSessionBeforeRequest,
@@ -92,6 +93,9 @@ export function followGenerations(generations: readonly StreamScript[]): StreamS
 export const workspaceWorld: RemoteTable = {
   unary: {
     'workspace/initializeDefault': (): RemoteResult<WorkspaceValue> => ok({ workspace: workspace('default') }),
+    'workspace/gitInfo': (path: string): RemoteResult<WorkspaceGitInfoValue> => ok({
+      path, git: { repoName: 'repo', root: path, branch: 'main', detached: false },
+    }),
     'workspace/create': (request: WorkspaceCreateRequest): RemoteResult<WorkspaceCreateValue> => ok({
       workspace: workspace('created', { path: request.path }), created: true,
     }),

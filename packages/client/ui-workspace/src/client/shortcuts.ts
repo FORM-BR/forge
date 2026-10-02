@@ -64,7 +64,7 @@ export function createWorkspaceShortcutControls(): WorkspaceShortcutControls {
  */
 export function installWorkspaceShortcuts(
   ctx: Context,
-  navigation: Pick<UiWorkspace, 'startSession' | 'forkSession'>,
+  navigation: Pick<UiWorkspace, 'startSession' | 'forkSession' | 'latestSession' | 'openSession'>,
   controls: ReturnType<typeof createWorkspaceShortcutControls>,
   archiveSession: (sessionId: SessionId) => void,
 ): void {
@@ -86,6 +86,11 @@ export function installWorkspaceShortcuts(
   }
   register('session.new', () => t('session.new'), ['new session', 'new chat'], 'KeyN', ['primary'], ['primary', 'alt'],
     () => ({ status: 'handled', run: () => { navigation.startSession() } }))
+  register('session.resume', () => t('session.resume'), ['resume session', 'continue last session'], 'KeyL', ['primary', 'shift'], ['primary', 'shift'], () => {
+    const target = navigation.latestSession()
+    return target === undefined ? { status: 'blocked', reason: t('shortcut.noResumable') }
+      : { status: 'handled', run: () => { navigation.openSession(target) } }
+  })
   register('session.search', () => t('search.sessions.aria'), ['search sessions'], 'KeyK', ['primary'], ['primary', 'alt'],
     () => ({ status: 'handled', run: controls.search }))
   register('workspace.add', () => t('workspace.add'), ['add workspace', 'open folder'], 'KeyO', ['primary'], ['primary', 'alt'],

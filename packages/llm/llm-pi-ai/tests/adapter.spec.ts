@@ -766,6 +766,93 @@ describe('provider profile lifecycle', () => {
     expect(server.requests[0]).toMatchObject({ reasoning_effort: 'none' })
   })
 
+  describe('OpenRouter reasoning dialect on a declared route', () => {
+    /** The level dict the Models settings page writes: checked levels under their own name, `off` valueless. */
+    const PAGE_EFFORTS = { off: null, high: 'high', xhigh: 'xhigh' } as const
+
+    async function openRouterRoute(
+      baseURL: string,
+      efforts: NonNullable<LlmPiAi.PiAiModelProfile['reasoningEfforts']>,
+      compat?: LlmPiAi.PiAiCompatProfile,
+    ): Promise<Context> {
+      vi.stubEnv('PI_TEST_KEY', 'test-key')
+      const ctx = new Context()
+      await ctx.plugin(LlmRuntime)
+      await ctx.plugin(LlmPiAi, {
+        providers: {
+          openrouterv1: {
+            apiKeyEnv: 'PI_TEST_KEY',
+            api: 'openai-completions',
+            baseURL,
+            ...compat === undefined ? {} : { compat },
+            models: [{ id: 'deepseek/deepseek-v4.1-flash', reasoningEfforts: efforts }],
+          },
+        },
+      })
+      return ctx
+    }
+
+    const prompt = (ctx: Context, effort: string | undefined): Promise<unknown> => assemble(ctx, {
+      provider: 'openrouterv1',
+      model: 'deepseek/deepseek-v4.1-flash',
+      ...effort === undefined ? {} : { reasoningEffort: ReasoningEffortId(effort) },
+      messages: [],
+    })
+
+    it('sends the chosen level as reasoning.effort, not reasoning_effort', async () => {
+      const server = await mockServer([{ events: textEvents }, { events: textEvents }, { events: textEvents }])
+      const ctx = await openRouterRoute(`${server.url}/v1`, PAGE_EFFORTS, { thinkingFormat: 'openrouter' })
+
+      await prompt(ctx, 'high')
+      await prompt(ctx, 'xhigh')
+      // Off is declared valueless, so pi-ai spells it with OpenRouter's own `none`.
+      await prompt(ctx, 'off')
+      expect(server.requests[0]).toMatchObject({ reasoning: { effort: 'high' } })
+      expect(server.requests[1]).toMatchObject({ reasoning: { effort: 'xhigh' } })
+      expect(server.requests[2]).toMatchObject({ reasoning: { effort: 'none' } })
+      for (const request of server.requests) expect(request).not.toHaveProperty('reasoning_effort')
+    })
+
+    it('sends nothing for the provider default while off is not declared', async () => {
+      const server = await mockServer([{ events: textEvents }])
+      const ctx = await openRouterRoute(`${server.url}/v1`, { high: 'high' }, { thinkingFormat: 'openrouter' })
+      await prompt(ctx, undefined)
+      expect(server.requests[0]).not.toHaveProperty('reasoning')
+      expect(server.requests[0]).not.toHaveProperty('reasoning_effort')
+    })
+
+    it('offers exactly the declared levels to the picker and refuses the rest', async () => {
+      const server = await mockServer([])
+      const ctx = await openRouterRoute(`${server.url}/v1`, PAGE_EFFORTS, { thinkingFormat: 'openrouter' })
+      await expect(ctx.llm.resolveModelInfo('openrouterv1', 'deepseek/deepseek-v4.1-flash')).resolves.toMatchObject({
+        reasoning: { efforts: [{ id: 'off' }, { id: 'high' }, { id: 'xhigh' }] },
+      })
+      const refused = await prompt(ctx, 'low')
+      expect(refused).toMatchObject({ finish: { kind: 'error', failure: { code: 'UNSUPPORTED_REASONING_EFFORT' } } })
+      expect(server.requests).toHaveLength(0)
+    })
+
+    it('recognizes an openrouter.ai endpoint without any compat switch', async () => {
+      const bodies: unknown[] = []
+      const urls: string[] = []
+      vi.stubGlobal('fetch', vi.fn((input: unknown, init?: { body?: unknown }) => {
+        urls.push(typeof input === 'string' ? input : (input as { url: string }).url)
+        bodies.push(JSON.parse(String(init?.body)))
+        const sse = textEvents.map(event => `data: ${event}\n\n`).join('')
+        return Promise.resolve(new Response(sse, { headers: { 'content-type': 'text/event-stream' } }))
+      }))
+      try {
+        const ctx = await openRouterRoute('https://openrouter.ai/api/v1', PAGE_EFFORTS)
+        await prompt(ctx, 'high')
+      } finally {
+        vi.unstubAllGlobals()
+      }
+      expect(urls).toEqual(['https://openrouter.ai/api/v1/chat/completions'])
+      expect(bodies[0]).toMatchObject({ model: 'deepseek/deepseek-v4.1-flash', reasoning: { effort: 'high' } })
+      expect(bodies[0]).not.toHaveProperty('reasoning_effort')
+    })
+  })
+
   it('holds back reasoning_effort when the endpoint cannot take it', async () => {
     vi.stubEnv('PI_TEST_KEY', 'test-key')
     const server = await mockServer([{ events: textEvents }])
