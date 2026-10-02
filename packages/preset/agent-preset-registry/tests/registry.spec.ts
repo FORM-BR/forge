@@ -226,6 +226,20 @@ it('resolves the saved default over the deployment default, and drops a removed 
   expect(ctx.agentPresets.defaultId).toBe('standard')
 })
 
+it('publishes the saved Workspace profiles with the roster and follows live edits', async () => {
+  const ctx = await harness({ live: true })
+  contexts.push(ctx)
+  const live = liveRegistries.get(ctx)!
+  await declare(ctx, contribution('minimal'))
+  expect((await ctx.agentPresets.remoteExportList()).workspacePresets).toEqual({})
+  await live.update({ workspacePresets: { '/work/form': 'minimal' } })
+  expect((await ctx.agentPresets.remoteExportList()).workspacePresets).toEqual({ '/work/form': 'minimal' })
+  // A profile is a pointer, not a default: new sessions elsewhere still resolve the default.
+  expect(ctx.agentPresets.defaultId).toBe('standard')
+  await live.replace({ default: 'standard' })
+  expect((await ctx.agentPresets.remoteExportList()).workspacePresets).toEqual({})
+})
+
 it('ignores a retired modeSelectionEnabled field in the user patch', async () => {
   const ctx = await harness({ live: true })
   contexts.push(ctx)
