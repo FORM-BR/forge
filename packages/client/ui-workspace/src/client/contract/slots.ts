@@ -269,6 +269,12 @@ export type WorkspaceBrowserInjected = {
   unarchiveSession: (sessionId: SessionId) => Promise<void>
   /** Adopt a picked host directory as a real Workspace before targeting a Session. */
   createWorkspace: (input: { path: string }) => Promise<WorkspaceView>
+  /**
+   * Regenerate the titles of one Workspace's Sessions (a "..." menu action).
+   * Pinned (user-renamed), archived, and blank Sessions are left alone; progress
+   * and the outcome surface as notices, so the call never rejects.
+   */
+  retitleWorkspaceSessions: (workspaceId: WorkspaceId) => void
 }
 
 /** The browser's declared viewing store handle, shared with the row actions that write view state. */
@@ -300,6 +306,10 @@ export type RowToast =
    * a report can be searched by it — and any other failure's own message.
    */
   | { kind: 'createFailed'; message: string }
+  /** A bulk title regeneration began over `total` Sessions. */
+  | { kind: 'retitleStarted'; total: number }
+  /** A bulk title regeneration finished; `failed` counts Sessions whose provider call failed. */
+  | { kind: 'retitleDone'; refreshed: number; skipped: number; failed: number }
 
 /** The notice on display; `seq` keys remounts so a repeated notice restarts its hold. */
 export type RowToastState = RowToast & { seq: number }

@@ -44,6 +44,37 @@ export function RowActionToast({ useToast, useStore, dismissToast, undoArchive, 
       />
     )
   }
+  if (toast.kind === 'retitleStarted') {
+    return (
+      <Toast
+        key={`toast-${String(toast.seq)}`}
+        text={t('toast.retitleStarted', { n: toast.total })}
+        onDone={dismissToast}
+      />
+    )
+  }
+  if (toast.kind === 'retitleDone') {
+    const counts = { refreshed: toast.refreshed, skipped: toast.skipped, failed: toast.failed }
+    return toast.failed > 0
+      ? (
+        <Toast
+          key={`toast-${String(toast.seq)}`}
+          text={t('toast.retitleDoneFailed', counts)}
+          icon={<IconWarningOutlineRegular />}
+          holdMs={LONG_TOAST_HOLD_MS}
+          onDone={dismissToast}
+        />
+      )
+      : (
+        <Toast
+          key={`toast-${String(toast.seq)}`}
+          text={t('toast.retitleDone', counts)}
+          tone="success"
+          holdMs={LONG_TOAST_HOLD_MS}
+          onDone={dismissToast}
+        />
+      )
+  }
   if (toast.kind === 'createFailed') {
     return (
       <Toast
@@ -67,7 +98,7 @@ export function RowActionToast({ useToast, useStore, dismissToast, undoArchive, 
 
 /** The copy of one plain warning, keyed by the notice kind the union closes over. */
 function plainNoticeText(
-  toast: Exclude<RowToastState, { kind: 'archived' | 'stoppedAndArchived' | 'createFailed' }>,
+  toast: Exclude<RowToastState, { kind: 'archived' | 'stoppedAndArchived' | 'createFailed' | 'retitleStarted' | 'retitleDone' }>,
   t: RowToastProps['t'],
 ): string {
   switch (toast.kind) {

@@ -159,6 +159,7 @@ describe('generateSessionTitleWithLlm', () => {
     })
     expect(options.system).toContain('5 words')
     expect(options.system).toContain('10 CJK characters')
+    expect(options.system).toContain('SAME language as the human messages')
     const prompt = options.messages[0]?.content[0]
     expect(prompt?.type === 'text' && prompt.text).toContain('first prompt')
     expect(prompt?.type === 'text' && prompt.text).toContain('第二个问题')

@@ -994,6 +994,33 @@ describe('fork', () => {
   })
 })
 
+describe('refreshTitle', () => {
+  it('sends the pin policy, settles the title projection from a refreshed outcome, and passes other outcomes through', async ({ bench }) => {
+    const b = bench()
+    await feedList(b, [{ id: 'source', cwd: '/work' }])
+    b.mock.remote.session.refreshTitle.mockResolvedValue(ok({ status: 'refreshed', title: 'Novo titulo', seq: 7 }))
+
+    await expect(b.svc.refreshTitle(sid('source'), { skipPinned: true }))
+      .resolves.toEqual({ status: 'refreshed', title: 'Novo titulo', seq: 7 })
+    expect(b.mock.remote.session.refreshTitle).toHaveBeenLastCalledWith({ sessionId: 'source', skipPinned: true })
+    expect(b.svc.list.getSnapshot().byId[sid('source')]?.title).toBe('Novo titulo')
+
+    b.mock.remote.session.refreshTitle.mockResolvedValue(ok({ status: 'skipped-pinned' }))
+    await expect(b.svc.refreshTitle(sid('source'), { skipPinned: true })).resolves.toEqual({ status: 'skipped-pinned' })
+    await b.svc.refreshTitle(sid('source'))
+    expect(b.mock.remote.session.refreshTitle).toHaveBeenLastCalledWith({ sessionId: 'source', skipPinned: false })
+    expect(b.svc.list.getSnapshot().byId[sid('source')]?.title).toBe('Novo titulo')
+  })
+
+  it('rejects with the Host code and message when the refresh fails', async ({ bench }) => {
+    const b = bench()
+    await feedList(b, [{ id: 'source' }])
+    b.mock.remote.session.refreshTitle.mockResolvedValue(err(new RemoteError('gateway/internal', 'model offline', {})))
+
+    await expect(b.svc.refreshTitle(sid('source'))).rejects.toThrow('session title refresh failed: gateway/internal: model offline')
+  })
+})
+
 describe('catalog arrival', () => {
   it('keeps a retained binding alive without a catalog row after Host removal', async ({ bench }) => {
     const b = bench()

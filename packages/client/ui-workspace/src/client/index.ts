@@ -228,6 +228,44 @@ export function apply(ctx: Context): void {
     undoArchive: unarchiveSession,
     showArchived: () => { viewInstance.actions.setArchivedFilter('show') },
   })
+  // Bulk title regeneration is sequential (one auxiliary model call at a time)
+  // and single-flight: a second request while one runs is ignored. The Host
+  // skips pinned (user-renamed) titles; archived and blank rows are never sent.
+  let retitling = false
+  const retitleWorkspaceSessions: WorkspaceBrowserInjected['retitleWorkspaceSessions'] = (workspaceId) => {
+    if (retitling) return
+    const snapshot = workspaces.list.getSnapshot()
+    const workspace = snapshot.items.find(item => item.workspaceId === workspaceId)
+    if (workspace === undefined) return
+    const archived = new Set<SessionId>(snapshot.archivedSessionIds)
+    const rows = sessions.list.getSnapshot().byId
+    const targets = workspace.sessionIds.filter((id) => {
+      const row = rows[id]
+      return row !== undefined && !row.blank && !archived.has(id)
+    })
+    if (targets.length === 0) {
+      notify({ kind: 'retitleDone', refreshed: 0, skipped: 0, failed: 0 })
+      return
+    }
+    retitling = true
+    notify({ kind: 'retitleStarted', total: targets.length })
+    void (async () => {
+      let refreshed = 0
+      let skipped = 0
+      let failed = 0
+      for (const id of targets) {
+        try {
+          const outcome = await sessions.refreshTitle(id, { skipPinned: true })
+          if (outcome.status === 'refreshed') refreshed++
+          else skipped++
+        } catch (reason: unknown) {
+          failed++
+          console.warn('session title refresh rejected:', reason)
+        }
+      }
+      notify({ kind: 'retitleDone', refreshed, skipped, failed })
+    })().finally(() => { retitling = false })
+  }
   const browserInjected = (): WorkspaceBrowserInjected => ({
     // Explicit group actions keep their target; unscoped New Session inherits
     // the current Session Workspace before the recent-Workspace fallback.
@@ -239,6 +277,7 @@ export function apply(ctx: Context): void {
     notifyArchivedNotOpenable: () => { notify({ kind: 'archivedNotOpenable' }) },
     renameWorkspace: async (workspaceId, title) => { await workspaces.rename(workspaceId, title) },
     deleteWorkspace: async (workspaceId) => { await workspaces.delete(workspaceId) },
+    retitleWorkspaceSessions,
     insertWorkspaceBefore: async (workspaceId, beforeWorkspaceId) => {
       await workspaces.insertBefore(workspaceId, beforeWorkspaceId)
     },

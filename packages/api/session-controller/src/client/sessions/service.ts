@@ -4,7 +4,7 @@ import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import { SessionSeq, type SessionId } from '@deepseek-ai/dsh-session/types'
 import { workspaceTitleOf } from '@deepseek-ai/dsh-util-workspace-path'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
-import { SESSION_SEARCH_RESULT_LIMIT } from '../../types.ts'
+import { SESSION_SEARCH_RESULT_LIMIT, type SessionRefreshTitleValue } from '../../types.ts'
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 import {
   createSnapshotStore, notifySubscribers, type ObservableSnapshot, type SnapshotStore,
@@ -470,6 +470,20 @@ export class ClientSessions implements ISessions {
       if (!renamed.ok) throw new Error(`fork child rename failed: ${renamed.error.code}: ${renamed.error.message}`)
     }
     return childId
+  }
+
+  /**
+   * Regenerate one Session's title on the Host without opening its history.
+   * @param sessionId - Session to retitle.
+   * @param opts - `skipPinned` leaves a user-renamed (pinned) Session untouched.
+   * @returns the refresh outcome.
+   * @throws {Error} when the Host refuses or the title provider fails.
+   */
+  async refreshTitle(sessionId: SessionId, opts: { skipPinned?: boolean } = {}): Promise<SessionRefreshTitleValue> {
+    const result = await this.manager.refreshTitle(sessionId, opts.skipPinned === true)
+    if (!result.ok) throw new Error(`session title refresh failed: ${result.error.code}: ${result.error.message}`)
+    this.projectList()
+    return result.value
   }
 
   /**

@@ -8,6 +8,7 @@ import type {
   SessionControlBaseline,
   SessionControlFrame,
   SessionProjectionHints,
+  SessionRefreshTitleValue,
   SessionRenameValue,
   SessionSummary,
 } from '../../types.ts'
@@ -559,6 +560,20 @@ export class SessionManager {
   async rename(sessionId: SessionId, title: string): Promise<RemoteResult<SessionRenameValue>> {
     const result = await this.remote.session.rename({ sessionId, title })
     if (result.ok) {
+      this.projectionStore(sessionId).apply('title', result.value.title, SessionSeq(result.value.seq))
+    }
+    return result
+  }
+
+  /**
+   * Regenerate a Session title on the Host and settle its title projection without opening its history.
+   * @param sessionId - Session to retitle.
+   * @param skipPinned - leave a user-renamed (pinned) Session untouched.
+   * @returns the refresh outcome, or the Remote failure.
+   */
+  async refreshTitle(sessionId: SessionId, skipPinned: boolean): Promise<RemoteResult<SessionRefreshTitleValue>> {
+    const result = await this.remote.session.refreshTitle({ sessionId, skipPinned })
+    if (result.ok && result.value.status === 'refreshed') {
       this.projectionStore(sessionId).apply('title', result.value.title, SessionSeq(result.value.seq))
     }
     return result
