@@ -14,7 +14,7 @@ declare module '@deepseek-ai/dsh-llm' {
   }
 }
 
-import type { FinishReason, GenerateOptions, Message } from '@deepseek-ai/dsh-llm'
+import type { FinishReason, GenerateOptions, Message, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { deadline, MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import { deepFreeze } from '@deepseek-ai/dsh-util-values'
 import type { SessionSeq } from '@deepseek-ai/dsh-session'
@@ -206,8 +206,40 @@ function frameMessages(messages: readonly SessionTitleUserMessage[]): string {
   return `Generate the session title from this JSON array of human messages:\n${JSON.stringify(messages)}`
 }
 
+/**
+ * Lowest-first preference for the reasoning effort of a title call. Only a
+ * level the model itself declares is ever requested; a model that declares
+ * none of these (or no levels at all) is left on its own default.
+ */
+const LOWEST_REASONING_EFFORTS: readonly string[] = ['off', 'none', 'minimal', 'low']
+
+/**
+ * Pick the cheapest declared reasoning effort for a title call. Titles need no
+ * deliberation, and reasoning tokens count against the output cap, so a
+ * reasoning model left on its default can exhaust `maxOutputTokens` before it
+ * writes the title. A lookup failure or a model without declared efforts
+ * yields nothing, so the request is sent exactly as before.
+ */
+async function lowestReasoningEffort(
+  ctx: Context,
+  route: SessionTitleModelIdentity,
+  signal: AbortSignal,
+): Promise<ReasoningEffortId | undefined> {
+  try {
+    const info = await ctx.llm.resolveModelInfo(route.provider, route.model, signal)
+    const declared = info.reasoning?.efforts ?? []
+    for (const wanted of LOWEST_REASONING_EFFORTS) {
+      const match = declared.find(effort => effort.id === wanted)
+      if (match !== undefined) return match.id
+    }
+  } catch {
+    signal.throwIfAborted()
+  }
+  return undefined
+}
+
 /** Translate terminal finish reasons into an auxiliary-call failure. */
-function finishError(finish: FinishReason): Error | undefined {
+function finishError(finish: FinishReason, route: SessionTitleModelIdentity, maxOutputTokens: number): Error | undefined {
   switch (finish.kind) {
     case 'stop':
       return undefined
@@ -218,7 +250,9 @@ function finishError(finish: FinishReason): Error | undefined {
       return error
     }
     case 'max-tokens':
-      return new Error('session-title-llm: title output reached maxOutputTokens')
+      return new Error(
+        `session-title-llm: title output reached maxOutputTokens (${maxOutputTokens}) on ${route.provider}/${route.model}; reasoning tokens count against the cap`,
+      )
     case 'tool-calls':
       return new Error('session-title-llm: title model unexpectedly requested a tool')
     default:
@@ -258,9 +292,11 @@ export async function generateSessionTitleWithLlm(
   })]
   const system = systemPrompt(config)
   using callDeadline = deadline(request.signal, config.timeoutMs, SESSION_TITLE_TIMEOUT_CODE)
+  const reasoningEffort = await lowestReasoningEffort(ctx, route, callDeadline.signal)
   const options: GenerateOptions = deepFreeze({
     provider: route.provider,
     model: route.model,
+    ...reasoningEffort === undefined ? {} : { reasoningEffort },
     messages,
     system,
     maxTokens: config.maxOutputTokens,
@@ -283,7 +319,7 @@ export async function generateSessionTitleWithLlm(
     assembler.push(chunk)
   }
   callDeadline.signal.throwIfAborted()
-  const terminalError = finishError(assembler.finish)
+  const terminalError = finishError(assembler.finish, route, config.maxOutputTokens)
   if (terminalError !== undefined) throw terminalError
   const blocks = assembler.blocks()
   if (blocks.some(block => block.type === 'tool-call')) {

@@ -323,7 +323,7 @@ describe('ui-workspace apply', () => {
     // Single-flight: a second request while one runs is ignored.
     browser.retitleWorkspaceSessions('alpha' as never)
     await vi.waitFor(() => {
-      expect(toast.hooks.toast.getSnapshot()).toMatchObject({ kind: 'retitleDone', refreshed: 1, skipped: 1, failed: 1 })
+      expect(toast.hooks.toast.getSnapshot()).toMatchObject({ kind: 'retitleDone', refreshed: 1, skipped: 1, failed: 1, reason: 'model offline' })
     })
     expect(b.refreshTitle.mock.calls).toEqual([
       ['one', { skipPinned: true }], ['two', { skipPinned: true }], ['three', { skipPinned: true }],

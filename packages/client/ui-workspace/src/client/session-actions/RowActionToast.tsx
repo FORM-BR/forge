@@ -54,7 +54,7 @@ export function RowActionToast({ useToast, useStore, dismissToast, undoArchive, 
     )
   }
   if (toast.kind === 'retitleDone') {
-    const counts = { refreshed: toast.refreshed, skipped: toast.skipped, failed: toast.failed }
+    const counts = { refreshed: toast.refreshed, skipped: toast.skipped, failed: toast.failed, reason: toast.reason }
     return toast.failed > 0
       ? (
         <Toast

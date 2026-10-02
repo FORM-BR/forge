@@ -31,7 +31,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('first-prompt title provider with
       targetWords: 5,
       targetCjkCharacters: 10,
       maxInputBytes: 4_096,
-      maxOutputTokens: 64,
+      maxOutputTokens: 2048,
       timeoutMs: 60_000,
       provider: 'deepseek-official',
       model: 'deepseek-v4-flash',

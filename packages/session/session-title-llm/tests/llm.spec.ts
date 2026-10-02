@@ -1,7 +1,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import LlmRuntime, { createUserMessage, ToolCallId, isAgentLoopRequest, LlmAdapter  } from '@deepseek-ai/dsh-llm'
-import type { FinishReason, GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
+import LlmRuntime, { createUserMessage, ToolCallId, isAgentLoopRequest, LlmAdapter, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+import type { FinishReason, GenerateOptions, LlmResolvedModelInfo, StreamChunk } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import { SessionTitleProviderId } from '@deepseek-ai/dsh-session-title'
 import type { SessionTitleProviderRequest } from '@deepseek-ai/dsh-session-title'
@@ -27,6 +27,24 @@ class RecordingAdapter extends LlmAdapter {
     this.onDispatch?.()
     this.requests.push(options)
     yield * this.script
+  }
+}
+
+/** Adapter that declares reasoning efforts for its model, or none when `efforts` is empty. */
+class ReasoningAdapter extends RecordingAdapter {
+  constructor(private readonly efforts: readonly string[]) {
+    super(SCRIPT)
+  }
+
+  override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+    return Promise.resolve({
+      provider,
+      id: model,
+      name: model,
+      ...this.efforts.length === 0
+        ? {}
+        : { reasoning: { efforts: this.efforts.map(id => ({ id: ReasoningEffortId(id), name: id })) } },
+    })
   }
 }
 
@@ -172,6 +190,43 @@ describe('generateSessionTitleWithLlm', () => {
         messages: options.messages,
         maxTokens: 32,
       })
+  })
+
+  it.each([
+    [['off', 'minimal', 'low', 'high'], 'off'],
+    [['low', 'medium', 'high'], 'low'],
+    [['medium', 'high'], undefined],
+    [[], undefined],
+  ] as const)('requests the lowest declared reasoning effort for declared levels %j', async (declared, expected) => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(LlmRuntime)
+    const adapter = new ReasoningAdapter(declared)
+    ctx.llm.registerAdapter(['current-route'], adapter)
+    const providerRequest = request(ctx)
+
+    await generateSessionTitleWithLlm(
+      ctx,
+      resolveSessionTitleLlmConfig(CONFIG),
+      providerRequest,
+      providerRequest.messages,
+      TITLE_PROVIDER,
+    )
+
+    expect(adapter.requests).toHaveLength(1)
+    expect(adapter.requests[0]?.reasoningEffort).toBe(expected)
+  })
+
+  it('names the route and the cap when the output budget is exhausted', async () => {
+    const { ctx } = await withScript([{ type: 'finish', reason: { kind: 'max-tokens' } }])
+    const providerRequest = request(ctx)
+    await expect(generateSessionTitleWithLlm(
+      ctx,
+      resolveSessionTitleLlmConfig(CONFIG),
+      providerRequest,
+      providerRequest.messages,
+      TITLE_PROVIDER,
+    )).rejects.toThrow('reached maxOutputTokens (32) on current-route/current-model; reasoning tokens count against the cap')
   })
 
   it('uses paired explicit overrides and bounds the final framed input before model dispatch', async () => {

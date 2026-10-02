@@ -308,8 +308,11 @@ export type RowToast =
   | { kind: 'createFailed'; message: string }
   /** A bulk title regeneration began over `total` Sessions. */
   | { kind: 'retitleStarted'; total: number }
-  /** A bulk title regeneration finished; `failed` counts Sessions whose provider call failed. */
-  | { kind: 'retitleDone'; refreshed: number; skipped: number; failed: number }
+  /**
+   * A bulk title regeneration finished; `failed` counts Sessions whose provider call failed and
+   * `reason` is the first failure's untranslated message (empty when none failed).
+   */
+  | { kind: 'retitleDone'; refreshed: number; skipped: number; failed: number; reason: string }
 
 /** The notice on display; `seq` keys remounts so a repeated notice restarts its hold. */
 export type RowToastState = RowToast & { seq: number }

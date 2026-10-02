@@ -244,7 +244,7 @@ export function apply(ctx: Context): void {
       return row !== undefined && !row.blank && !archived.has(id)
     })
     if (targets.length === 0) {
-      notify({ kind: 'retitleDone', refreshed: 0, skipped: 0, failed: 0 })
+      notify({ kind: 'retitleDone', refreshed: 0, skipped: 0, failed: 0, reason: '' })
       return
     }
     retitling = true
@@ -253,17 +253,19 @@ export function apply(ctx: Context): void {
       let refreshed = 0
       let skipped = 0
       let failed = 0
+      let reason = ''
       for (const id of targets) {
         try {
           const outcome = await sessions.refreshTitle(id, { skipPinned: true })
           if (outcome.status === 'refreshed') refreshed++
           else skipped++
-        } catch (reason: unknown) {
+        } catch (error: unknown) {
           failed++
-          console.warn('session title refresh rejected:', reason)
+          if (reason === '') reason = error instanceof Error ? error.message : String(error)
+          console.warn('session title refresh rejected:', error)
         }
       }
-      notify({ kind: 'retitleDone', refreshed, skipped, failed })
+      notify({ kind: 'retitleDone', refreshed, skipped, failed, reason })
     })().finally(() => { retitling = false })
   }
   const browserInjected = (): WorkspaceBrowserInjected => ({
