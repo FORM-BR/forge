@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-使用本包可浏览父会话下的每个 subagent 对话、打开任意后代，并查看其是否正在运行以及 token 用量和活跃轮次耗时。已完成的 one-shot 对话会作为只读执行记录打开。可继续对话在运行期间按提交顺序接收后续提示词，并独立提供 Stop。普通会话侧边栏会省略 subagent 对话，因此父会话页头目录是它们的导航入口。独立的 `@` source 会把运行中 child 的 label 插入用户消息，但不会把它解析成继续执行地址。
+使用本包可浏览父会话下的每个 subagent 对话、打开任意后代，并查看其是否正在运行以及 token 用量和活跃轮次耗时。已完成的 one-shot 对话会作为只读记录打开。可继续对话在运行期间按提交顺序接收后续提示词，并独立提供 Stop。会话侧边栏会省略 subagent 对话，因此父会话页头目录是它们的导航入口。右侧边栏的 Agent Map 标签页展示委派树及其实时状态与费用。独立的 `@` source 会把运行中 child 的 label 插入用户消息，但不会把它解析成继续执行地址。
 
 ## 目录
 
@@ -43,6 +43,12 @@ kind: "package-reference"
 
 `@` source 仍然刻意保持独立且惰性：候选是从 `ctx.sessions.list` 零 RPC 得到的运行中 child；pick 会插入字面文本 `@label `，codec 投影为 `@label`。它不参与命令裁决，也不会把 label 解析成继续执行地址。
 
+### Agent Map
+
+右侧边栏注册了 Agent Map 页面，可从其 guide 打开，也可从后代数量目录底部的“打开智能体地图”链接打开。树以拥有该侧边栏的对话在客户端已知的最高祖先为根，列出每个后代的 label、mode、状态、最新提示词和指标。状态分为等待你的操作（存在待处理交互）、运行中、已中断（最近一个已结束轮次未正常完成）、已完成和当前未运行。运行中的 agent 显示其进行中的 todo；空闲 agent 显示最终回复的预览。
+
+页头汇总整棵树的估算费用、token 与 agent 数量；带有后代的行还会显示自身子树合计。费用来自各会话的 `costUsage` 投影，因此未启用费用统计的 agent 显示短横线且不计入合计。选择某一行会按其确切地址打开对应对话，根行打开根会话，尾部箭头在侧边栏中打开 child。分支可折叠和展开。当 lead 会话发布 `agentTeam` 名册时，Lead 与队员带有 Team 标签；队员是普通的可继续 child，显示在 Lead 之下。
+
 -----
 
 <a id="understand-the-implementation"></a>
@@ -65,6 +71,10 @@ kind: "package-reference"
 
 每个可见目录层在包含运行中 child 时独立推进时钟；折叠该层或关闭菜单会释放时钟。token 用量总计为四个互不重叠的 `tokenUsage` 桶之和。`subagentTiming` 投影会累加已结束轮次的耗时，并记录最近一个已结束轮次是否以 `completed` 结束；新轮次开始时会清除该完成状态，直到自身的 `turn/end` 到达。耗时仅在运行中 child 存在未结束轮次时每秒递增一次，并在 child 变为 inactive 后冻结；被中断的未结束轮次以其同一切面的 `active.through` 为上界，绝不使用更新的会话元数据。
 
+### Agent Map 派生
+
+`agent-map/model.ts` 把 `projectionsBySession`、会话列表行与实时会话状态折叠成一棵树：成员来自各 agent 的 `subagentCatalog`，状态来自待处理交互、运行状态与 `subagentTiming`，活动来自 `todos` 与 `turnOutline` 投影，费用来自 `costUsage`。标签页对每个从未读取过目录的 agent 调用一次 `refreshProjection`，因此无需展开行即可长到完整深度。token 与耗时的格式化通过 `metrics.ts` 与目录下拉菜单共用。`agentTeam` 名册以结构方式读取并逐行校验，因为这个稳定包不能依赖实验性的 Team 包。格式错误的目录若出现环，会在重复的 id 处截断。
+
 ### 编辑器选举
 
 one-shot child 始终选用只读编辑器。可继续 child 仅在其确切 parent 不可用且 child 未在运行时选用只读编辑器；否则普通编辑器的会话会经 `subagents/prompt` 路由提示词。本包绝不接收宿主上下文，也不调用面向模型的工具。
@@ -83,6 +93,7 @@ one-shot child 始终选用只读编辑器。可继续 child 仅在其确切 par
 - [ui-conversation](../ui-conversation/README.zh.md)——承载页头操作与编辑器链的聊天界面。
 - [ui-input-trigger](../ui-input-trigger/README.zh.md)——承载 `@` source 的建议机制。
 - [subagent](../../subagent/subagent/README.zh.md)——可继续 child 背后的宿主能力 seam。
+- [cost-meter](../../llm/cost-meter/README.zh.md)——Agent Map 为各 agent 计价所用的 `costUsage` 投影。
 - [Web subagent 对话](../../../.agents/notes/implemented/feature/2026-07-27-web-subagent-conversations.zh.md)——目录与编辑器规范。
 - [当前轮次中断](../../../.agents/notes/implemented/feature/2026-08-06-continuable-subagent-interrupt.zh.md)——独立 Stop 的语义。
 
@@ -113,6 +124,8 @@ one-shot child 始终选用只读编辑器。可继续 child 仅在其确切 par
 这些限制定义目录能显示什么、`@` 引用意味着什么；它们是当前包约束。
 
 - **非完成的 inactive 结果仍合并显示**：目录能区分最近一次正常完成与其他 inactive 状态，但不区分失败、取消、拒绝、token 耗尽或尚无已结束轮次的 child；UI 不公开 Activation 身份，停止能力仅限编辑器上针对运行中可继续 child 的当前轮次 Stop。
+- **地图显示进行中的 todo，而非正在运行的工具调用**：没有投影携带当前工具，因此没有 todo 列表的 agent 只显示状态和最新提示词。
+- **费用依赖费用统计插件**：金额是来自 `costUsage` 投影的价格目录估算；没有该插件时所有费用都显示为短横线。
 - **`@` 引用仍是显示标题文本**：重复或改名后的 label 会有歧义，因此它们刻意不获得继续执行语义。
 
 <a id="dev-note"></a>
