@@ -36,6 +36,8 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the SlotRegistry service merge (ctx.slots).
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+// Type-only: pulls the right Sidebar's tab registry and slot declarations (the Git Map tab).
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 // Type-only: pulls the Session root standard-hook merge.
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import {
@@ -64,6 +66,8 @@ import { PinWorkspaceMenuItem } from './session-actions/PinWorkspace.tsx'
 import { RenameSessionMenuItem, SessionRenameDialog } from './session-actions/RenameSession.tsx'
 import { RetitleSessionMenuItem } from './session-actions/RetitleSession.tsx'
 import { RowActionToast } from './session-actions/RowActionToast.tsx'
+import { registerGitMap } from './git-map/register.ts'
+import type { GitMapInjected } from './git-map/GitMapTab.tsx'
 import { HeroGitChip } from './status/HeroGitChip.tsx'
 import { WorkspaceSwitcher } from './status/WorkspaceSwitcher.tsx'
 import { WorkspacePicker } from './WorkspacePicker.tsx'
@@ -78,6 +82,8 @@ export type {
   WorkspacePickerInjected, WorkspacePickerProps,
 } from './contract/slots.ts'
 export type { WorkspaceKey } from './locales.ts'
+export type { GitMapInjected, GitMapTabProps } from './git-map/GitMapTab.tsx'
+export type { GitMapLayout } from './git-map/model.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface GlobalStandardProps {
@@ -469,6 +475,12 @@ export function apply(ctx: Context): void {
     { name: 'conversation.hero.workspace.status', locale: NS, inject: statusInjected },
     HeroGitChip,
   ))
+  // The Git Map right-Sidebar tab. The tab registry may arrive after this plugin, so registration waits for it.
+  // One face for every occurrence: the body keys its lookup on this function, so it must keep its identity.
+  const gitMapInjected: GitMapInjected = { gitGraph: (request, signal) => workspaces.gitGraph(request, signal) }
+  ctx.inject(['sidebarRightTabs'], (scope) => {
+    registerGitMap(scope, ctx.locale.bind(NS), NS, () => gitMapInjected)
+  })
   ctx.slots.inject('conversation.hero.workspace', () => ctx.slots.register(
     {
       name: 'conversation.hero.workspace',

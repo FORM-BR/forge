@@ -4,7 +4,9 @@ import { Service, type Context } from '@deepseek-ai/cordis'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { RemoteFailure } from '@deepseek-ai/dsh-typert-protocol'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
-import type { WorkspaceGitInfoValue, WorkspaceView, WorkspaceWorktreeValue } from '../types.ts'
+import type {
+  WorkspaceGitGraphRequest, WorkspaceGitGraphValue, WorkspaceGitInfoValue, WorkspaceView, WorkspaceWorktreeValue,
+} from '../types.ts'
 import type { ClientWorkspaceModel, WorkspaceSnapshot } from './model.ts'
 
 /** Structured create failure for callers that distinguish Host business errors. */
@@ -80,6 +82,14 @@ export interface IWorkspaces {
    * @throws when the Host refuses the path or the lookup is cancelled or lost.
    */
   gitInfo(path: string, signal?: AbortSignal): Promise<WorkspaceGitInfoValue>
+  /**
+   * Read the commit history of the git repository containing a Host directory, for the Git Map.
+   * @param request - fully qualified Host directory, typically a Session's cwd, and the number of main-line stations.
+   * @param signal - caller lifetime; abort cancels the Host lookup.
+   * @returns the echoed path, the lookup state, and the graph when ready.
+   * @throws when the Host refuses the path or the lookup is cancelled or lost.
+   */
+  gitGraph(request: WorkspaceGitGraphRequest, signal?: AbortSignal): Promise<WorkspaceGitGraphValue>
   /**
    * Rename a Workspace.
    * @param workspaceId - target Workspace.
@@ -177,6 +187,12 @@ export class WorkspaceController extends Service implements IWorkspaces {
   async gitInfo(path: string, signal?: AbortSignal): Promise<WorkspaceGitInfoValue> {
     const result = await this.model.gitInfo(path, signal)
     if (!result.ok) throw commandError('git info', result.error)
+    return result.value
+  }
+
+  async gitGraph(request: WorkspaceGitGraphRequest, signal?: AbortSignal): Promise<WorkspaceGitGraphValue> {
+    const result = await this.model.gitGraph(request, signal)
+    if (!result.ok) throw commandError('git graph', result.error)
     return result.value
   }
 

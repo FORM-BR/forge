@@ -35,6 +35,9 @@ import { PinWorkspaceMenuItem } from '../src/client/session-actions/PinWorkspace
 import { WorkspacePicker } from '../src/client/WorkspacePicker.tsx'
 import { FLAT_SESSION_ORDER_KEY } from '../src/client/stores.ts'
 import { UNGROUPED_KEY } from '../src/client/tree.ts'
+import { GitMapTab, GitMapTitle, type GitMapInjected } from '../src/client/git-map/GitMapTab.tsx'
+import { GIT_MAP_ID, GIT_MAP_KIND } from '../src/client/git-map/register.ts'
+import { SidebarRightTabRegistry } from '@deepseek-ai/dsh-client-ui-sidebar-right/src/client/tab-registry.ts'
 import { apply as hostApply } from '../src/index.ts'
 
 const sid = (id: string) => id as SessionId
@@ -114,8 +117,10 @@ async function bench() {
   const gitInfo = vi.fn(async (path: string) => ({
     path, git: { repoName: 'repo', root: path, branch: 'main', detached: false },
   }))
+  const gitGraph = vi.fn(async (request: { path: string }) => ({ path: request.path, state: 'no-repository' as const }))
   ctx.provide('workspaces', {
     gitInfo,
+    gitGraph,
     list: { getSnapshot: () => workspaceSnapshot, subscribe: workspacesSubscribe },
     create,
     initializeDefault,
@@ -154,7 +159,7 @@ async function bench() {
   return {
     ctx, slots: ctx.get('slots') as SlotRegistry, locale, create, rename,
     retain, using, selectPanel, search, renameSession, binding, fork, refreshTitle, pickDirectory, pinSession, unpinSession,
-    workspacesSubscribe, initializeDefault, gitInfo,
+    workspacesSubscribe, initializeDefault, gitInfo, gitGraph,
     setWorkspaces: (snapshot: WorkspaceSnapshot): void => { workspaceSnapshot = snapshot },
     setSessions: (snapshot: SessionListState): void => { sessionSnapshot = snapshot },
   }
@@ -313,6 +318,35 @@ describe('ui-workspace apply', () => {
     expect(rows[0]!.options).toMatchObject({ id: 'pin', order: 50 })
     expect(rows[0]!.locale).toBe('workspace')
     expect(rows[0]!.store).toBe(b.slots.entries('sidebar.workspaces')[0]!.store)
+  })
+
+  it('registers the Git Map tab when the right Sidebar tab registry arrives and wires its history lookup', async () => {
+    const b = await bench()
+    onTestFinished(() => b.ctx.fiber.dispose())
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    // No registry yet: the plugin applies without it and registers nothing.
+    expect(b.slots.entries('sidebar.right.pane.tab')).toHaveLength(0)
+    b.slots.register({
+      name: 'root',
+      children: {
+        'sidebar.right.pane.tab': { kind: 'keyed', scope: 'session' },
+        'sidebar.right.pane.tab.title': { kind: 'keyed', scope: 'session' },
+      },
+    } as never, () => null)
+    const tabs = new SidebarRightTabRegistry(b.ctx)
+    b.ctx.provide('sidebarRightTabs', tabs)
+    await vi.waitFor(() => { expect(tabs.get(GIT_MAP_KIND)).toBeDefined() })
+    expect(tabs.get(GIT_MAP_KIND)?.id).toBe(GIT_MAP_ID)
+    const seat = (name: 'sidebar.right.pane.tab' | 'sidebar.right.pane.tab.title') =>
+      b.slots.entries(name).find(candidate => candidate.options.key === GIT_MAP_ID)
+    expect(seat('sidebar.right.pane.tab')?.component).toBe(GitMapTab)
+    expect(seat('sidebar.right.pane.tab.title')?.component).toBe(GitMapTitle)
+    expect(seat('sidebar.right.pane.tab')?.locale).toBe('workspace')
+    const face = faceOf(seat('sidebar.right.pane.tab')!) as GitMapInjected
+    const signal = new AbortController().signal
+    await expect(face.gitGraph({ path: '/projects/alpha', limit: 18 }, signal))
+      .resolves.toEqual({ path: '/projects/alpha', state: 'no-repository' })
+    expect(b.gitGraph).toHaveBeenCalledWith({ path: '/projects/alpha', limit: 18 }, signal)
   })
 
   it('registers the hero git chip into the hero status seat and wires its git lookup', async () => {

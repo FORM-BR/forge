@@ -30,6 +30,8 @@ Client 入口提供 `ClientWorkspaceModel` 和 `createWorkspaceStateStream()`。
 
 `workspace.createWorktree({ cwd, title }, signal)` 会创建 git worktree，让并行会话在自己的检出中写作：它从 `cwd` 解析仓库根目录，用标题推导目录与分支片段，并运行 `git worktree add -b forge/<slug>` 到同级的 `<repo>-worktrees/<slug>` 目录。路径已被占用时顺延编号后缀。它返回 `{ path, branch }`；目录不在仓库内为 `workspace/not-a-repository`，git 拒绝则为 `workspace/worktree-failed`，两者都带上出错的目录。Client 服务将其暴露为 `workspaces.createWorktree(input, signal?)`。把新路径采用为工作区仍是单独的 `create` 调用，因此 git 操作与注册表行各自独立提交。
 
+`workspace.gitGraph({ path, limit }, signal)` 是 Git 地图标签背后的只读查询：它读取包含某个完整限定的 Host 目录的仓库的提交历史，返回回显的路径、一个 `state`，以及 `state` 为 `ready` 时的 `graph`。该图包含仓库名与根目录、基准分支（本地的 `main` 或 `master`，否则是远端默认分支，再否则是当前检出的那条线）、当前检出的提交与分支、所有引用上的提交与合并总数、基准分支 first-parent 链上最多 `limit` 个站点（1 到 100，默认 18，最旧的在前），以及最多六条尚未合并进基准的分支。站点是一次合并或直接提交在主线上的提交；合并携带被合并分支最新的三个非合并提交及其总数、标题中出现的 PR 编号，以及被合并分支的名称。未合并分支是基准无法到达的引用，按最新在前排列；本地分支的远端跟踪重复项计为别名，相互堆叠的分支只保留最上面的一条；每条分支携带最新的十二个非合并提交、其总数，以及当前检出的提交是否在其上，其余分支计入 `moreBranches`。提交按约定式提交前缀分类为 `feat`、`fix` 或 `other`。目录不在任何仓库内或 Host 没有 `git` 时 `state` 为 `no-repository`，未诞生的分支为 `no-commits`，git 出错或超过期限为 `failed`。每次调用都是读取（`rev-parse`、`log`、`rev-list`、`for-each-ref`、`merge-base`、`symbolic-ref`），通过无 shell 的运行器并以参数传入路径；不执行 fetch，也不写入。相对路径以 `gateway/bad-request` 失败，调用方中止以 `gateway/cancelled` 失败。Client 服务将其暴露为 `workspaces.gitGraph(request, signal?)`，Host 失败时拒绝。
+
 <a id="first-use-workspace"></a>
 ### 首次使用工作区
 
@@ -44,6 +46,7 @@ Client 入口提供 `ClientWorkspaceModel` 和 `createWorkspaceStateStream()`。
 | `documentsDirectory` | 系统 Documents 目录 | 完全限定的 Host 目录覆盖值 |
 | `documentsLookupTimeoutMs` | `10000` | 操作系统目录查询的正数最大时长，单位为毫秒 |
 | `gitLookupTimeoutMs` | `3000` | 单次 `workspace.gitInfo` 查询的正数最大时长，单位为毫秒 |
+| `gitGraphTimeoutMs` | `15000` | 单次 `workspace.gitGraph` 查询的正数最大时长，单位为毫秒 |
 
 Documents 查询占用注册表变更队列，因此其他 Workspace 变更（包括登记已选目录）最多可能等待 `documentsLookupTimeoutMs`。取消可以停止查询；解析成功后，取消不会回滚创建或登记。
 

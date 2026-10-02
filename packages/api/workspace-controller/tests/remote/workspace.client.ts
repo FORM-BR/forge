@@ -17,6 +17,8 @@ import type {
   WorkspaceDeleteSessionValue,
   WorkspaceDeleteValue,
   WorkspaceFollowFrame,
+  WorkspaceGitGraphRequest,
+  WorkspaceGitGraphValue,
   WorkspaceGitInfoValue,
   WorkspaceId,
   WorkspaceInsertBeforeRequest,
@@ -97,6 +99,9 @@ export const workspaceWorld: RemoteTable = {
     'workspace/initializeDefault': (): RemoteResult<WorkspaceValue> => ok({ workspace: workspace('default') }),
     'workspace/gitInfo': (path: string): RemoteResult<WorkspaceGitInfoValue> => ok({
       path, git: { repoName: 'repo', root: path, branch: 'main', detached: false },
+    }),
+    'workspace/gitGraph': (request: WorkspaceGitGraphRequest): RemoteResult<WorkspaceGitGraphValue> => ok({
+      path: request.path, state: 'no-repository',
     }),
     'workspace/create': (request: WorkspaceCreateRequest): RemoteResult<WorkspaceCreateValue> => ok({
       workspace: workspace('created', { path: request.path }), created: true,

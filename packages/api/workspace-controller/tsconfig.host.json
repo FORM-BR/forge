@@ -13,6 +13,7 @@
     "src/directory-picker.ts",
     "src/feed.ts",
     "src/default-directory.ts",
+    "src/git-graph.ts",
     "src/git-info.ts",
     "src/worktree.ts"
   ],

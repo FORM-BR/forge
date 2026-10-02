@@ -902,6 +902,9 @@ describe('workspaces action face', () => {
       { method: 'gitInfo', args: ['/tmp/plain', signal] },
       { method: 'gitInfo', args: ['/w/repo', undefined] },
     ])
+    await expect(ws.gitGraph({ path: '/tmp/plain' }, signal)).resolves.toEqual({ path: '/tmp/plain', state: 'no-repository' })
+    ws.stub('gitGraph', async request => ({ path: request.path, state: 'no-commits' as const }))
+    await expect(ws.gitGraph({ path: '/w/repo', limit: 5 })).resolves.toEqual({ path: '/w/repo', state: 'no-commits' })
     await runtime.dispose()
   })
 })
