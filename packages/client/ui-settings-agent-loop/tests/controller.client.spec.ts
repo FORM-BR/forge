@@ -58,6 +58,42 @@ describe('AgentLoopCardController', () => {
     })
   })
 
+  it('persists the direct-mode switch as a boolean and clears it back to the default', async () => {
+    const host = stubConfigForm<AgentLoopSettings>()
+    acceptWrites(host)
+    const controller = new AgentLoopCardController(host.scope)
+    host.publish({
+      status: 'ready',
+      writable: true,
+      value: { maxParallelToolCalls: 10, directMode: false },
+      base: { maxParallelToolCalls: 10, directMode: false },
+      user: {},
+    })
+    const face = controller.inject()
+    expect(face.hooks.agentLoopCard.getSnapshot().directMode).toMatchObject({ text: 'false', overridden: false })
+
+    face.edit('directMode', 'true')
+    face.save()
+    await vi.waitFor(() => { expect(host.mutate).toHaveBeenCalledWith([{ op: 'set', path: ['directMode'], value: true }], undefined) })
+    expect(face.hooks.agentLoopCard.getSnapshot()).toMatchObject({ dirty: false, directMode: { text: 'true', overridden: true } })
+
+    face.resetField('directMode')
+    face.save()
+    await vi.waitFor(() => { expect(host.mutate).toHaveBeenLastCalledWith([{ op: 'unset', path: ['directMode'] }], undefined) })
+    expect(face.hooks.agentLoopCard.getSnapshot().directMode).toMatchObject({ text: 'false', overridden: false })
+  })
+
+  it('blocks the save for a draft that is not a boolean', () => {
+    const host = stubConfigForm<AgentLoopSettings>()
+    const controller = new AgentLoopCardController(host.scope)
+    host.publish({ status: 'ready', writable: true, value: { directMode: false }, base: { directMode: false }, user: {} })
+    const face = controller.inject()
+
+    face.edit('directMode', 'maybe')
+
+    expect(face.hooks.agentLoopCard.getSnapshot()).toMatchObject({ invalid: true, directMode: { invalid: true } })
+  })
+
   it('reports a read-only document so the card can disable its controls', () => {
     const host = stubConfigForm<AgentLoopSettings>()
     const controller = new AgentLoopCardController(host.scope)

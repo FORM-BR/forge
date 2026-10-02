@@ -4,16 +4,18 @@ import type { SettingsFormLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 
 /** Locale keys the page renders. */
 export type AgentLoopSettingsLocaleKey =
-  | 'title' | 'description' | 'maxParallel' | 'maxParallelHint'
+  | 'title' | 'description' | 'maxParallel' | 'maxParallelHint' | 'directMode' | 'directModeHint'
   | 'overridden' | 'reset' | 'readOnly' | 'unavailable'
   | 'save' | 'saving' | 'saveFailed' | 'invalidNumber'
 
 /** English copy. */
 export const en: Record<AgentLoopSettingsLocaleKey, string> = {
   title: 'Agent loop',
-  description: 'Control how the Agent dispatches tool calls.',
+  description: 'Control how the Agent dispatches tool calls and how directly it works.',
   maxParallel: 'Parallel tool calls',
   maxParallelHint: 'Upper bound on parallel-safe calls running at once within one step.',
+  directMode: 'Direct mode',
+  directModeHint: 'Asks the Agent for concise answers and the fewest tool calls, with no subagents for trivial tasks. Applies from the next step.',
   overridden: 'Overridden',
   reset: 'Reset to default',
   readOnly: 'This deployment stores settings read-only.',
@@ -27,9 +29,11 @@ export const en: Record<AgentLoopSettingsLocaleKey, string> = {
 /** Simplified Chinese copy. */
 export const zh: Record<AgentLoopSettingsLocaleKey, string> = {
   title: 'Agent 循环',
-  description: '控制 Agent 派发工具调用的方式。',
+  description: '控制 Agent 派发工具调用的方式，以及它的作答是否直接。',
   maxParallel: '并行工具调用数',
   maxParallelHint: '同一步内最多同时运行多少个可并行的调用。',
+  directMode: '直接模式',
+  directModeHint: '让 Agent 简洁作答、尽量少调用工具，简单任务不启动子 Agent。从下一步起生效。',
   overridden: '已覆盖',
   reset: '恢复默认',
   readOnly: '本部署的设置为只读。',

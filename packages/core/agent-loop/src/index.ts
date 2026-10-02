@@ -33,7 +33,7 @@ import { SessionPersistenceNotFoundError } from '@deepseek-ai/dsh-session-persis
 import type { SessionHandle, SessionPersistence } from '@deepseek-ai/dsh-session-persistence'
 import { ReactLoopAgent } from './agent.ts'
 import { inboxProjectionDefinition } from './inbox.ts'
-import { DEFAULT_MAX_PARALLEL_TOOL_CALLS } from './constants.ts'
+import { DEFAULT_MAX_PARALLEL_TOOL_CALLS, DIRECT_MODE_POLICY, DIRECT_MODE_SECTION } from './constants.ts'
 import type {} from './runtime-context.ts'
 
 /** Fiber states that cannot own or serve a new lifecycle. */
@@ -239,7 +239,7 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-export { DEFAULT_MAX_PARALLEL_TOOL_CALLS }
+export { DEFAULT_MAX_PARALLEL_TOOL_CALLS, DIRECT_MODE_POLICY, DIRECT_MODE_SECTION }
 
 /**
  * One launcher-selected session identity for a configured agent. `resume`
@@ -295,6 +295,12 @@ export interface Config {
    * omission defaults to {@link DEFAULT_MAX_PARALLEL_TOOL_CALLS}.
    */
   maxParallelToolCalls: Volatile<number>
+  /**
+   * Direct mode: while on, every agent's system prompt carries a short policy
+   * asking for concise answers, minimal tool use, and no subagents for trivial
+   * work. It only advises the model; omission means off.
+   */
+  directMode: Volatile<boolean>
   /** Agents created or resumed at plugin startup. */
   agents: (AgentOptions & {
     /** Stable config label used in logs and as the fresh combined-id prefix. */
@@ -331,8 +337,9 @@ export class AgentLoop extends Service implements AgentFactory {
   static inject = ['agents', 'sessions', 'llm', 'tools', 'systemPrompt', 'sessionProjections']
 
   /** Runtime schema for declarative agents. */
-  static Config: z<{ agents?: Config['agents']; maxParallelToolCalls?: number }, Config> = z.object({
+  static Config: z<{ agents?: Config['agents']; maxParallelToolCalls?: number; directMode?: boolean }, Config> = z.object({
     maxParallelToolCalls: z.number().step(1).min(1).default(DEFAULT_MAX_PARALLEL_TOOL_CALLS).volatile(),
+    directMode: z.boolean().default(false).volatile(),
     agents: z.array(z.object({
       id: z.string().required(),
       sessionId: z.string().min(1),
@@ -343,7 +350,7 @@ export class AgentLoop extends Service implements AgentFactory {
       cwd: z.string(),
       resumeSessionId: z.string(),
     })).default([]),
-  }) as z<{ agents?: Config['agents']; maxParallelToolCalls?: number }, Config>
+  }) as z<{ agents?: Config['agents']; maxParallelToolCalls?: number; directMode?: boolean }, Config>
 
   /** Validated configuration owned by the agent-loop service. */
   readonly config: Config
@@ -357,6 +364,7 @@ export class AgentLoop extends Service implements AgentFactory {
     this.config = {
       agents: applyLauncherIdentities(config.agents, ctx.get(CONFIGURED_AGENT_IDENTITIES_KEY)),
       maxParallelToolCalls: config.maxParallelToolCalls,
+      directMode: config.directMode,
     }
     validateConfiguredAgents(this.config.agents)
     // Register only after every config validation above has passed, so a
@@ -370,6 +378,13 @@ export class AgentLoop extends Service implements AgentFactory {
     ctx.systemPrompt.variable('provider', context => context.agent?.options.provider)
     ctx.systemPrompt.variable('model', context => context.agent?.options.model)
     ctx.systemPrompt.variable('cwd', context => context.agent?.session.header.cwd)
+    // Re-read each assembly, so flipping the setting takes effect from the next step.
+    ctx.systemPrompt.section({
+      name: DIRECT_MODE_SECTION,
+      order: ctx.systemPrompt.getSectionOrder('DIRECT_MODE_POLICY'),
+      text: () => this.config.directMode.get() ? DIRECT_MODE_POLICY : '',
+      interpolate: false,
+    })
 
     for (const { id, sessionId, cwd, resumeSessionId, ...options } of this.config.agents) {
       const meta = cwd === undefined ? {} : { cwd }

@@ -46,6 +46,7 @@ Agents declared in the config start automatically when the plugin loads. Each en
 | Field | Default | Meaning |
 |---|---|---|
 | `maxParallelToolCalls` | `10` | Parallel-safe tool calls in flight per step; `1` is serial |
+| `directMode` | `false` | While `true`, every agent's system prompt carries a short direct-mode policy (concise answers, fewest tool calls, no subagents for trivial tasks, reply in the user's language); advice only, no limit changes |
 | `agents[].id` | required | Stable label; a fresh session mints `${id}-session-<uuid>` unless `sessionId` is set |
 | `agents[].provider` / `agents[].model` | — | Model route; both required before dispatch |
 | `agents[].reasoningEffort` | — | Non-empty initial reasoning effort; `agent/request` may override it |
@@ -54,7 +55,7 @@ Agents declared in the config start automatically when the plugin loads. Each en
 | `agents[].sessionId` | — | Exact identity: first use creates, a remount resumes materialized history |
 | `agents[].resumeSessionId` | — | Load this persisted session instead of creating one; mutually exclusive with `sessionId` |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-agent-loop) lists every accepted field. `maxParallelToolCalls` is a volatile Config field sampled for the next tool group; `agents` remains startup configuration.
+The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-agent-loop) lists every accepted field. `maxParallelToolCalls` is a volatile Config field sampled for the next tool group, and `directMode` is a volatile Config field sampled at the next step's prompt assembly; `agents` remains startup configuration.
 
 ### Create or resume agents programmatically
 
@@ -103,7 +104,7 @@ The loop deep-freezes each derived message identity on its first request and reu
 | [`src/inbox.ts`](src/inbox.ts) | Package-internal `ReactLoopInbox`: durable projection, structural commands, and loop-only claim state |
 | [`src/tool-calls.ts`](src/tool-calls.ts) | Tool scheduling: exclusive barriers and the bounded parallel pool |
 | [`src/runtime-context.ts`](src/runtime-context.ts) | Per-step runtime-context snapshot handling |
-| [`src/constants.ts`](src/constants.ts) | `DEFAULT_MAX_PARALLEL_TOOL_CALLS` |
+| [`src/constants.ts`](src/constants.ts) | `DEFAULT_MAX_PARALLEL_TOOL_CALLS`, the direct-mode section name and policy text |
 | [`src/invariant.ts`](src/invariant.ts) | Invariant companion: request reconstruction from the session log |
 
 ### Creation and teardown
@@ -153,7 +154,7 @@ The package-level contract is enough for most consumers; read these when you nee
 
 #### What the model sees
 
-For each step, the loop sends the session's derived messages and visible tool schemas. Non-empty `system/message` nodes carry the prompt, with the latest as the effective version; an empty rendering clears all prompt versions from derived history. It supplies `provider`, `model`, and `cwd` variable values but no additional fixed prose. The request header always records active tools. Comparing their names with the preceding header emits one `developer/message` for additions and removals, independently of model capability; additions reference the new header. Requests also carry `Session.toolHistory()` for the LLM runtime to construct provider declarations.
+For each step, the loop sends the session's derived messages and visible tool schemas. Non-empty `system/message` nodes carry the prompt, with the latest as the effective version; an empty rendering clears all prompt versions from derived history. It supplies `provider`, `model`, and `cwd` variable values but no additional fixed prose, except the direct-mode section described below. The request header always records active tools. Comparing their names with the preceding header emits one `developer/message` for additions and removals, independently of model capability; additions reference the new header. Requests also carry `Session.toolHistory()` for the LLM runtime to construct provider declarations.
 
 #### Token effect
 
@@ -162,6 +163,20 @@ System text and schemas are paid again on every step, and on an `in-history` rou
 #### KV Cache effect
 
 Prefix reuse requires earlier messages and declarations to stay byte-identical under the same provider and model route. An unchanged rendered prompt keeps the cached prefix unless an incapable route or a new request series must consolidate retained in-history system nodes. A prompt change that replaces a system node in place makes the request differ from that node's first token — in full when the node is node 0 — so the provider prefix cache misses from there; when the prepared call declares `systemPromptUpdate: 'in-history'`, a non-empty prompt change inside a continuing request series is appended after the cached history, so the prefix through that history stays reusable. Changing a retained tool definition or rebuilding declarations invalidates reuse from the first altered request token.
+
+### Direct-mode policy
+
+#### What the model sees
+
+While `directMode` is `true`, the `agent-loop:direct-mode` prompt section renders a short English policy: answer concisely, keep reasoning short on simple tasks, use the fewest tool calls, do not spawn subagents or workflows for trivial work, ask only when blocked, and reply in the language the user writes in. It advises only; no loop limit, tool catalog, or turn budget changes. While `false` the section renders empty and the prompt is unchanged.
+
+#### Token effect
+
+About eighty words of system text on every step while the mode is on; fewer exploratory steps and shorter answers usually repay it.
+
+#### KV Cache effect
+
+Flipping the setting changes the rendered prompt once, so the prompt-change rules above apply at the next step; while the setting stays unchanged the prefix is stable.
 
 ### Retained message history
 
