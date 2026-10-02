@@ -91,6 +91,9 @@
       "path": "../cost-report"
     },
     {
+      "path": "../mcp-status"
+    },
+    {
       "path": "../workspace-controller/tsconfig.client.json"
     },
     {
