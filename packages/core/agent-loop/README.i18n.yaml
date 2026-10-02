@@ -18,8 +18,8 @@
   en: 35a960c0100a6aa4
   zh: 438e133fb4c24a9e
 /deepseek-ai-dsh-agent-loop/use-this-package/configure-declarative-agents:
-  en: 96295035babf4f90
-  zh: 8848f9497019ee63
+  en: deffaf77fc3bdbe4
+  zh: 4f936978e1a94e33
 /deepseek-ai-dsh-agent-loop/use-this-package/create-or-resume-agents-programmatically:
   en: 82ec792637e8e57f
   zh: e32f8ec5ee17afcf
@@ -36,8 +36,8 @@
   en: 6fa5c8b2f91552d8
   zh: 75886c7e922d23df
 /deepseek-ai-dsh-agent-loop/understand-the-implementation/source-map:
-  en: d7f6b2947ec9b2f3
-  zh: 8a3d566fb8cf2938
+  en: a4b50b79b56e3558
+  zh: e1eea81610752be8
 /deepseek-ai-dsh-agent-loop/understand-the-implementation/creation-and-teardown:
   en: 6bc52b8ef503eeda
   zh: 3290052ebc47baf6
@@ -60,14 +60,26 @@
   en: 5507d83eb979c737
   zh: 0ffde85d627b3933
 /deepseek-ai-dsh-agent-loop/model-experience/complete-conversation-request/what-the-model-sees:
-  en: cd89b20032608049
-  zh: 1f57d4cecc30313b
+  en: 5f7c086393423b79
+  zh: 0b9b7ba80756a7c0
 /deepseek-ai-dsh-agent-loop/model-experience/complete-conversation-request/token-effect:
   en: ad93d8d61968a25d
   zh: 268ff858b0fa96e8
 /deepseek-ai-dsh-agent-loop/model-experience/complete-conversation-request/kv-cache-effect:
   en: c002d27c825d04e8
   zh: b0dbdd95d3b3b6b5
+/deepseek-ai-dsh-agent-loop/model-experience/direct-mode-policy:
+  en: d9e6d43c550ff49e
+  zh: 662d881b146e815c
+/deepseek-ai-dsh-agent-loop/model-experience/direct-mode-policy/what-the-model-sees:
+  en: cbd5dffd3a9c5324
+  zh: 1969f299528460ed
+/deepseek-ai-dsh-agent-loop/model-experience/direct-mode-policy/token-effect:
+  en: aa58b8f1051e6286
+  zh: a995ffdd32ba3586
+/deepseek-ai-dsh-agent-loop/model-experience/direct-mode-policy/kv-cache-effect:
+  en: 556b85c188edd03f
+  zh: 62a6c26e27f5fefc
 /deepseek-ai-dsh-agent-loop/model-experience/retained-message-history:
   en: 50d33d852dec1e28
   zh: ec15695304f25f38

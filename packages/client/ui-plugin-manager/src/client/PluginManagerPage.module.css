@@ -1375,3 +1375,22 @@ label.registryOption {
   color: var(--dsw-alias-state-error-primary);
   overflow-wrap: anywhere;
 }
+
+/* Safe mode: why third-party plugins are absent, and how to leave it. */
+.safeModeNotice {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 0.5px solid color-mix(in srgb, var(--dsw-alias-state-warn-primary) 40%, transparent);
+  border-radius: var(--dsw-radius-lg);
+  background: var(--dsw-alias-state-warn-tertiary);
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.safeModeNotice p {
+  margin: 0;
+}

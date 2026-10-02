@@ -1,0 +1,26 @@
+/* Safe mode indicator: a small pill pinned to the shell's bottom-right corner, above the page but out of the way. */
+
+.pill {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 0.5px solid color-mix(in srgb, var(--dsw-alias-state-warn-primary) 45%, transparent);
+  border-radius: 999px;
+  background: var(--dsw-alias-state-warn-tertiary);
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+  line-height: 18px;
+  cursor: default;
+  user-select: none;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dsw-alias-state-warn-primary);
+}

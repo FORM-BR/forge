@@ -332,6 +332,10 @@ describe('WorkspaceController', () => {
     expect(client.ctx.workspaces.list).toBe(model)
     await expect(controller.initializeDefault(new AbortController().signal)).resolves.toMatchObject({ workspaceId: 'default' })
     await expect(controller.create({ path: '/work/created' })).resolves.toMatchObject({ workspaceId: 'created' })
+    await expect(controller.gitInfo('/work/created')).resolves.toEqual({
+      path: '/work/created',
+      git: { repoName: 'repo', root: '/work/created', branch: 'main', detached: false },
+    })
     await expect(controller.rename(wid('one'), 'renamed')).resolves.toMatchObject({ title: 'renamed' })
     await expect(controller.insertBefore(wid('one'))).resolves.toBeUndefined()
     await expect(controller.insertSessionBefore(wid('one'), sid('session'))).resolves.toMatchObject({
@@ -369,6 +373,9 @@ describe('WorkspaceController', () => {
     await expect(create).rejects.toBeInstanceOf(WorkspaceCreateError)
     await expect(create).rejects.toThrow('workspace create failed: workspace/invalid-path: missing path')
 
+    mock.remote.workspace.gitInfo.mockResolvedValueOnce(err(new RemoteError('gateway/bad-request', 'not absolute', {})))
+    await expect(controller.gitInfo('relative'))
+      .rejects.toThrow('workspace git info failed: gateway/bad-request: not absolute')
     mock.remote.workspace.rename.mockResolvedValueOnce(err(missingWorkspace))
     await expect(controller.rename(wid('missing'), 'name')).rejects.toThrow('workspace rename failed: workspace/not-found: gone')
     mock.remote.workspace.delete.mockResolvedValueOnce(err(missingWorkspace))

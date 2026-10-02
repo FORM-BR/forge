@@ -18,4 +18,17 @@ foreach ($d in $alvos) {
   $s.Description = 'FORGE (servidor em segundo plano + navegador)'
   $s.Save()
   "Atalho atualizado: $lnk -> $($s.TargetPath) $($s.Arguments)"
+  # Atalho irmao em modo seguro (so plugins do FORGE; nenhum arquivo do profile e alterado). Criado so na area de trabalho real.
+  if ($d -eq $real) {
+    $lnkSafe = Join-Path $d 'FORGE (modo seguro).lnk'
+    $t = $sh.CreateShortcut($lnkSafe)
+    $t.TargetPath = $s.TargetPath
+    $t.Arguments = $s.Arguments + ' safe'
+    $t.WorkingDirectory = $s.WorkingDirectory
+    $t.WindowStyle = 7
+    $t.IconLocation = $s.IconLocation
+    $t.Description = 'FORGE em modo seguro (sem plugins de terceiros nem MCP)'
+    $t.Save()
+    "Atalho atualizado: $lnkSafe -> $($t.TargetPath) $($t.Arguments)"
+  }
 }

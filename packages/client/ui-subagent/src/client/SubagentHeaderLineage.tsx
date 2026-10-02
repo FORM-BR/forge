@@ -7,10 +7,14 @@ import {
 import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import {
-  IconChevronDownOutlineRegular, IconChevronRightOutlineRegular, IconRefreshOutlineRegular, StateDot, Tooltip,
+  IconChevronDownOutlineRegular, IconChevronRightOutlineRegular, IconRefreshOutlineRegular, IconWorkspaceTreeOutlineRegular,
+  StateDot, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { NS } from './locales.ts'
+import {
+  activityDuration, formatDuration, formatExactDuration, formatTokens, tokenTotal,
+} from './metrics.ts'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-token-meter/client'
 import css from './SubagentHeaderLineage.module.css'
@@ -26,6 +30,8 @@ export interface SubagentCatalogInjected {
   openChild: (address: SubagentAddress) => void
   openChildAside: (address: SubagentAddress) => void
   refreshProjection: (parentSessionId: SessionId) => void
+  /** Open the Agent Map Sidebar tab; absent when no Agent Map is registered. */
+  openMap?: () => void
 }
 
 /** Full props for the session-header lineage renderer. */
@@ -51,117 +57,6 @@ function treeItems(root: HTMLDivElement | null): HTMLElement[] {
   return root === null
     ? []
     : Array.from(root.querySelectorAll<HTMLElement>('[role="treeitem"]:not([aria-disabled="true"])'))
-}
-
-/** Compact token count shared in shape with the conversation stats strip. */
-function formatTokens(value: number, t: TranslateNS<typeof NS>): string {
-  const scaled = (next: number): string => next >= 100
-    ? String(Math.round(next))
-    : String(Math.round(next * 10) / 10)
-  if (value < 1_000) return String(value)
-  if (value < 1_000_000) return t('tokens.thousand', { value: scaled(value / 1_000) })
-  return t('tokens.million', { value: scaled(value / 1_000_000) })
-}
-
-/** Sum the four disjoint durable provider-usage buckets. */
-function tokenTotal(
-  usage: SessionProjectionMap['tokenUsage'] | undefined,
-): number | undefined {
-  return usage === undefined
-    ? undefined
-    : usage.uncachedInputTokens + usage.outputTokens
-      + usage.cacheReadTokens + usage.cacheWriteTokens
-}
-
-/** Exact whole-second active-turn duration for one catalog row. */
-function activityDuration(
-  summary: SessionSummary | undefined,
-  activity: 'running' | 'inactive',
-  now: number,
-): number | undefined {
-  if (summary === undefined) return undefined
-  const timing: SessionProjectionMap['subagentTiming'] | undefined
-    = summary.projectionValues?.subagentTiming
-  if (timing === undefined) return undefined
-  if (timing.active === undefined) return timing.settledMs
-  const end = activity === 'running'
-    ? now
-    : timing.active.through
-  return timing.settledMs + Math.max(0, end - timing.active.since)
-}
-
-interface DurationParts {
-  seconds: number
-  minutes: number
-  hours: number
-  days: number
-  totalMinutes: number
-  totalHours: number
-}
-
-function splitDuration(ms: number): DurationParts {
-  const totalSeconds = Math.floor(Math.max(0, ms) / 1_000)
-  const totalMinutes = Math.floor(totalSeconds / 60)
-  const totalHours = Math.floor(totalMinutes / 60)
-  return {
-    seconds: totalSeconds % 60,
-    minutes: totalMinutes % 60,
-    hours: totalHours % 24,
-    days: Math.floor(totalHours / 24),
-    totalMinutes,
-    totalHours,
-  }
-}
-
-/** Format a duration with decreasing visual precision at larger scales. */
-function formatDuration(ms: number, t: TranslateNS<typeof NS>): string {
-  const { seconds, minutes, hours, days, totalMinutes, totalHours } = splitDuration(ms)
-  if (days >= 365) {
-    const years = Math.floor(days / 365)
-    const months = Math.floor((days % 365) / 30)
-    return months === 0
-      ? t('duration.years', { years })
-      : t('duration.yearsMonths', { years, months })
-  }
-  if (days >= 30) {
-    const months = Math.floor(days / 30)
-    const remainingDays = days % 30
-    return remainingDays === 0
-      ? t('duration.months', { months })
-      : t('duration.monthsDays', { months, days: remainingDays })
-  }
-  if (days > 0) {
-    return hours === 0
-      ? t('duration.days', { days })
-      : t('duration.daysHours', { days, hours })
-  }
-  if (totalHours > 0) {
-    return t('duration.hours', {
-      hours: totalHours,
-      minutes: String(minutes).padStart(2, '0'),
-      seconds: String(seconds).padStart(2, '0'),
-    })
-  }
-  if (totalMinutes > 0) {
-    return t('duration.minutes', {
-      minutes: totalMinutes,
-      seconds: String(seconds).padStart(2, '0'),
-    })
-  }
-  return t('duration.seconds', { seconds })
-}
-
-/** Preserve exact whole seconds for hover and accessible naming. */
-function formatExactDuration(ms: number, t: TranslateNS<typeof NS>): string {
-  const { seconds, minutes, hours, days } = splitDuration(ms)
-  return days === 0
-    ? formatDuration(ms, t)
-    : t('duration.exactDays', {
-      days,
-      hours: String(hours).padStart(2, '0'),
-      minutes: String(minutes).padStart(2, '0'),
-      seconds: String(seconds).padStart(2, '0'),
-    })
 }
 
 function SubagentSwitcherIcon() {
@@ -445,7 +340,7 @@ function catalogMenuPosition(trigger: HTMLButtonElement): CSSProperties {
 /** One trigger-plus-tree dropdown over the catalog rooted at `rootSessionId`. */
 function CatalogDropdown({
   rootSessionId, currentSessionId, displayTitle, openTitle, variant,
-  useSessions, useSessionStatus, openChild, openChildAside, refreshProjection, t,
+  useSessions, useSessionStatus, openChild, openChildAside, refreshProjection, openMap, t,
 }: CatalogDropdownProps) {
   const ancestorSwitcher = variant === 'switcher' && openTitle !== undefined
   const projections = useSessions(state => state.projectionsBySession)
@@ -723,6 +618,19 @@ function CatalogDropdown({
               t={t}
             />
           </div>
+          {openMap !== undefined && (
+            <button
+              type="button"
+              className={css.mapLink}
+              onClick={() => {
+                changeOpen(false)
+                openMap()
+              }}
+            >
+              <IconWorkspaceTreeOutlineRegular size={14} />
+              {t('map.link')}
+            </button>
+          )}
         </div>
       ), document.body)}
     </div>
@@ -742,7 +650,7 @@ export type SubagentCatalogActionProps =
  * @returns The count dropdown, or null on a child session.
  */
 export function SubagentCatalogAction({
-  sessionId, useSessions, useSessionStatus, openChild, openChildAside, refreshProjection, t,
+  sessionId, useSessions, useSessionStatus, openChild, openChildAside, refreshProjection, openMap, t,
 }: SubagentCatalogActionProps) {
   const isChild = useSessions(state => state.byId[sessionId]?.origin === 'subagent')
   if (isChild) return null
@@ -756,6 +664,7 @@ export function SubagentCatalogAction({
       openChild={openChild}
       openChildAside={openChildAside}
       refreshProjection={refreshProjection}
+      {...openMap === undefined ? {} : { openMap }}
       t={t}
     />
   )
@@ -768,7 +677,7 @@ export function SubagentCatalogAction({
  */
 export function SubagentHeaderLineage({
   lineageSessionId, displayTitle, openTitle,
-  useSessions, useSession, useSessionStatus, openChild, openChildAside, refreshProjection, t,
+  useSessions, useSession, useSessionStatus, openChild, openChildAside, refreshProjection, openMap, t,
 }: SubagentHeaderLineageProps) {
   const address = useSession(session => session.subagent?.address)
   const parentId = useSessions((state) => {
@@ -778,7 +687,10 @@ export function SubagentHeaderLineage({
     }
     return undefined
   })
-  const shared = { useSessions, useSessionStatus, openChild, openChildAside, refreshProjection, t }
+  const shared = {
+    useSessions, useSessionStatus, openChild, openChildAside, refreshProjection, t,
+    ...openMap === undefined ? {} : { openMap },
+  }
   // Root sessions carry no breadcrumb; their descendant count lives in the
   // header actions band (SubagentCatalogAction).
   if (parentId === undefined) return null
