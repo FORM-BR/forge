@@ -14,7 +14,8 @@
  * primary state is idle, and the section the row's hover card renders between
  * its relative time and its trailing status line. A third registration puts
  * the workspace status line (cwd, git repository, branch) into the
- * `conversation.composer.dock` list. Export discipline:
+ * `conversation.composer.dock` list, and the hero's branch chip into
+ * `conversation.hero.workspace.status`. Export discipline:
  * packages/client/AGENTS.md.
  */
 import type {} from '@deepseek-ai/dsh-client-product-analytics/client'
@@ -53,6 +54,7 @@ import { ForkSessionMenuItem } from './session-actions/ForkSession.tsx'
 import { PinSessionMenuItem, PinSessionRowButton } from './session-actions/PinSession.tsx'
 import { RenameSessionMenuItem, SessionRenameDialog } from './session-actions/RenameSession.tsx'
 import { RowActionToast } from './session-actions/RowActionToast.tsx'
+import { HeroGitChip } from './status/HeroGitChip.tsx'
 import { WorkspaceStatusLine } from './status/WorkspaceStatusLine.tsx'
 import { WorkspacePicker } from './WorkspacePicker.tsx'
 import { en, zh, type WorkspaceKey } from './locales.ts'
@@ -319,6 +321,11 @@ export function apply(ctx: Context): void {
       name: 'conversation.composer.dock', id: 'workspace-status', order: -100, locale: NS, inject: statusInjected,
     },
     WorkspaceStatusLine,
+  ))
+  // Branch chip beside the blank-session Workspace chip.
+  ctx.slots.inject('conversation.hero.workspace.status', () => ctx.slots.register(
+    { name: 'conversation.hero.workspace.status', locale: NS, inject: statusInjected },
+    HeroGitChip,
   ))
   ctx.slots.inject('conversation.hero.workspace', () => ctx.slots.register(
     {

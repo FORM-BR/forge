@@ -23,6 +23,7 @@ import { ForkSessionMenuItem } from '../src/client/session-actions/ForkSession.t
 import { PinSessionMenuItem, PinSessionRowButton } from '../src/client/session-actions/PinSession.tsx'
 import { RenameSessionMenuItem, SessionRenameDialog } from '../src/client/session-actions/RenameSession.tsx'
 import { RowActionToast } from '../src/client/session-actions/RowActionToast.tsx'
+import { HeroGitChip } from '../src/client/status/HeroGitChip.tsx'
 import { WorkspaceStatusLine } from '../src/client/status/WorkspaceStatusLine.tsx'
 import { WorkspacePicker } from '../src/client/WorkspacePicker.tsx'
 import { FLAT_SESSION_ORDER_KEY } from '../src/client/stores.ts'
@@ -247,6 +248,24 @@ describe('ui-workspace apply', () => {
     const signal = new AbortController().signal
     await expect(face.gitInfo('/projects/alpha', signal)).resolves.toMatchObject({ git: { repoName: 'repo' } })
     expect(b.gitInfo).toHaveBeenCalledWith('/projects/alpha', signal)
+  })
+
+  it('registers the hero git chip into the hero status seat and wires its git lookup', async () => {
+    const b = await bench()
+    onTestFinished(() => b.ctx.fiber.dispose())
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    expect(b.slots.entries('conversation.hero.workspace.status')).toHaveLength(0)
+    b.slots.register({
+      name: 'root', children: { 'conversation.hero.workspace.status': { kind: 'single', scope: 'root' } },
+    } as never, () => null)
+    await Promise.resolve()
+    const seat = b.slots.entries('conversation.hero.workspace.status')
+    expect(seat).toHaveLength(1)
+    expect(seat[0]!.component).toBe(HeroGitChip)
+    expect(seat[0]!.locale).toBe('workspace')
+    const face = faceOf(seat[0]!) as WorkspaceStatusInjected
+    await face.gitInfo('/projects/alpha', new AbortController().signal)
+    expect(b.gitInfo).toHaveBeenCalledWith('/projects/alpha', expect.any(AbortSignal))
   })
 
   it('declares the two Session row lists and registers the shipped actions and overlay surfaces into them', async () => {

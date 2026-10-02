@@ -7,18 +7,11 @@
  * repeated when the Session's running state flips so a branch switched by the
  * agent's own commands shows up when the turn ends.
  */
-import { useEffect, useState } from 'react'
-import type { WorkspaceGitRepo } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { IconBranchOutlineRegular, IconFolderCloseRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { WorkspaceStatusProps } from '../contract/slots.ts'
 import { abbreviatePath } from './path-label.ts'
+import { useGitRepo } from './use-git-repo.ts'
 import css from './WorkspaceStatusLine.module.css'
-
-/** The repository found for one directory, or none; keyed so a stale answer never shows under another cwd. */
-interface GitLookup {
-  readonly cwd: string
-  readonly repo: WorkspaceGitRepo | undefined
-}
 
 /**
  * Render the working directory and git repository of the Session.
@@ -28,21 +21,9 @@ interface GitLookup {
 export function WorkspaceStatusLine({ sessionId, useSessions, gitInfo, t }: WorkspaceStatusProps) {
   const cwd = useSessions(sessions => sessions.byId[sessionId]?.cwd)
   const running = useSessions(sessions => sessions.byId[sessionId]?.running ?? false)
-  const [lookup, setLookup] = useState<GitLookup | undefined>(undefined)
-
-  useEffect(() => {
-    if (cwd === undefined) return
-    const abort = new AbortController()
-    gitInfo(cwd, abort.signal).then(
-      (value) => { if (!abort.signal.aborted) setLookup({ cwd, repo: value.git }) },
-      // A refused or lost lookup shows the directory without a repository.
-      () => { if (!abort.signal.aborted) setLookup({ cwd, repo: undefined }) },
-    )
-    return () => { abort.abort() }
-  }, [cwd, running, gitInfo])
+  const repo = useGitRepo(cwd, running, gitInfo)
 
   if (cwd === undefined) return null
-  const repo = lookup?.cwd === cwd ? lookup.repo : undefined
   return (
     <div className={css.root} data-workspace-status>
       <span className={css.item} title={t('statusLine.cwd', { path: cwd })}>

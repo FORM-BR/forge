@@ -403,6 +403,12 @@ export interface WorkspaceStatusInjected {
   gitInfo: (path: string, signal: AbortSignal) => Promise<WorkspaceGitInfoValue>
 }
 
+/** Props of the git chip entry in `conversation.hero.workspace.status`. */
+export type HeroGitChipProps =
+  PropsRuntime<'conversation.hero.workspace.status'>
+  & PropsLocale<'workspace'>
+  & InjectFace<WorkspaceStatusInjected>
+
 /** Props of the status line entry in `conversation.composer.dock`. */
 export type WorkspaceStatusProps =
   PropsRuntime<'conversation.composer.dock'>
