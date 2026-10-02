@@ -53,6 +53,7 @@ export class AgentPresetRegistry extends TypertRemoteService {
   static Config = z.object({
     default: z.string().required(),
     selectedDefault: z.string().volatile(),
+    workspacePresets: z.dict(z.string()).default({}).volatile(),
   })
   private readonly owner: Context
   private readonly definitions = new Map<string, Definition>()
@@ -170,7 +171,10 @@ export class AgentPresetRegistry extends TypertRemoteService {
   @Remote('list')
   async remoteExportList(): Promise<AgentPresetRoster> {
     const defaultId = this.defaultId
-    return { presets: (await this.list()).map(row => ({ ...row, isDefault: row.id === defaultId })) }
+    return {
+      presets: (await this.list()).map(row => ({ ...row, isDefault: row.id === defaultId })),
+      workspacePresets: { ...this.config.workspacePresets.get() },
+    }
   }
 
   /** Resolve an identity without starting an Agent.

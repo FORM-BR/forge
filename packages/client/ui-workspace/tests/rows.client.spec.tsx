@@ -462,6 +462,49 @@ describe('workspace browser rows', () => {
     expect(screen.queryByRole('menu')).toBeNull()
   })
 
+  it('renders the Workspace seats: a badge after the title and extra menu rows with the Workspace identity', () => {
+    const rendered = vi.fn()
+    const onEntry = vi.fn()
+    const renderSlot = ((name: string, owner: object, opts?: object) => {
+      const hookContext = opts !== undefined && 'hookContext' in opts ? opts.hookContext : undefined
+      rendered(name, owner, hookContext)
+      if (name === 'sidebar.workspaces.workspace.badge') return <span>Profile badge</span>
+      const [, setMenuOpen] = hookContext as MenuOpenState
+      return (
+        <MenuItemButton onSelect={() => { setMenuOpen(false); onEntry(owner) }}>Profile row</MenuItemButton>
+      )
+    }) as never
+    const group: GroupNode = {
+      key: 'project', workspaceId: wid('project'), cwd: '/projects/project', createdAt: 0, label: 'Project',
+      sessionCount: 0, expanded: false, containsCurrent: false, sessions: [],
+    }
+    render(<ProjectRowItem
+      group={group} onToggle={vi.fn()} onCreate={vi.fn()}
+      actions={{ rename: vi.fn(), delete: vi.fn() }} renderSlot={renderSlot} t={t}
+    />)
+    const owner = { workspaceId: wid('project'), path: '/projects/project', title: 'Project' }
+    expect(screen.getByText('Profile badge')).toBeTruthy()
+    expect(rendered).toHaveBeenCalledWith('sidebar.workspaces.workspace.badge', owner, undefined)
+    expect(rendered).toHaveBeenCalledWith('sidebar.workspaces.workspace.menu.item', owner, [false, expect.any(Function)])
+    expect(screen.queryByRole('menuitem', { name: 'Profile row' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '工作区“Project”的操作' }))
+    // The extra rows follow the shipped Rename and Delete rows.
+    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['重命名', '删除工作区', 'Profile row'])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Profile row' }))
+    expect(onEntry).toHaveBeenCalledWith(owner)
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+
+  it('mounts no Workspace seat for the ungrouped bucket', () => {
+    const rendered = vi.fn()
+    const renderSlot = ((name: string) => { rendered(name); return null }) as never
+    const group: GroupNode = {
+      key: '__ungrouped__', workspaceId: undefined, cwd: undefined, createdAt: undefined, label: '', sessionCount: 0, expanded: true, containsCurrent: false, sessions: [],
+    }
+    render(<ProjectRowItem group={group} onToggle={vi.fn()} onCreate={vi.fn()} renderSlot={renderSlot} t={t} />)
+    expect(rendered).not.toHaveBeenCalled()
+  })
+
   it('workspace hover card shows its details and copies the full directory path', async () => {
     vi.useFakeTimers()
     const writeText = vi.fn(async () => {})

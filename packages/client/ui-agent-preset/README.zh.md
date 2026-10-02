@@ -29,6 +29,8 @@ kind: "package-reference"
 
 通用设置中的代码工作工具决定能否选择模式：关闭后新会话选择器消失、卡片拒绝选择，而已保存的默认值继续用于新任务。选择健康定义作为默认值也会同步当前新任务页面的空白会话。Creator 入口开启一个使用 `cordis` preset 的新任务。
 
+工作区可以带有业务配置：把一个 Agent preset 绑定到它的目录。工作区「...」菜单中有「工作区方案」分组，在其中选择「无」或某个健康的 preset 即保存绑定。工作区标题后的徽标显示该 preset；已被移除或加载失败的 preset 以删除线显示其 id。之后在该工作区打开的下一个空白会话，会像在新任务选择器上点选一样，以方案的 preset 启动。在会话上手动选择的 preset 对该会话优先于方案；方案之后被修改，会影响仍为空白且未手动选择的会话；方案指向不可用的 preset 时保留默认值。菜单项、徽标与方案的应用都受代码工作工具开关控制。方案携带其 preset 所组合的全部内容：提示词人设行、技能与工具；模型、权限默认值和插件集仍是整个部署共用。
+
 已知的内置预设提供只读的模式说明与使用示例对话框。各页签保留各自的滚动位置；关闭后焦点回到打开它的操作。帮助不会改变新任务默认值。默认徽标取代卡片的分组徽标，预设 id 显示在标题旁。指南文案与示例归本包所有。
 
 <a id="understand-the-implementation"></a>
@@ -37,7 +39,7 @@ kind: "package-reference"
 <details>
 <summary>实现细节 — 点击展开</summary>
 
-`agentPresets/list` 提供列表并标记当前默认值，`agentPresets/read` 为查看器提供一条声明的 YAML；默认值的修改写入 `agent-preset-registry` settings 命名空间。选择器、空白会话同步和只读会话标签使用记录的 preset 标识。连接重置和设置更新会刷新列表。
+`agentPresets/list` 提供列表并标记当前默认值，`agentPresets/read` 为查看器提供一条声明的 YAML；默认值的修改写入 `agent-preset-registry` settings 命名空间。选择器、空白会话同步和只读会话标签使用记录的 preset 标识。连接重置和设置更新会刷新列表。列表还携带 `workspacePresets`，即从工作区目录路径到 preset id 的方案映射；它保存在同一 settings 条目的 volatile 字段 `workspacePresets` 中，每次修改是一次按路径寻址的 `settings.mutate` 写入。新会话座位通过工作区快照解析会话所属的工作区（先看归属，再以 `cwd` 兜底），并像处理手动选择一样暂存方案；它按会话记住用户的选择和最近应用的方案值，因此被拒绝的方案不会重试。菜单项与徽标填入工作区浏览器声明的 `sidebar.workspaces.workspace.menu.item` 与 `sidebar.workspaces.workspace.badge` 座位。
 
 </details>
 
@@ -61,6 +63,7 @@ kind: "package-reference"
 
 <a id="known-limitations-and-deferred-work"></a>
 
+- 方案只选择 preset，不涉及其他：模型、权限默认值和已安装插件仍是全局的，因此第三方插件无法按工作区区分。它在 Web UI 中于空白会话打开时生效；由其他调用方创建的会话以默认值启动。
 - Web 不创建也不编辑 preset：配置查看器是只读的；通过创造模式安装的 bundle 声明新 preset，或按行 id 覆盖内置 preset，覆盖会替换整个子插件列表。
 
 <a id="dev-note"></a>

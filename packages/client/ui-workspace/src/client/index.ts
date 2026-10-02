@@ -43,6 +43,7 @@ import {
   type SessionArchiveConfirmInjected, type SessionArchiveConfirmRequest,
   type RenameSessionInjected, type RowToast, type RowToastInjected, type RowToastState, type SessionRenameDialogInjected,
   type WorkspaceBrowserInjected, type WorkspacePickerInjected, type WorkspaceStatusInjected,
+  workspaceMenuOpenStateFactory,
 } from './contract/slots.ts'
 import { createWorkspaceShortcutControls, installWorkspaceShortcuts } from './shortcuts.ts'
 import { UiWorkspaceService } from './navigation.ts'
@@ -64,7 +65,7 @@ export type { UiWorkspace } from './navigation.ts'
 export type {
   DirectoryFlowOwnerProps, DirectoryFlowSlotName, DirectoryPickingHooks, DirectoryPickingInjected,
   MenuOpenState, RowToast, SessionRenameTarget, SessionRowOwnerProps, UseMenuOpenState, WorkspaceBrowserInjected,
-  SessionRowScheduleOwnerProps,
+  SessionRowScheduleOwnerProps, WorkspaceRowOwnerProps,
   WorkspaceBrowserProps,
   WorkspacePickerInjected, WorkspacePickerProps,
 } from './contract/slots.ts'
@@ -335,6 +336,10 @@ export function apply(ctx: Context): void {
           kind: 'list', scope: 'root', inject: { hooks: { menuOpenState: menuOpenStateFactory, shortcuts: ctx.shortcuts.catalog } },
         },
         'sidebar.workspaces.session.row.action': { kind: 'list', scope: 'root' },
+        'sidebar.workspaces.workspace.menu.item': {
+          kind: 'list', scope: 'root', inject: { hooks: { menuOpenState: workspaceMenuOpenStateFactory } },
+        },
+        'sidebar.workspaces.workspace.badge': { kind: 'list', scope: 'root' },
         'sidebar.session.row.leading': { kind: 'list', scope: 'root' },
         'sidebar.session.row.hover': { kind: 'list', scope: 'root' },
       },
