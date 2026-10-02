@@ -489,7 +489,7 @@ describe('workspace browser rows', () => {
     expect(screen.queryByRole('menuitem', { name: 'Profile row' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '工作区“Project”的操作' }))
     // The extra rows follow the shipped Rename and Delete rows.
-    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['重命名', '删除工作区', 'Profile row'])
+    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['重命名', '重新生成会话标题', '删除工作区', 'Profile row'])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Profile row' }))
     expect(onEntry).toHaveBeenCalledWith(owner)
     expect(screen.queryByRole('menu')).toBeNull()
