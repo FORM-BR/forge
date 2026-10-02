@@ -752,8 +752,8 @@ describe('UiWorkspaceService', () => {
     expect(b.uiWorkspace.latestSession()).toBe(newer.id)
     expect(b.uiWorkspace.latestSession(wid('w2'))).toBe(other.id)
     expect(b.uiWorkspace.latestSession(wid('unknown'))).toBeUndefined()
-    expect(bench({ ...catalogs, sessions: sessionState([older], 'loading') }).uiWorkspace.latestSession()).toBeUndefined()
-    expect(bench({ ...catalogs, workspaces: workspaceState([], [], 'loading') }).uiWorkspace.latestSession()).toBeUndefined()
+    expect(bench({ ...catalogs, sessions: sessionState([older], 'pending') }).uiWorkspace.latestSession()).toBeUndefined()
+    expect(bench({ ...catalogs, workspaces: workspaceState([], [], 'pending') }).uiWorkspace.latestSession()).toBeUndefined()
     expect(bench({
       sessions: sessionState([blank]), workspaces: workspaceState([workspace('w1', [blank.id])]),
     }).uiWorkspace.latestSession()).toBeUndefined()
