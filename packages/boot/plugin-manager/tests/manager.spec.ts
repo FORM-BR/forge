@@ -83,6 +83,13 @@ async function fixture(reload: 'live' | 'startup' = 'live', overlay = false, pre
   return { ctx, dir, manager: ctx.pluginManager, bundle, profile, stopHmr, overlays, connection }
 }
 
+it('reports whether the process booted in safe mode', async () => {
+  const { manager, profile } = await fixture()
+  expect(manager.safeMode()).toEqual({ active: false })
+  ;(profile as { safeMode?: boolean }).safeMode = true
+  expect(manager.safeMode()).toEqual({ active: true })
+})
+
 it.each(['network', 'timeout'] as const)('stops a GitHub %s before pnpm and attributes it to the repository', async (kind) => {
   const { manager, dir, connection } = await fixture()
   const before = readFileSync(join(dir, 'package.json'), 'utf8')

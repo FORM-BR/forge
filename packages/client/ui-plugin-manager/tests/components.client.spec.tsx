@@ -12,6 +12,7 @@ import { StrictMode, type ReactNode } from 'react'
 import { createNavigationStore } from '../src/client/navigation-store.ts'
 import { PluginManagerPage } from '../src/client/PluginManagerPage.tsx'
 import { PluginRefreshToast } from '../src/client/PluginRefreshToast.tsx'
+import { SafeModePill } from '../src/client/SafeModePill.tsx'
 import type { PluginManagerPageProps } from '../src/client/index.ts'
 import type { ConfigLedger } from '../src/client/config-ledger.ts'
 import { rowKey, type InstallState, type PackageRow, type PackageView, type PluginManagerState } from '../src/client/manager-store.ts'
@@ -74,6 +75,7 @@ const READY: PluginManagerState = {
   install: IDLE_INSTALL,
   confirm: null,
   highlight: null,
+  safeMode: false,
 }
 
 /**
@@ -189,6 +191,23 @@ function renderTab(
     },
   }
 }
+
+describe('safe mode indicator', () => {
+  it('shows the explanation on the page and the pill only while the Host runs in safe mode', () => {
+    const b = renderTab({ status: 'ready', packages: [] })
+    const pill = render(<SafeModePill usePluginManager={b.props.usePluginManager} t={t} />)
+    expect(document.querySelector('[data-safe-mode-notice]')).toBeNull()
+    expect(document.querySelector('[data-safe-mode-pill]')).toBeNull()
+    b.set({ safeMode: true })
+    const notice = document.querySelector<HTMLElement>('[data-safe-mode-notice]')
+    expect(notice?.textContent).toContain(en.safeModeBannerTitle)
+    expect(notice?.textContent).toContain('-Safe')
+    expect(within(pill.container).getByRole('status').textContent).toContain(en.safeModePill)
+    b.set({ safeMode: false })
+    expect(document.querySelector('[data-safe-mode-notice]')).toBeNull()
+    expect(pill.container.querySelector('[data-safe-mode-pill]')).toBeNull()
+  })
+})
 
 describe('PluginManagerPage', () => {
   it('opens the requested bundle after its inventory arrives and falls back when it is absent', () => {

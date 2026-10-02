@@ -30,7 +30,7 @@ import { checkGithubConnection } from './github-connection.ts'
 import type {
   BundleInfo, BundleRowInfo, ChangeResult, InspectOptions, InstallBundleOptions, ManagementError, PackageResult, PluginChange,
   PluginEntryId, PluginInfo, PluginInspectProblem, PluginInstallCancellation, PluginInstallProgress, PluginInstallRequestId,
-  PluginRegistries, PluginSpecInspection, Registry,
+  PluginRegistries, PluginSpecInspection, Registry, SafeModeStatus,
 } from './types.ts'
 export type * from './types.ts'
 export { classifyInstallFailure, type InstallFailureFacts } from './install-failure.ts'
@@ -222,6 +222,15 @@ export class PluginManager extends TypertRemoteService {
       this.abort.abort()
       await Promise.allSettled([...this.packageOperations])
     }, 'plugin-manager: package cancellation')
+  }
+
+  /** Report whether this process was started in safe mode (`dsh --safe` or `FORGE_SAFE_MODE=1`).
+   * Safe mode is fixed at launch: leaving it means starting the application again without the flag.
+   * @returns The launch-time safe mode state.
+   */
+  @Remote
+  safeMode(): SafeModeStatus {
+    return { active: this.profile.safeMode === true }
   }
 
   /** Read exact plugin-version exemptions saved in this profile.

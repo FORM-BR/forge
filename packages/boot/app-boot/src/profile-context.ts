@@ -2,6 +2,7 @@
 import { join } from 'node:path'
 import { composeEntries, loadProfileDirectory, PROFILE_PATCH_FILENAME, type Profile } from './profile.ts'
 import { loadOptionalPatches } from './index.ts'
+import { filterSafeModePatches, isSafeModeBundle } from './profile-safe-mode.ts'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 
 /** Application-owned package manager executable; environment applies only to package operations. */
@@ -27,6 +28,11 @@ export interface ProfileContext {
   readonly overlays: readonly PatchOptions[]
   /** Launch-time DSH_TELEMETRY_DISABLED value; any non-empty value opts out. */
   readonly telemetryDisabledEnv: string | undefined
+  /**
+   * Safe mode: only shipped bundles and the user rows that configure or add shipped plugins are composed;
+   * third-party plugins stay unmounted. Held for the whole process so every reload composes the same way.
+   */
+  readonly safeMode?: boolean
 }
 
 declare module '@deepseek-ai/cordis' {
@@ -62,11 +68,16 @@ export function resolveTelemetryPatch(disabledEnv: string | undefined, hasRow: b
  */
 export function readProfilePatches(binName: string, context: ProfileContext, initialProfile?: Profile): PatchOptions[] {
   const profile = initialProfile ?? loadProfileDirectory(binName, context.dir, context.installAnchor, { userLayer: false })
-  const patches = structuredClone([
-    ...profile.layers.flatMap(layer => layer.patches),
+  const layers = (context.safeMode === true ? profile.layers.filter(layer => isSafeModeBundle(layer.packageName)) : profile.layers)
+    .flatMap(layer => layer.patches)
+  const userPatches = [
     ...(initialProfile?.patches ?? loadOptionalPatches(binName, context.patchPath) ?? []),
     ...(loadOptionalPatches(binName, join(context.home, PROFILE_PATCH_FILENAME)) ?? []),
     ...context.overlays,
+  ]
+  const patches = structuredClone([
+    ...layers,
+    ...(context.safeMode === true ? filterSafeModePatches(layers, userPatches) : userPatches),
   ])
   const telemetryPatch = resolveTelemetryPatch(context.telemetryDisabledEnv,
     composeEntries([patches]).some(row => row.id === TELEMETRY_ROW_ID))

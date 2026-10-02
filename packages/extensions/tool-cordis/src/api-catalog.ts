@@ -1635,6 +1635,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Manage profile files and apply their declared reload lifecycle.',
     methods: [
       {
+        signature: '@Remote safeMode(): SafeModeStatus',
+        description: 'Report whether this process was started in safe mode (`dsh --safe` or `FORGE_SAFE_MODE=1`). Safe mode is fixed at launch: leaving it means starting the application again without the flag.',
+        parameters: [],
+        returns: 'The launch-time safe mode state.',
+      },
+      {
         signature: '@Remote listVersionExemptions(): { exemptions: Record<string, string[]>; warnings: string[] }',
         description: 'Read exact plugin-version exemptions saved in this profile.',
         parameters: [],

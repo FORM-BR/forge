@@ -2,12 +2,14 @@ param(
   [Parameter(Mandatory)][ValidateSet('web','plain')][string]$Profile,
   [int]$Port = 3080,        # porta do `dsh web`; so e repassada ao servidor se diferente de 3080
   [switch]$NoOpen,          # nao abre o navegador (testes)
-  [switch]$Atualizar        # reconstroi agora (janela visivel) mesmo que o build pareca em dia
+  [switch]$Atualizar,       # reconstroi agora (janela visivel) mesmo que o build pareca em dia
+  [switch]$Safe             # modo seguro: so plugins do FORGE, sem terceiros/MCP; nenhum arquivo do profile e alterado
 )
 # Abre o FORGE rapido e sem janela: usa o build compilado (apps\cli\lib\bin.js), sobe o servidor escondido
 # e deixa o proprio `dsh web` abrir o navegador (ele imprime/abre a URL com o token).
 #  - ja existe instancia na porta: so abre o navegador nela (nada de matar, nada de EADDRINUSE);
 #  - build defasado (master mudou): abre mesmo assim e avisa com um balao; `-Atualizar` reconstroi;
+#  - `-Safe` sobe com `--safe` (pill "Safe mode" na UI); se ja ha instancia no outro modo, ela e reiniciada no modo pedido;
 #  - o servidor roda com cwd num diretorio neutro, NUNCA na raiz do repo (o sandbox do Forge marca o cwd
 #    com integridade Low e isso quebrou os hooks do git; ver Vault-IA/geral/Forge - sandbox Windows ...).
 $ErrorActionPreference = 'Stop'
@@ -82,8 +84,9 @@ function Build-Forge {
 if ($Profile -eq 'web' -and -not $Atualizar -and (Test-PortOpen $Port)) {
   $forge = Get-ForgeProcs | Where-Object { $_.CommandLine -match '\bweb\b' }
   if ($forge) {
-    if (Open-Existing $Port) { exit 0 }
-    Stop-Forge; Start-Sleep 1   # sem token conhecido: reinicia (abaixo) para o navegador abrir autenticado
+    $runningSafe = [bool]($forge | Where-Object { $_.CommandLine -match '\s--safe(\s|$)' })
+    if ($runningSafe -eq [bool]$Safe -and (Open-Existing $Port)) { exit 0 }
+    Stop-Forge; Start-Sleep 1   # outro modo (normal x seguro) ou sem token conhecido: reinicia (abaixo) para abrir no modo pedido e autenticado
   } else {
   Show-Toast 'FORGE nao abriu' "A porta $Port esta ocupada por outro programa (nao e o FORGE)."
   exit 1
@@ -106,6 +109,7 @@ if ($Profile -eq 'plain') { Stop-Forge }
 $node = (Get-Command node -ErrorAction SilentlyContinue).Source
 if (-not $node) { $node = 'C:\Program Files\nodejs\node.exe' }
 $argList = @("`"$bin`"", $Profile)
+if ($Safe) { $argList += '--safe' }   # flag do launcher: precisa vir logo apos o profile, antes das flags do app
 if ($Profile -eq 'web') {
   if ($Port -ne 3080) { $argList += @('--port', $Port) }
   if ($NoOpen) { $argList += '--no-open' }
