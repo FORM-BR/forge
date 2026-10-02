@@ -287,6 +287,21 @@ describe('SubagentHeaderLineage', () => {
     expect(translate).toHaveBeenCalledWith('count.total.one', { count: 1 })
   })
 
+  it('offers the Agent Map link only when the host registers it, and closes the catalog on use', () => {
+    const base = props(catalog())
+    const view = render(<HeaderCatalog {...base} />)
+    hoverCatalog(screen.getByRole('button', { name: /个子智能体/ }))
+    expect(screen.queryByRole('button', { name: zh['map.link'] })).toBeNull()
+
+    view.unmount()
+    const openMap = vi.fn()
+    render(<HeaderCatalog {...base} openMap={openMap} />)
+    hoverCatalog(screen.getByRole('button', { name: /个子智能体/ }))
+    fireEvent.click(screen.getByRole('button', { name: zh['map.link'] }))
+    expect(openMap).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('tree')).toBeNull()
+  })
+
   it('removes the disclosure column from branchless catalog levels', () => {
     render(<HeaderCatalog {...props(catalog({
       entries: catalog().entries.slice(0, 1),
