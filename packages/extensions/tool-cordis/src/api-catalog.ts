@@ -1994,6 +1994,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the accepted title and durable event sequence.',
       },
       {
+        signature: '@Remote(\'refreshTitle\') refreshTitle(request: SessionRefreshTitleRequest, signal: AbortSignal): Promise<SessionRefreshTitleValue>',
+        description: 'Regenerate one Session title after explicitly resuming it.',
+        parameters: [{ name: 'request', description: 'Session identity and whether a user-renamed (pinned) title is left untouched.' }, { name: 'signal', description: 'caller cancellation.' }],
+        returns: 'the accepted title, or why nothing changed.',
+      },
+      {
         signature: '@Remote(\'fork\') fork(request: SessionForkRequest): Promise<SessionForkValue>',
         description: 'Fork one cold-readable exact event prefix into a new Session. An omitted boundary selects the latest completed-turn prefix; an open cut receives synthetic fork closers.',
         parameters: [{ name: 'request', description: 'source Session and optional exact inclusive event boundary.' }],
@@ -6772,6 +6778,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SessionReferenceMentionCandidate',
     declaration: 'export interface SessionReferenceMentionCandidate extends SessionReferenceCandidate {\n    mention: string;\n}',
+  },
+  {
+    name: 'SessionRefreshTitleRequest',
+    declaration: 'export interface SessionRefreshTitleRequest {\n    readonly sessionId: SessionId;\n    /** When true, a Session whose latest title is a user rename (pinned) is left untouched. */\n    readonly skipPinned?: boolean;\n}',
+  },
+  {
+    name: 'SessionRefreshTitleValue',
+    declaration: 'export type SessionRefreshTitleValue = {\n    readonly status: \'refreshed\';\n    readonly title: string;\n    readonly seq: number;\n} | {\n    readonly status: \'skipped-pinned\';\n} | {\n    readonly status: \'no-input\';\n};',
   },
   {
     name: 'SessionRenameRequest',

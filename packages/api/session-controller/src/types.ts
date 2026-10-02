@@ -317,6 +317,19 @@ export interface SessionRenameValue {
   readonly seq: number
 }
 
+/** Session title-regeneration request. */
+export interface SessionRefreshTitleRequest {
+  readonly sessionId: SessionId
+  /** When true, a Session whose latest title is a user rename (pinned) is left untouched. */
+  readonly skipPinned?: boolean
+}
+
+/** Outcome of one title regeneration. */
+export type SessionRefreshTitleValue =
+  | { readonly status: 'refreshed'; readonly title: string; readonly seq: number }
+  | { readonly status: 'skipped-pinned' }
+  | { readonly status: 'no-input' }
+
 /** Session fork request. */
 export interface SessionForkRequest {
   readonly sessionId: SessionId

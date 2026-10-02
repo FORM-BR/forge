@@ -13,7 +13,8 @@ import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply, inject } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { WorkspaceBrowserInjected, WorkspacePickerInjected } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import {
-  type ArchiveSessionInjected, type ForkSessionInjected, menuOpenStateFactory, type PinSessionInjected, workspaceMenuOpenStateFactory,
+  type ArchiveSessionInjected, type ForkSessionInjected, type RetitleSessionInjected, menuOpenStateFactory, type PinSessionInjected,
+  workspaceMenuOpenStateFactory,
   type RenameSessionInjected, type RowToastInjected, type SessionArchiveConfirmInjected, type SessionRenameDialogInjected,
   type WorkspaceStatusInjected, type WorkspaceViewStoreHandle,
 } from '../src/client/contract/slots.ts'
@@ -22,6 +23,7 @@ import { ArchiveSessionMenuItem, ArchiveSessionRowButton, SessionArchiveConfirmD
 import { ForkSessionMenuItem } from '../src/client/session-actions/ForkSession.tsx'
 import { PinSessionMenuItem, PinSessionRowButton } from '../src/client/session-actions/PinSession.tsx'
 import { RenameSessionMenuItem, SessionRenameDialog } from '../src/client/session-actions/RenameSession.tsx'
+import { RetitleSessionMenuItem } from '../src/client/session-actions/RetitleSession.tsx'
 import { RowActionToast } from '../src/client/session-actions/RowActionToast.tsx'
 import { HeroGitChip } from '../src/client/status/HeroGitChip.tsx'
 import { WorkspaceStatusLine } from '../src/client/status/WorkspaceStatusLine.tsx'
@@ -88,6 +90,7 @@ async function bench() {
     operation: (reference: SessionReference) => unknown,
   ) => await operation(retain(target)))
   const fork = vi.fn(async () => 'forked' as never)
+  const refreshTitle = vi.fn(async (_id: string, _opts?: unknown): Promise<{ status: string; title?: string; seq?: number }> => ({ status: 'refreshed', title: 'x', seq: 1 }))
   const pinSession = vi.fn(async () => undefined)
   const unpinSession = vi.fn(async () => undefined)
   // The Host snapshots the injected hooks derive from and a pin's order write
@@ -126,6 +129,7 @@ async function bench() {
     subagentAddress: vi.fn(() => undefined),
     refreshProjections: vi.fn(() => Promise.resolve()),
     fork,
+    refreshTitle,
   } as never)
   const pickDirectory = vi.fn(() => Promise.resolve({ ok: true as const, value: '/projects/picked' }))
   const directoryPicker = { pick: pickDirectory }
@@ -139,7 +143,7 @@ async function bench() {
   ctx.provide('locale', locale)
   return {
     ctx, slots: ctx.get('slots') as SlotRegistry, locale, create, rename,
-    retain, using, selectPanel, search, renameSession, binding, fork, pickDirectory, pinSession, unpinSession,
+    retain, using, selectPanel, search, renameSession, binding, fork, refreshTitle, pickDirectory, pinSession, unpinSession,
     workspacesSubscribe, initializeDefault, gitInfo,
     setWorkspaces: (snapshot: WorkspaceSnapshot): void => { workspaceSnapshot = snapshot },
     setSessions: (snapshot: SessionListState): void => { sessionSnapshot = snapshot },
@@ -224,7 +228,7 @@ describe('ui-workspace apply', () => {
     await Promise.resolve()
     expect(after.slots.entries('conversation.hero.workspace')[0]!.component).toBe(WorkspacePicker)
     // The row actions follow the browser's own declaration, whenever it lands.
-    expect(after.slots.entries(MENU_ITEM)).toHaveLength(4)
+    expect(after.slots.entries(MENU_ITEM)).toHaveLength(5)
     expect(after.slots.entries(ROW_ACTION)).toHaveLength(2)
     expect(after.slots.entries('shell.overlay')).toHaveLength(3)
   })
@@ -300,6 +304,7 @@ describe('ui-workspace apply', () => {
     expect(rows(MENU_ITEM)).toEqual([
       ['pin', 100, PinSessionMenuItem, 'workspace'],
       ['rename', 200, RenameSessionMenuItem, 'workspace'],
+      ['retitle', 250, RetitleSessionMenuItem, 'workspace'],
       ['fork', 300, ForkSessionMenuItem, 'workspace'],
       ['archive', 400, ArchiveSessionMenuItem, 'workspace'],
     ])
@@ -358,6 +363,73 @@ describe('ui-workspace apply', () => {
     expect(pin.hooks.pinned.getSnapshot()).toEqual(new Set(['one', 'two']))
     expect(pin.hooks.pinned.getSnapshot()).not.toBe(pinned)
     expect(archive.hooks.archived.getSnapshot()).toEqual(new Set())
+  })
+
+  it('regenerates one session title without skipPinned, with start, success, empty, and failure notices', async () => {
+    const b = await bench()
+    b.setWorkspaces(workspaceState([workspace('alpha', ['one'])]))
+    b.setSessions(sessionState([summary('one', 1)]))
+    declare(b.slots, 'sidebar.workspaces', 'shell.overlay')
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const retitle = faceOf(entry(b.slots, MENU_ITEM, 'retitle')) as RetitleSessionInjected
+    const toast = faceOf(entry(b.slots, 'shell.overlay', 'workspace.row-toast')) as RowToastInjected
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    onTestFinished(() => { warn.mockRestore() })
+
+    b.refreshTitle.mockResolvedValueOnce({ status: 'refreshed', title: 'Novo titulo', seq: 2 })
+    retitle.retitleSession(sid('one'))
+    expect(toast.hooks.toast.getSnapshot()).toMatchObject({ kind: 'retitleSessionStarted' })
+    await vi.waitFor(() => {
+      expect(toast.hooks.toast.getSnapshot()).toMatchObject({ kind: 'retitleSessionDone', title: 'Novo titulo' })
+    })
+    // The explicit action replaces a hand-set title: no pin policy is sent.
+    expect(b.refreshTitle).toHaveBeenLastCalledWith('one')
+
+    b.refreshTitle.mockResolvedValueOnce({ status: 'no-input' })
+    retitle.retitleSession(sid('one'))
+    await vi.waitFor(() => {
+      expect(toast.hooks.toast.getSnapshot()).toMatchObject({ kind: 'retitleSessionDone', title: '' })
+    })
+
+    b.refreshTitle.mockRejectedValueOnce(new Error('model offline'))
+    retitle.retitleSession(sid('one'))
+    await vi.waitFor(() => {
+      expect(toast.hooks.toast.getSnapshot()).toMatchObject({ kind: 'retitleSessionFailed', reason: 'model offline' })
+    })
+  })
+
+  it('regenerates the titles of a workspace one by one, skipping archived and blank rows, and reports the outcome', async () => {
+    const b = await bench()
+    b.setWorkspaces(workspaceState([workspace('alpha', ['one', 'two', 'three', 'four', 'blank'])], [sid('four')]))
+    b.setSessions(sessionState([
+      summary('one', 5), summary('two', 4), summary('three', 3), summary('four', 2),
+      { ...summary('blank', 1), blank: true },
+    ]))
+    declare(b.slots, 'sidebar.workspaces', 'shell.overlay')
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const browser = faceOf(b.slots.entries('sidebar.workspaces')[0]!) as WorkspaceBrowserInjected
+    const toast = faceOf(entry(b.slots, 'shell.overlay', 'workspace.row-toast')) as RowToastInjected
+    b.refreshTitle.mockResolvedValueOnce({ status: 'refreshed', title: 'a', seq: 1 })
+    b.refreshTitle.mockResolvedValueOnce({ status: 'skipped-pinned' })
+    b.refreshTitle.mockRejectedValueOnce(new Error('model offline'))
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    onTestFinished(() => { warn.mockRestore() })
+
+    browser.retitleWorkspaceSessions('alpha' as never)
+    expect(toast.hooks.toast.getSnapshot()).toMatchObject({ kind: 'retitleStarted', total: 3 })
+    // Single-flight: a second request while one runs is ignored.
+    browser.retitleWorkspaceSessions('alpha' as never)
+    await vi.waitFor(() => {
+      expect(toast.hooks.toast.getSnapshot()).toMatchObject({ kind: 'retitleDone', refreshed: 1, skipped: 1, failed: 1, reason: 'model offline' })
+    })
+    expect(b.refreshTitle.mock.calls).toEqual([
+      ['one', { skipPinned: true }], ['two', { skipPinned: true }], ['three', { skipPinned: true }],
+    ])
+    // The flag clears after a run, and an unknown Workspace is a no-op.
+    browser.retitleWorkspaceSessions('missing' as never)
+    expect(b.refreshTitle).toHaveBeenCalledTimes(3)
+    browser.retitleWorkspaceSessions('alpha' as never)
+    await vi.waitFor(() => { expect(b.refreshTitle).toHaveBeenCalledTimes(6) })
   })
 
   it('pins through the navigation service, which fronts the Session in its group and the flat list of the browser view', async () => {
@@ -657,7 +729,7 @@ describe('ui-workspace apply', () => {
     declare(b.slots, 'sidebar.workspaces', 'conversation.hero.workspace', 'conversation.empty.workspace', 'shell.overlay')
     const fiber = b.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    expect(b.slots.entries(MENU_ITEM)).toHaveLength(4)
+    expect(b.slots.entries(MENU_ITEM)).toHaveLength(5)
     expect(b.slots.entries(ROW_ACTION)).toHaveLength(2)
     expect(b.slots.entries('shell.overlay')).toHaveLength(3)
     await fiber.dispose()

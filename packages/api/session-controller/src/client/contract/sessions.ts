@@ -9,6 +9,7 @@ import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
+import type { SessionRefreshTitleValue } from '../../types.ts'
 import type { AgentContext } from '../scope.ts'
 import type { SessionSearchResultItem } from '../sessions/manager.ts'
 import type { SessionBinding, SessionListState } from '../sessions/service.ts'
@@ -135,6 +136,16 @@ export interface ISessions {
     increaseTitle?: boolean
     onCreated?: (childId: SessionId) => void
   }): Promise<SessionId>
+  /**
+   * Regenerate one Session's title on the Host (the registered title provider,
+   * or the deterministic fallback when none is mounted) without opening its
+   * history. A refreshed title lands in the list row through the title projection.
+   * @param sessionId - Session to retitle.
+   * @param opts - `skipPinned` leaves a user-renamed (pinned) Session untouched.
+   * @returns the refresh outcome.
+   * @throws {Error} when the Host refuses or the title provider fails.
+   */
+  refreshTitle(sessionId: SessionId, opts?: { skipPinned?: boolean }): Promise<SessionRefreshTitleValue>
   /**
    * Borrow an already-retained Agent-scoped Context without extending its lifetime.
    * @param id - session id.

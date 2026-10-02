@@ -430,6 +430,7 @@ describe('workspace browser rows', () => {
   it('workspace row menu opens on the ellipsis, renames, and shows the danger delete row', () => {
     const onRename = vi.fn()
     const onDelete = vi.fn()
+    const onRetitle = vi.fn()
     const onToggle = vi.fn()
     const group: GroupNode = {
       key: 'project', workspaceId: wid('project'), cwd: '/projects/project', createdAt: 0, label: 'Project',
@@ -437,7 +438,7 @@ describe('workspace browser rows', () => {
     }
     render(<ProjectRowItem
       group={group} onToggle={onToggle} onCreate={vi.fn()}
-      actions={{ rename: onRename, delete: onDelete }} t={t}
+      actions={{ rename: onRename, retitle: onRetitle, delete: onDelete }} t={t}
     />)
     fireEvent.click(screen.getByRole('button', { name: '工作区“Project”的操作' }))
     // Opening the menu neither toggles the group nor renames yet.
@@ -445,6 +446,10 @@ describe('workspace browser rows', () => {
     expect(screen.getByRole('menuitem', { name: '删除工作区' }).className).toMatch(/danger/)
     fireEvent.click(screen.getByRole('menuitem', { name: '重命名' }))
     expect(onRename).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('menu')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '工作区“Project”的操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '重新生成会话标题' }))
+    expect(onRetitle).toHaveBeenCalledOnce()
     expect(screen.queryByRole('menu')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '工作区“Project”的操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '删除工作区' }))
@@ -475,7 +480,7 @@ describe('workspace browser rows', () => {
     }
     render(<ProjectRowItem
       group={group} onToggle={vi.fn()} onCreate={vi.fn()}
-      actions={{ rename: vi.fn(), delete: vi.fn() }} renderSlot={renderSlot} t={t}
+      actions={{ rename: vi.fn(), retitle: vi.fn(), delete: vi.fn() }} renderSlot={renderSlot} t={t}
     />)
     const owner = { workspaceId: wid('project'), path: '/projects/project', title: 'Project' }
     expect(screen.getByText('Profile badge')).toBeTruthy()
@@ -484,7 +489,7 @@ describe('workspace browser rows', () => {
     expect(screen.queryByRole('menuitem', { name: 'Profile row' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '工作区“Project”的操作' }))
     // The extra rows follow the shipped Rename and Delete rows.
-    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['重命名', '删除工作区', 'Profile row'])
+    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['重命名', '重新生成会话标题', '删除工作区', 'Profile row'])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Profile row' }))
     expect(onEntry).toHaveBeenCalledWith(owner)
     expect(screen.queryByRole('menu')).toBeNull()

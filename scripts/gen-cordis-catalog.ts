@@ -407,6 +407,8 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   SessionPageRequest: 'session.md',
   SessionPromptRequest: 'session.md',
   SessionPromptValue: 'session.md',
+  SessionRefreshTitleRequest: 'session.md',
+  SessionRefreshTitleValue: 'session.md',
   SessionRenameRequest: 'session.md',
   SessionRenameValue: 'session.md',
   SessionRespondReceipt: 'session.md',

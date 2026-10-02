@@ -45,6 +45,8 @@ import type {
   SessionForkValue,
   SessionPromptRequest,
   SessionPromptValue,
+  SessionRefreshTitleRequest,
+  SessionRefreshTitleValue,
   SessionRenameRequest,
   SessionRenameValue,
   SessionSelectModelRequest,
@@ -206,6 +208,39 @@ export class SessionCommandController {
       throw new RemoteError(
         'gateway/internal',
         `failed to rename session "${request.sessionId}": ${String(error)}`,
+        {},
+      )
+    }
+  }
+
+  /**
+   * Regenerate one Session title through the title service's explicit refresh
+   * (the registered provider, or the fallback when none is mounted). With
+   * `skipPinned`, a user-renamed Session is left untouched.
+   * @param request - Session identity and pin policy.
+   * @param signal - caller cancellation.
+   * @returns the accepted title, or why nothing changed.
+   */
+  async refreshTitle(request: SessionRefreshTitleRequest, signal?: AbortSignal): Promise<SessionRefreshTitleValue> {
+    signal?.throwIfAborted()
+    const agent = await this.resolveAgent(request.sessionId)
+    const titles = this.ctx.get('sessionTitle')
+    if (titles === undefined) {
+      throw new RemoteError('gateway/internal', 'title refresh is unavailable: this deployment mounts no session-title service', {})
+    }
+    if (request.skipPinned === true && titles.get(agent.session)?.source.kind === 'user') {
+      return { status: 'skipped-pinned' }
+    }
+    try {
+      const accepted = await titles.refresh(agent.session, signal)
+      return accepted === undefined
+        ? { status: 'no-input' }
+        : { status: 'refreshed', title: accepted.title, seq: accepted.eventSeq }
+    } catch (error) {
+      if (signal?.aborted === true) throw error
+      throw new RemoteError(
+        'gateway/internal',
+        `failed to refresh the title of session "${request.sessionId}": ${error instanceof Error ? error.message : String(error)}`,
         {},
       )
     }

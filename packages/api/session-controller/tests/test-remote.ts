@@ -54,6 +54,8 @@ import type {
   SessionPageRequest,
   SessionPromptRequest,
   SessionPromptValue,
+  SessionRefreshTitleRequest,
+  SessionRefreshTitleValue,
   SessionRenameRequest,
   SessionRenameValue,
   SessionSearchRequest,
@@ -77,6 +79,7 @@ export interface TestSessionRemote {
   selectModel(request: SessionSelectModelRequest): Promise<RemoteResult<SessionSelectModelValue>>
   modelCatalog(): Promise<RemoteResult<ModelCatalog>>
   rename(request: SessionRenameRequest): Promise<RemoteResult<SessionRenameValue>>
+  refreshTitle(request: SessionRefreshTitleRequest, signal?: AbortSignal): Promise<RemoteResult<SessionRefreshTitleValue>>
   fork(request: SessionForkRequest): Promise<RemoteResult<SessionForkValue>>
   prompt(request: SessionPromptRequest, signal?: AbortSignal): Promise<RemoteResult<SessionPromptValue>>
   attachment(request: SessionAttachmentRequest): Promise<RemoteResult<SessionAttachmentValue>>
@@ -363,6 +366,7 @@ export function createSessionTestRemote(
     selectModel: request => remoteResult(() => direct.selectModel(request)),
     modelCatalog: () => remoteResult(() => direct.modelCatalog()),
     rename: request => remoteResult(() => direct.rename(request)),
+    refreshTitle: (request, signal) => remoteResult(() => direct.refreshTitle(request, signal ?? new AbortController().signal)),
     fork: request => remoteResult(() => direct.fork(request)),
     prompt: (request, signal = new AbortController().signal) => remoteResult(
       () => direct.prompt(request, signal),
