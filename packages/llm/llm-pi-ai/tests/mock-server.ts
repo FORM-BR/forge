@@ -25,10 +25,13 @@ export const textEvents = [
   '[DONE]',
 ]
 
+/** One SSE frame: an optional `event:` name plus the `data:` JSON payload. */
+export type MockSseEvent = string | { event?: string; data: string }
+
 /** Local provider stand-in: replays scripted behaviors per request. */
 export async function mockServer(script: {
   status?: number
-  events?: string[]
+  events?: MockSseEvent[]
   body?: string
   delayMs?: number
   headers?: Record<string, string>
@@ -65,7 +68,11 @@ export async function mockServer(script: {
       const writeNext = (): void => {
         const event = behavior.events?.[index++]
         if (event === undefined) { response.end(); return }
-        response.write(`data: ${event}\n\n`)
+        if (typeof event === 'string') {
+          response.write(`data: ${event}\n\n`)
+        } else {
+          response.write(`${event.event === undefined ? '' : `event: ${event.event}\n`}data: ${event.data}\n\n`)
+        }
         if (behavior.delayMs === undefined) writeNext()
         else setTimeout(writeNext, behavior.delayMs)
       }

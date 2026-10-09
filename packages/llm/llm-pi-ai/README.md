@@ -149,6 +149,7 @@ The adapter is built on immutable snapshots and per-operation resolution. Each o
 | [`src/stream.ts`](src/stream.ts) | pi-ai event conversion into harness `StreamChunk` values |
 | [`src/replay.ts`](src/replay.ts) | Versioned `ReplayEnvelope` storage and validation |
 | [`src/discovery.ts`](src/discovery.ts) | Endpoint interrogation for configuration surfaces |
+| [`src/thinking-binding.ts`](src/thinking-binding.ts) | Anthropic drop-block binding for replayed signed thinking blocks |
 
 ### Registration and directory
 
@@ -157,6 +158,8 @@ The plugin declares every installed catalog provider it can authenticate in the 
 ### Replay and vocabulary
 
 Successful assistant responses store a versioned, lossless-JSON replay state beside the provider and model that produced them — response-level facts plus one per-block entry per streamed block. At request time, `LlmRuntime` passes replay state only when the same adapter instance owns both routes; the adapter validates it and restores native response ids, provider signatures, and optional `providerThinkingLevel` effort metadata, keeping absent effort metadata absent. Replay validates the requested model identity against the assistant source and separately restores an Anthropic response model when the provider resolved an alias or fallback. Absent or unusable replay state degrades to provider-neutral content while preserving the assistant source’s required provider and model. pi-ai tool-call arguments are parsed objects, so the adapter parses input and re-stringifies output to the harness raw-JSON convention; pi-ai in-stream error events map to terminal `finish` chunks.
+
+For first-party Anthropic routes (catalog provider `anthropic` with the `anthropic-messages` protocol), the adapter also declares `thinking.block_binding.prefix_mismatch_behavior: "drop_block"` and sends the `anthropic-beta: thinking-binding-controls-2026-08-01` header, so a replayed signed thinking block whose request prefix changed — history compaction, rewritten tool results, re-linked history — is dropped by the API instead of rejected with `Invalid signature in thinking block`. Hidden reasoning models that think by engine default without an explicit effort receive a synthesized `{ type: "adaptive", display: "summarized", block_binding }` so the binding applies there too. See [`src/thinking-binding.ts`](src/thinking-binding.ts).
 
 </details>
 
