@@ -61,6 +61,7 @@ import type { ResolvedPiAiProviderProfile } from './config.ts'
 import { toPiContext } from './context.ts'
 import { createModels, getSupportedThinkingLevels } from './models.ts'
 import { toStreamChunks } from './stream.ts'
+import { dropStaleThinkingBlocks } from './thinking-binding.ts'
 
 /** One resolution's frozen view: the profiles and the collection built from them. */
 interface PiAiSnapshot {
@@ -392,6 +393,13 @@ export class PiAiAdapter extends LlmAdapter {
         // Profile headers are deployment-owned; attribution names are
         // Harness-owned and therefore win collisions.
         headers: requestHeaders(profile.headers),
+        // First-party Anthropic models replay signed thinking blocks on every
+        // turn. pi-ai only asks the API to tolerate prefix drift for models
+        // declaring `supportsMidConvoEffort`; bind the rest so a stale block
+        // is dropped instead of 400ing the request.
+        ...(model.api === 'anthropic-messages' && model.provider === 'anthropic'
+          ? { onPayload: (params: unknown) => dropStaleThinkingBlocks(params, model.reasoning === true) }
+          : {}),
       })
       const iterator = toStreamChunks(events, model.contextWindow, options.signal, model.id)[Symbol.asyncIterator]()
       let exhausted = false
