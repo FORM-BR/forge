@@ -229,6 +229,14 @@ export interface InputActions {
    * @returns false when the draft changed or submission locked the editor.
    */
   insertText(text: string, span: TokenSpan): boolean
+  /**
+   * Append one quote card (excerpt + reply) above the draft text without
+   * sending. The sent message carries the blockquote form of the excerpt.
+   * @param quote - the transcript excerpt (multi-line allowed).
+   * @param answer - the reply text; empty renders a quote-only card.
+   * @returns false when submission locked the editor.
+   */
+  insertQuoteCard(quote: string, answer: string): boolean
   /** Replace the whole draft (persisted-draft seed and programmatic writes). */
   setDraft(text: string): void
   /** Append ordered browser-owned attachment ids; busy admission phases refuse. */

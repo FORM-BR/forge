@@ -38,6 +38,73 @@ function contentParts(content: readonly unknown[]): {
   return { text: texts.join(''), attachments, rest }
 }
 
+/** A `>`-prefixed line (CommonMark loose: up to 3 leading spaces, optional space after `>`). */
+const QUOTE_LINE_RE = /^ {0,3}> ?(.*)$/
+
+export interface BubbleSegment {
+  readonly kind: 'quote' | 'plain'
+  readonly text: string
+}
+
+/**
+ * Partition user-bubble text into alternating quote blocks (consecutive
+ * `>`-prefixed lines, the shape the reply-quote card clipboard projects) and
+ * plain runs. Returns `undefined` when the text carries no quote line at all,
+ * so messages without a citation keep the exact previous rendering path.
+ */
+export function splitQuoteBlocks(text: string): BubbleSegment[] | undefined {
+  let segments: BubbleSegment[] | undefined
+  let last: BubbleSegment | undefined
+  let hasQuote = false
+  for (const line of text.split('\n')) {
+    const match = QUOTE_LINE_RE.exec(line)
+    const isQuote = match !== null
+    const content = match !== null ? match[1] ?? '' : line
+    if (isQuote) hasQuote = true
+    if (segments === undefined) segments = []
+    if (last !== undefined && last.kind === (isQuote ? 'quote' : 'plain')) {
+      last = { kind: last.kind, text: `${last.text}\n${content}` }
+      segments[segments.length - 1] = last
+    }
+    else {
+      last = { kind: isQuote ? 'quote' : 'plain', text: content }
+      segments.push(last)
+    }
+  }
+  return hasQuote ? segments : undefined
+}
+
+/**
+ * Project user-bubble text as citation blocks plus plain runs: `>`-prefixed
+ * segments render inside a styled blockquote (the sent-form of the
+ * reply-quote card), everything else keeps the existing ref/slash-chip
+ * projection. Returns `null` when no quote block exists.
+ */
+export function projectUserBubbleText(
+  text: string,
+  referenceLabels: readonly string[],
+  skillNames: readonly string[],
+  references: Pick<ChatNodeOwnerProps, 'openFile' | 'openSkill'> | undefined,
+): ReactNode {
+  const segments = splitQuoteBlocks(text)
+  if (segments === undefined) return null
+  return (
+    <Fragment>
+      {segments.map((segment, index) => segment.kind === 'quote'
+        ? (
+          <blockquote key={`quote:${index}`} className={css.quoteBlock} data-quote-block>
+            {projectUserText(segment.text, referenceLabels, skillNames, 'skill', references)}
+          </blockquote>
+        )
+        : (
+          <Fragment key={`plain:${index}`}>
+            {projectUserText(segment.text, referenceLabels, skillNames, 'skill', references)}
+          </Fragment>
+        ))}
+    </Fragment>
+  )
+}
+
 function retrySeconds(milliseconds: number): number {
   return Math.max(1, Math.ceil(milliseconds / 1_000))
 }
@@ -219,7 +286,7 @@ function UserStyleBubble({
           </div>
         )}
         {showBubble && <div className={css.bubble}>
-          {projectUserText(text, referenceLabels, skillNames, 'skill', references)}
+          {projectUserBubbleText(text, referenceLabels, skillNames, references) ?? projectUserText(text, referenceLabels, skillNames, 'skill', references)}
           {rest.map((block, i) => <JsonBlock key={i} label={t('message.extraBlock')} payload={block} truncatedLabel={truncated} />)}
         </div>}
         {referenceLabels.length > 0 && (

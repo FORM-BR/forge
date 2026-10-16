@@ -22,6 +22,7 @@ import { RunningStatus } from './RunningStatus.tsx'
 import { mergeTurnRailItems } from './turn-rail-items.ts'
 import { useChatScroll } from './use-chat-scroll.ts'
 import { fileMediaUrl, resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path'
+import { QuoteReply } from './QuoteReply.tsx'
 import css from './ChatView.module.css'
 
 /** Host/OS refusal text for the file-open dialog; empty throws keep a locale fallback. */
@@ -100,6 +101,7 @@ const ChatNodeList = memo(function ChatNodeList({ entries, useChatGroup, pending
  */
 export function ChatView({
   useSession, useChat, useChatNode, useChatNodeProcess, useChatGroup, useConversation, useSessions, useStore, actions, renderSlot,
+  inputActions,
   sessionId, openFile, openSkill, openExternalLink, loadOlder, loadThrough, loadImage, inspectCall, chatScroll, forkAt, fileMentions,
   usePresentation, useProjection, t,
 }: ChatViewSlotProps) {
@@ -175,6 +177,13 @@ export function ChatView({
     setFileOpenError(null)
     setFileOpenBusy(false)
   }, [])
+
+  // Quote-reply insertion: append the excerpt + answer as a composer quote
+  // card, without sending. The card stacks above the draft text; the sent
+  // message carries the blockquote form of the excerpt.
+  const handleQuoteReply = useCallback((quote: string, answer: string) => {
+    inputActions.insertQuoteCard(quote, answer)
+  }, [inputActions])
 
   const inboxSteering = useMemo(
     () => inbox?.['next-step'].filter(message => message.source.kind === 'user') ?? [],
@@ -305,6 +314,7 @@ export function ChatView({
           t={t}
         />
       )}
+      <QuoteReply t={t} onQuote={handleQuoteReply} />
     </div>
   )
 }

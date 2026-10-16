@@ -129,6 +129,7 @@ const kit: Omit<QuestionComposerProps, 'matched'> = {
   inputActions: {
     captureInsertion: () => ({ start: 0, end: 0, draftRev: 0 }),
     insertText: () => false,
+    insertQuoteCard: () => true,
     setDraft: () => { throw new Error('unused') },
     addAttachments: () => { throw new Error('unused') },
     removeAttachment: () => { throw new Error('unused') },

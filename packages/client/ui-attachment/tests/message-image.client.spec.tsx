@@ -329,6 +329,7 @@ describe('ImageGallery', () => {
       inputActions: {
         captureInsertion: () => ({ start: 0, end: 0, draftRev: 0 }),
         insertText: () => false,
+        insertQuoteCard: () => true,
         setDraft: vi.fn(),
         addAttachments: vi.fn(() => true),
         removeAttachment: vi.fn(),

@@ -98,6 +98,7 @@ function props(
     inputActions: {
       captureInsertion: unused,
       insertText: unused,
+      insertQuoteCard: unused,
       setDraft: unused,
       addAttachments: unused,
       removeAttachment: unused,
