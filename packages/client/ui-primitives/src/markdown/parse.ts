@@ -17,6 +17,7 @@ import { gfm } from 'micromark-extension-gfm'
 import { math } from 'micromark-extension-math'
 import { cjkFriendlyStrong } from './cjkFriendlyStrong.ts'
 import { mathCompatibility } from './mathCompatibility.ts'
+import { proseDollarGuard } from './proseDollarGuard.ts'
 
 /**
  * Parse GFM markdown (the streaming arm's grammar: no math, so incomplete
@@ -32,14 +33,17 @@ export function parseGfm(text: string): Root {
 }
 
 /**
- * Parse GFM markdown plus TeX math with the compatibility delimiters
- * (the settled arm's grammar).
+ * Parse GFM markdown plus TeX math with the compatibility delimiters and the
+ * prose-dollar guard, which keeps `R$ 1.435` from opening text math (the
+ * settled arm's grammar). The guard is registered last on purpose: combined
+ * text constructs are tried in reverse registration order, so the last one
+ * registered runs first.
  * @param text - Markdown source.
  * @returns The mdast root.
  */
 export function parseGfmWithMath(text: string): Root {
   return recoverLocalImages(fromMarkdown(text, {
-    extensions: [gfm(), cjkFriendlyStrong(), mathCompatibility(), math()],
+    extensions: [gfm(), cjkFriendlyStrong(), mathCompatibility(), math(), proseDollarGuard()],
     mdastExtensions: [gfmFromMarkdown(), mathFromMarkdown()],
   }), text)
 }

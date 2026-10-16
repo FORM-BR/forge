@@ -5,6 +5,7 @@ import { JsonBlock, MarkdownText } from './markdown-test-components.tsx'
 import { LinkIconMedium, MarkdownDelegateProvider } from '../src/index.ts'
 import { cjkFriendlyStrong } from '../src/markdown/cjkFriendlyStrong.ts'
 import { mathCompatibility } from '../src/markdown/mathCompatibility.ts'
+import { proseDollarGuard } from '../src/markdown/proseDollarGuard.ts'
 
 afterEach(cleanup)
 
@@ -563,6 +564,48 @@ describe('MarkdownText', () => {
     expect(live.container.querySelectorAll('.katex')).toHaveLength(1)
     expect(live.container.querySelectorAll('.katex-display')).toHaveLength(1)
     expect(live.container.querySelector('.katex-error')).toBeNull()
+  })
+
+  it('keeps prose currency dollars literal instead of opening text math', () => {
+    const source = 'A venda foi R$ 1.435.762 mas as **compras lançadas** somam só R$ 238 mil.'
+    const { container } = render(<MarkdownText text={source} />)
+
+    expect(container.querySelector('.katex')).toBeNull()
+    expect(container.querySelector('.katex-error')).toBeNull()
+    expect(container.textContent).toBe(
+      'A venda foi R$ 1.435.762 mas as compras lançadas somam só R$ 238 mil.',
+    )
+    expect(container.querySelector('strong')?.textContent).toBe('compras lançadas')
+  })
+
+  it('leaves a lone spaced dollar to prose as well', () => {
+    const { container } = render(<MarkdownText text="custa $ 5 e outro $ 8" />)
+
+    expect(container.querySelector('.katex')).toBeNull()
+    expect(container.textContent).toBe('custa $ 5 e outro $ 8')
+  })
+
+  it('still renders dollar math when neither a word nor a space abuts the delimiters', () => {
+    const { container } = render(<MarkdownText text="TeX $E = mc^2$ e moeda R$ 10 e R$ 20." />)
+
+    expect(container.querySelectorAll('.katex')).toHaveLength(1)
+    expect(container.querySelector('annotation')?.textContent).toContain('E = mc^2')
+    expect(container.textContent).toContain('R$ 10 e R$ 20.')
+  })
+
+  it('leaves currency inside a fenced code block alone', () => {
+    const source = ['```', 'R$ 1.435.762 e R$ 238', '```'].join('\n')
+    const { container } = render(<MarkdownText text={source} />)
+
+    expect(container.querySelector('.katex')).toBeNull()
+    expect(container.querySelector('pre code')?.textContent).toContain('R$ 1.435.762 e R$ 238')
+  })
+
+  it('exposes the prose dollar guard as a micromark extension', () => {
+    const extension = proseDollarGuard()
+
+    expect(Object.keys(extension)).toEqual(['text'])
+    expect(proseDollarGuard()).toBe(extension)
   })
 })
 
