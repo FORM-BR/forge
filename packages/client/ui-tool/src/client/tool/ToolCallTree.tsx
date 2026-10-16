@@ -11,6 +11,28 @@ function toolCallPhase(block: ToolCallBlock): ToolCallPhaseProps {
   return block.phase === 'preparing' ? { phase: 'preparing', block } : { phase: 'start', block }
 }
 
+/** Cua Driver computer-use tools: any tool whose name lands in this MCP namespace. */
+const CUA_PREFIX = 'mcp__cua-driver-mcp__'
+function isCuaDriver(toolName: string): boolean {
+  return toolName.startsWith(CUA_PREFIX)
+}
+
+/**
+ * Capture scope of a Cua Driver call, as a hook for the frame's CSS variants:
+ * whole-screen shots vs single-window/action captures. Every fallback call
+ * still gets the teal frame; the scope only tunes it later if we want to
+ * distinguish "agent owns the whole desktop" from "agent is in one window".
+ */
+function cuaScope(toolName: string): string {
+  if (toolName.endsWith('get_desktop_state')) return 'desktop'
+  if (
+    toolName.endsWith('get_window_state') ||
+    toolName.endsWith('get_browser_state') ||
+    toolName.endsWith('get_screen_size')
+  ) return 'window'
+  return 'action'
+}
+
 /** Resolve a Tool call's wire name from its current stage. */
 function callName(call: ToolCallPhaseProps): string {
   return call.phase === 'result' ? call.block.call?.name ?? '' : call.block.name
@@ -46,11 +68,13 @@ const ToolCall = memo(function ToolCall({
     () => call.phase === 'result' && toolRowModel(toolName, call.block).autoReviewDenial !== null,
     [toolName, call],
   )
+  const cua = isCuaDriver(toolName)
   return (
     <div
-      className={css.callRow}
+      className={cua ? `${css.callRow} ${css.cuaFrame}` : css.callRow}
       data-chat-anchor-key={`call:${callId}`}
       data-chat-call-id={callId}
+      data-cua-scope={cua ? cuaScope(toolName) : undefined}
     >
       {autoReviewDenied
         ? <GenericToolCard {...owner} t={t} />

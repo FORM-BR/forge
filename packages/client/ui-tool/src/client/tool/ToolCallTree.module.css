@@ -2,6 +2,46 @@
   border-radius: var(--dsw-radius-sm);
 }
 
+/* Cua Driver "computer use" cue: an internal (inset) teal gradient border on
+   the tool-call card whenever the agent is looking at a machine screen.
+   `::before` draws a 2px gradient ring confined to the padding band by a
+   content-box mask (mask-composite: exclude), so the ring sits on the card's
+   inner edge; the inset box-shadow adds a soft teal glow into the card
+   face. `pointer-events: none` keeps every click on the row itself. */
+.cuaFrame {
+  position: relative;
+}
+
+.cuaFrame::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: linear-gradient(
+    135deg,
+    rgba(45, 212, 191, 0.9) 0%,
+    rgba(20, 184, 166, 0.45) 32%,
+    rgba(13, 148, 136, 0.9) 68%,
+    rgba(45, 212, 191, 0.55) 100%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  box-shadow: inset 0 0 12px rgba(20, 184, 166, 0.35);
+}
+
+/* Future distinction: whole-desktop capture vs a single window/action. */
+.cuaFrame[data-cua-scope='desktop']::before {
+  box-shadow: inset 0 0 16px rgba(20, 184, 166, 0.45);
+}
+
+.cuaFrame[data-cua-scope='window']::before {
+  box-shadow: inset 0 0 10px rgba(45, 212, 191, 0.35);
+}
+
 .subCalls {
   display: flex;
   flex-direction: column;
