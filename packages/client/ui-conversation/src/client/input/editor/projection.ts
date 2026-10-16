@@ -12,6 +12,7 @@ import {
   $getRoot, $getSelection, $isElementNode, $isLineBreakNode, $isRangeSelection, $isTextNode,
 } from 'lexical'
 import type { Occurrence } from '../../contract/draft-editor.ts'
+import { $isQuoteCardNode } from './quote-card-node.tsx'
 import { $isReferenceChipNode } from './chip-node.tsx'
 
 /** The detect-projection stand-in for one chip (object replacement character). */
@@ -19,8 +20,8 @@ export const ATOMIC_CHAR = '￼'
 
 /** One leaf (or gap) of the composer document in projection coordinates. */
 export interface ComposerSegment {
-  /** text/linebreak carry a node; chip is atomic; gap is the newline between block elements. */
-  readonly kind: 'text' | 'chip' | 'linebreak' | 'gap'
+  /** text/linebreak carry a node; chip and quote-card are atomic; gap is the newline between block elements. */
+  readonly kind: 'text' | 'chip' | 'linebreak' | 'quote-card' | 'gap'
   /** The backing node; null only for gap. */
   readonly node: LexicalNode | null
   readonly detectStart: number
@@ -59,7 +60,7 @@ export function $composerLayout(): ComposerLayout {
   let detect = ''
   let clipboard = ''
 
-  const pushLeaf = (kind: 'text' | 'chip' | 'linebreak', node: LexicalNode, detectPiece: string, clipboardPiece: string): void => {
+  const pushLeaf = (kind: 'text' | 'chip' | 'linebreak' | 'quote-card', node: LexicalNode, detectPiece: string, clipboardPiece: string): void => {
     const segment: ComposerSegment = {
       kind,
       node,
@@ -103,17 +104,26 @@ export function $composerLayout(): ComposerLayout {
   blocks.forEach((block, index) => {
     const previous = blocks[index - 1]
     if (index > 0 && previous !== undefined) {
+      // A quote card is a visual block: its seam in the clipboard projection
+      // must be a blank line, or a following `>` would read as part of the
+      // previous paragraph in CommonMark. The detect seam stays one newline,
+      // so TokenSpan coordinates are unaffected by the seam widening.
+      const seam = $isQuoteCardNode(previous) || $isQuoteCardNode(block)
       segments.push({
         kind: 'gap',
         node: null,
         detectStart: detect.length,
         detectLength: 1,
         clipboardStart: clipboard.length,
-        clipboardLength: 1,
+        clipboardLength: seam ? 2 : 1,
         gapBetween: { before: previous.getKey(), after: block.getKey() },
       })
       detect += '\n'
-      clipboard += '\n'
+      clipboard += seam ? '\n\n' : '\n'
+    }
+    if ($isQuoteCardNode(block)) {
+      pushLeaf('quote-card', block, ATOMIC_CHAR, block.getTextContent())
+      return
     }
     if ($isElementNode(block)) walkElement(block)
   })
@@ -144,7 +154,7 @@ export function detectOffsetOfClipboardOffset(layout: ComposerLayout, clipboardO
     const end = segment.clipboardStart + segment.clipboardLength
     if (clipboardOffset > end) continue
     if (clipboardOffset === end) return segment.detectStart + segment.detectLength
-    if (segment.kind === 'chip') return segment.detectStart + segment.detectLength
+    if (segment.kind === 'chip' || segment.kind === 'quote-card') return segment.detectStart + segment.detectLength
     return segment.detectStart + (clipboardOffset - segment.clipboardStart)
   }
   return layout.detectLength

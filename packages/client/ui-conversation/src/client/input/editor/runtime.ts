@@ -12,6 +12,7 @@ import { mergeRegister } from '@lexical/utils'
 import type { Occurrence, ReferenceInsert } from '../../contract/draft-editor.ts'
 import { registerReferenceActivation } from './reference-activation.ts'
 import { ReferenceChipNode, $createReferenceChipNode } from './chip-node.tsx'
+import { QuoteCardNode, $createQuoteCardNode, $isQuoteCardNode, registerQuoteCardDismiss } from './quote-card-node.tsx'
 import { refreshClaimDecoration, registerClaimDecoration } from './claim-decor.ts'
 import { registerTextRefDecoration, rescanTextRefs, TextRefNode } from './text-ref.ts'
 import type { EditorProjection } from './projection.ts'
@@ -56,7 +57,7 @@ export class DraftEditorRuntime {
   constructor(private readonly deps: DraftEditorRuntimeDeps) {
     this.editor = createEditor({
       namespace: 'dsh-composer',
-      nodes: [ReferenceChipNode, TextRefNode],
+      nodes: [ReferenceChipNode, TextRefNode, QuoteCardNode],
       onError: (error) => { throw error },
     })
   }
@@ -87,6 +88,7 @@ export class DraftEditorRuntime {
         this.deps.openReference(source, reference)),
       registerHistory(this.editor, createEmptyHistoryState(), HISTORY_MERGE_DELAY_MS),
       this.editor.registerUpdateListener(() => { this.deps.onUpdate() }),
+      registerQuoteCardDismiss(this.editor),
       registerClaimDecoration(this.editor, () => this.deps.activeClaimToken()),
       registerTextRefDecoration(this.editor, () => this.deps.lexicon(), () => this.deps.activeClaimToken()),
       () => { this.lexiconOff?.() },
@@ -338,6 +340,45 @@ export class DraftEditorRuntime {
       appendText(draft.slice(cursor))
       root.selectEnd()
     }, { discrete: true, tag: HISTORY_MERGE_TAG })
+  }
+
+  /**
+   * Append one quote card (excerpt + reply) above the draft text without
+   * sending. Cards stack bottom-up in insertion order, above any typed
+   * content — the sent model form is the card's clipboard projection
+   * (`> …` blockquote + answer). One undo step, like a paste.
+   * @param quote - the transcript excerpt (multi-line allowed).
+   * @param answer - the reply text; empty renders a quote-only card.
+   * @returns true (false is a facade-level concern, phase/disposal guarded there).
+   */
+  insertQuoteCard(quote: string, answer: string): boolean {
+    const cleanQuote = quote.replace(REFERENCE_PLACEHOLDER_RE, '')
+    const cleanAnswer = answer.trim().replace(REFERENCE_PLACEHOLDER_RE, '')
+    this.applyEdit(() => {
+      const root = $getRoot()
+      const blocks = root.getChildren()
+      // Card zone: insert after the last existing card (keeps cards grouped
+      // above the draft text, in insertion order; pure text stays below).
+      let at = 0
+      blocks.forEach((block, index) => {
+        if ($isQuoteCardNode(block)) at = index + 1
+      })
+      const anchor = blocks[at]
+      const card = $createQuoteCardNode(cleanQuote, cleanAnswer)
+      if (anchor === undefined) root.append(card)
+      else anchor.insertBefore(card)
+      // A block decorator cannot hold the caret. When nothing typeable
+      // follows the card zone (empty root, or cards at the very end), append
+      // an empty paragraph and land the selection there — otherwise the user
+      // could never type plain text alongside the mentions.
+      const tail = root.getLastChild()
+      if (tail === null || $isQuoteCardNode(tail)) {
+        const paragraph = $createParagraphNode()
+        root.append(paragraph)
+        paragraph.select()
+      }
+    }, PASTE_TAG)
+    return true
   }
 
   /** Cut the editor's undo history after a committed clear or restoration. */

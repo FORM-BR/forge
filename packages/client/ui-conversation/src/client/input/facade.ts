@@ -127,6 +127,10 @@ export class SessionInputShell implements SessionInput {
       if (span.draftRev !== this.rev) return false
       return this.draftEditor.insertAsyncText(span, text)
     },
+    insertQuoteCard: (quote, answer) => {
+      if (this.snapshot.phase === 'adjudicating' || this.snapshot.phase === 'submitting' || this.disposed) return false
+      return this.draftEditor.insertQuoteCard(quote, answer)
+    },
     setDraft: (text) => { this.setDraft(text) },
     addAttachments: ids => this.addAttachments(ids),
     removeAttachment: (id) => { this.removeAttachment(id) },

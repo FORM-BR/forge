@@ -44,6 +44,20 @@
   font-size: var(--dsh-content-font-size-secondary, 13px);
   line-height: calc(18px + var(--dsh-content-font-delta-secondary, 0px));
 }
+/* Sent-form of a reply-quote card: the quoted excerpt renders as a bordered
+   citation block (like the composer card / Claude Code mention) instead of a
+   literal `> ...` run. Resets blockquote UA margins; the bubble owns
+   wrapping, so the block keeps pre-wrap like its siblings. */
+.quoteBlock {
+  margin: 0;
+  border-left: 3px solid var(--dsw-alias-state-business-primary);
+  background: var(--dsw-alias-bg-module-platform);
+  border-radius: 0 var(--dsw-radius-sm) var(--dsw-radius-sm) 0;
+  padding: 4px 12px;
+  color: var(--dsw-alias-label-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 .contextRow {
   padding: 2px 0;
 }

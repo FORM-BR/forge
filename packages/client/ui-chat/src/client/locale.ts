@@ -194,6 +194,10 @@ export const zh = {
   'json.truncated': '… 已截断，共 {total} 字符',
   'clock.md': '{m}月{d}日',
   'clock.ymd': '{y}年{m}月{d}日',
+  'quoteReply.action': '回复',
+  'quoteReply.placeholder': '写下你的回复…',
+  'quoteReply.hint': '回车添加到提示词，不发送',
+  'quoteReply.confirm': '添加到提示词',
 } satisfies Record<string, string>
 
 /** Chat dictionary key union. */
@@ -390,4 +394,8 @@ export const en = {
   'json.truncated': '… truncated, {total} characters total',
   'clock.md': '{m}/{d}',
   'clock.ymd': '{y}-{m}-{d}',
+  'quoteReply.action': 'Reply',
+  'quoteReply.placeholder': 'Write your reply…',
+  'quoteReply.hint': 'Enter adds it to the prompt without sending',
+  'quoteReply.confirm': 'Add to prompt',
 } satisfies Record<ChatKey, string>
