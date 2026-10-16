@@ -8,7 +8,10 @@
 import { Context } from '@deepseek-ai/cordis'
 import { createHeadlessEditor } from '@lexical/headless'
 import type { LexicalEditor, NodeKey } from 'lexical'
-import { $createParagraphNode, $createTextNode, $getRoot, UNDO_COMMAND } from 'lexical'
+import {
+  $createParagraphNode, $createTextNode, $getRoot, $getSelection, $isParagraphNode, $isRangeSelection,
+  UNDO_COMMAND,
+} from 'lexical'
 import { describe, expect, it, vi } from 'vitest'
 import { SessionInputShell } from '../src/client/input/facade.ts'
 import { ReferenceChipNode } from '../src/client/input/editor/chip-node.tsx'
@@ -258,5 +261,60 @@ describe('insertQuoteCard via the session shell', () => {
     const input = shell()
     input.dispose()
     expect(input.actions.insertQuoteCard('trecho', 'r')).toBe(false)
+  })
+
+  it('leaves a typeable paragraph after the card in an empty composer', () => {
+    // A never-focused composer has an empty root; a block decorator cannot
+    // hold the caret, so without a trailing paragraph the user could never
+    // type plain text beyond the mentions (the regression this guards).
+    const input = shell()
+    try {
+      expect(input.actions.insertQuoteCard('trecho', 'r')).toBe(true)
+      const [blocks, caret, lastKey] = input.editor.getEditorState().read(() => {
+        const root = $getRoot()
+        const kids = root.getChildren()
+        const selection = $getSelection()
+        return [
+          kids.map(child => ({ card: $isQuoteCardNode(child), paragraph: $isParagraphNode(child) })),
+          $isRangeSelection(selection)
+            ? { key: selection.anchor.key, offset: selection.anchor.offset }
+            : null,
+          root.getLastChild()?.getKey() ?? null,
+        ] as const
+      })
+      expect(blocks).toEqual([
+        { card: true, paragraph: false },
+        { card: false, paragraph: true },
+      ])
+      // The caret landed inside the trailing paragraph, not on the card.
+      expect(caret).toEqual({ key: lastKey, offset: 0 })
+      expect(lastKey).not.toBeNull()
+      // Plain typing at that caret flows after the card, producing the
+      // blockquote + reply + typed text projection; the submit trims the
+      // empty trailing paragraph away (draft.trim() in the sink path).
+      input.editor.update(() => {
+        const selection = $getSelection()
+        if ($isRangeSelection(selection)) selection.insertText('oi')
+      }, { discrete: true })
+      expect(input.state.getSnapshot().draft).toBe('> trecho\n\nr\n\noi')
+    } finally { input.dispose() }
+  })
+
+  it('does not duplicate the trailing paragraph while cards accumulate', () => {
+    const input = shell()
+    try {
+      input.actions.insertQuoteCard('a', 'r1')
+      input.actions.insertQuoteCard('b', 'r2')
+      const [cards, paragraphs] = input.editor.getEditorState().read(() => {
+        const kids = $getRoot().getChildren()
+        return [
+          kids.filter($isQuoteCardNode).length,
+          kids.filter($isParagraphNode).length,
+        ] as const
+      })
+      expect(cards).toBe(2)
+      expect(paragraphs).toBe(1)
+      expect(input.state.getSnapshot().draft).toBe('> a\n\nr1\n\n> b\n\nr2\n\n')
+    } finally { input.dispose() }
   })
 })

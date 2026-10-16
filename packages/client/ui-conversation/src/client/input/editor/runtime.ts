@@ -367,6 +367,16 @@ export class DraftEditorRuntime {
       const card = $createQuoteCardNode(cleanQuote, cleanAnswer)
       if (anchor === undefined) root.append(card)
       else anchor.insertBefore(card)
+      // A block decorator cannot hold the caret. When nothing typeable
+      // follows the card zone (empty root, or cards at the very end), append
+      // an empty paragraph and land the selection there — otherwise the user
+      // could never type plain text alongside the mentions.
+      const tail = root.getLastChild()
+      if (tail === null || $isQuoteCardNode(tail)) {
+        const paragraph = $createParagraphNode()
+        root.append(paragraph)
+        paragraph.select()
+      }
     }, PASTE_TAG)
     return true
   }
