@@ -77,6 +77,12 @@ export function ModelSelect(
   const [menuPos, setMenuPos] = useState<CSSProperties | null>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
   const id = useId()
+  // Provider-group disclosure: collapsing UNMOUNTS a group's rows rather than
+  // hiding them, because the keyboard walk is built from the mounted rows in
+  // itemRefs — a hidden-but-mounted row would stay reachable. The choice lives
+  // on the seat, not on the portaled card: the card unmounts on close, the
+  // seat does not, so a folded group stays folded when the menu reopens.
+  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<string>>(() => new Set())
 
   const groups = useMemo(() => state.groups.toSorted((left, right) =>
     (left.id === 'deepseek-account' ? 0 : left.id === 'deepseek-official' ? 1 : 2)
@@ -191,7 +197,7 @@ export function ModelSelect(
       window.removeEventListener('scroll', place, true)
       window.removeEventListener('resize', place)
     }
-  }, [open, pane, state])
+  }, [open, pane, state, collapsedGroups])
   /* jscpd:ignore-end */
 
   if (!available) return null
@@ -213,6 +219,16 @@ export function ModelSelect(
   const drill = (next: Pane): void => {
     paneFocus.current = 'drill'
     setPane(next)
+  }
+
+  /** Fold or unfold one provider group's rows. */
+  const toggleGroup = (groupId: string): void => {
+    setCollapsedGroups((previous) => {
+      const next = new Set(previous)
+      if (next.has(groupId)) next.delete(groupId)
+      else next.add(groupId)
+      return next
+    })
   }
 
   /** Leave a drilled pane for the root one, handing the keyboard back to its cell. */
@@ -437,10 +453,24 @@ export function ModelSelect(
               <div className={clsx(css.groups, 'scrollable')}>
                 {groups.map((group) => {
                   const headingId = `${id}-${group.id}`
+                  const folded = collapsedGroups.has(group.id)
                   return (
                     <section role="group" aria-labelledby={headingId} className={css.group} key={group.id}>
-                      <div className={css.groupTitle} id={headingId}>{group.id === 'deepseek-account' ? t('provider.account') : group.name}</div>
-                      {group.models.map((model) => {
+                      <button
+                        type="button"
+                        className={css.groupTitle}
+                        id={headingId}
+                        aria-expanded={!folded}
+                        onClick={() => { toggleGroup(group.id) }}
+                      >
+                        <IconChevronRightOutlineRegular
+                          className={clsx(css.groupChevron, !folded && css.groupChevronOpen)}
+                        />
+                        <span className={css.groupName}>
+                          {group.id === 'deepseek-account' ? t('provider.account') : group.name}
+                        </span>
+                      </button>
+                      {!folded && group.models.map((model) => {
                         const selected = state.current?.provider === group.id && state.current.model === model.id
                         return (
                           <button

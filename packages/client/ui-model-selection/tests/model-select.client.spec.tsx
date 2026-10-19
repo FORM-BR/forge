@@ -598,3 +598,84 @@ it('restores the account model name after login without changing the saved route
   expect(screen.getByRole('button', { name: /选择模型，当前/ }).textContent).toBe('DeepSeek FlashHigh')
   expect(directory.getSnapshot().current).toEqual(selected)
 })
+
+describe('ModelSelect provider group disclosure', () => {
+  function mountGroups() {
+    const directory = createSnapshotStore<ModelDirectoryState>(state({
+      current: { provider: 'alpha', model: 'alpha-small' },
+      groups: [
+        {
+          id: 'alpha',
+          name: 'Alpha',
+          models: [
+            { id: 'alpha-small', name: 'Alpha Small' },
+            { id: 'alpha-large', name: 'Alpha Large' },
+          ],
+        },
+        { id: 'beta', name: 'Beta', models: [{ id: 'beta-one', name: 'Beta One' }] },
+      ],
+    }))
+    render(<ModelSelect
+      locked={false}
+      available
+      directory={directory}
+      load={vi.fn()}
+      select={vi.fn().mockResolvedValue({ ok: true, value: undefined })}
+      t={t}
+    />)
+    const trigger = screen.getByRole('button', { name: /选择模型，当前 Alpha Small/ })
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('menuitem', { name: /^模型/ }))
+    return trigger
+  }
+
+  it('folds a provider group on its heading and unfolds it on the second click', () => {
+    mountGroups()
+    const heading = screen.getByRole('button', { name: 'Alpha' })
+    expect(heading.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('menuitemradio', { name: 'Alpha Small' })).toBeTruthy()
+
+    fireEvent.click(heading)
+    expect(heading.getAttribute('aria-expanded')).toBe('false')
+    // Folded rows unmount rather than hide, so the keyboard walk cannot reach them.
+    expect(screen.queryByRole('menuitemradio', { name: 'Alpha Small' })).toBeNull()
+    expect(screen.queryByRole('menuitemradio', { name: 'Alpha Large' })).toBeNull()
+    expect(screen.getByRole('menuitemradio', { name: 'Beta One' })).toBeTruthy()
+
+    fireEvent.click(heading)
+    expect(heading.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('menuitemradio', { name: 'Alpha Large' })).toBeTruthy()
+  })
+
+  it('keeps a folded group folded when the menu is closed and reopened', () => {
+    const trigger = mountGroups()
+    fireEvent.click(screen.getByRole('button', { name: 'Beta' }))
+    fireEvent.click(trigger)
+    expect(screen.queryByRole('menu')).toBeNull()
+
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('menuitem', { name: /^模型/ }))
+    expect(screen.getByRole('button', { name: 'Beta' }).getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByRole('menuitemradio', { name: 'Beta One' })).toBeNull()
+  })
+
+  it('folds the localized account group by its own heading', () => {
+    const directory = createSnapshotStore<ModelDirectoryState>(state({
+      groups: [{ id: 'deepseek-account', name: 'DeepSeek Account', models: [{
+        id: 'deepseek-v4-flash', name: 'DeepSeek-V4-Flash',
+      }] }],
+    }))
+    render(<ModelSelect
+      locked={false}
+      available
+      directory={directory}
+      load={vi.fn()}
+      select={vi.fn().mockResolvedValue({ ok: true, value: undefined })}
+      t={t}
+    />)
+    fireEvent.click(screen.getByRole('button', { name: /选择模型，当前/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /^模型/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'DeepSeek 账号' }))
+    expect(screen.queryByRole('menuitemradio', { name: 'DeepSeek-V4-Flash' })).toBeNull()
+  })
+})
