@@ -36,6 +36,7 @@ import type {
   MutableModels,
   SimpleStreamOptions,
   ThinkingLevel,
+  Tool as PiTool,
 } from '@earendil-works/pi-ai'
 import {
   attributionHeaders,
@@ -201,14 +202,65 @@ function reasoningInfo(
   }
 }
 
-/** Merge deployment headers while removing case-insensitive attribution collisions. */
+/**
+ * Merge deployment headers while removing case-insensitive attribution
+ * collisions — except `user-agent`, which a profile may declare explicitly
+ * (e.g. a gateway that requires a specific client identity, like OpenCode's
+ * free tier). Attribution stays the default when the profile says nothing.
+ */
 function requestHeaders(headers: Readonly<Record<string, string>> | undefined): Record<string, string> {
   const attribution = attributionHeaders()
   const reserved = new Set(Object.keys(attribution).map(name => name.toLowerCase()))
+  const deployment = Object.fromEntries(
+    Object.entries(headers ?? {}).filter(([name]) => !reserved.has(name.toLowerCase())),
+  )
+  const explicitUserAgent = Object.entries(headers ?? {})
+    .find(([name]) => name.toLowerCase() === 'user-agent')
   return {
-    ...Object.fromEntries(Object.entries(headers ?? {}).filter(([name]) => !reserved.has(name.toLowerCase()))),
+    ...deployment,
     ...attribution,
+    ...(explicitUserAgent === undefined ? {} : { 'user-agent': explicitUserAgent[1] }),
   }
+}
+
+/** The empty object schema a gateway that insists on `type` accepts. */
+const EMPTY_OBJECT_SCHEMA = { type: 'object', properties: {} } as PiTool['parameters']
+
+/** The tool a gateway requires to consider the client its own. */
+const GATEWAY_READ_TOOL: PiTool = {
+  name: 'read',
+  description: 'Read the contents of a file from the workspace.',
+  parameters: {
+    type: 'object',
+    properties: { filePath: { type: 'string', description: 'Path of the file to read.' } },
+    required: ['filePath'],
+  } as PiTool['parameters'],
+}
+
+/**
+ * Tool declarations the OpenCode free-tier gateway accepts.
+ *
+ * That gateway validates each request against the shape its own CLI sends. A
+ * tool whose `parameters` is not an object schema — a harness tool that takes
+ * no arguments declares `{}` — is answered with `400` and a body naming only
+ * the model. A request declaring no function at all is answered `403
+ * FreeTierError`, which is how harness calls that carry no tool surface
+ * (session title, compaction summaries) always failed there. Normalizing the
+ * empty schema and guaranteeing one `read` function keeps every request on that
+ * route acceptable without changing what any other provider receives.
+ * @param tools - the tools the harness declared for this request.
+ * @returns a tool list safe for that gateway, never empty.
+ */
+function gatewaySafeTools(tools: readonly PiTool[] | undefined): PiTool[] {
+  const normalized = (tools ?? []).map(tool =>
+    tool.parameters !== undefined
+      && typeof tool.parameters === 'object'
+      && Object.keys(tool.parameters).length > 0
+      ? tool
+      : { ...tool, parameters: EMPTY_OBJECT_SCHEMA })
+  return normalized.some(tool => tool.name === 'read')
+    ? normalized
+    : [...normalized, GATEWAY_READ_TOOL]
 }
 
 /**
@@ -377,7 +429,12 @@ export class PiAiAdapter extends LlmAdapter {
             maxBytes: profile.requestImageMaxBytes,
           },
         }, onReplayDegrade)
-      const events = snapshot.models.streamSimple(model, context, {
+      // Deployment-owned request shims apply to the wire context only; the
+      // harness context keeps the tool surface its own dispatch expects.
+      const requestContext = profile.gatewayCompat === 'opencode-gateway'
+        ? { ...context, tools: gatewaySafeTools(context.tools) }
+        : context
+      const events = snapshot.models.streamSimple(model, requestContext, {
         ...profileOptions(profile, reasoning, apiKey),
         ...options.temperature === undefined ? {} : { temperature: options.temperature },
         ...options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens },
