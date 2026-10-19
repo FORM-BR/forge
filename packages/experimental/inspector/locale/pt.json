@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Inspector",
+    "description": "Abra o Host em execução e seus clientes do navegador no Chrome DevTools por meio de um endpoint de loopback que permite execução de código e captura o tráfego de rede do Host, incluindo segredos. Para desenvolvedores; apenas Web; recarregue as páginas abertas após ativar."
+  }
+}

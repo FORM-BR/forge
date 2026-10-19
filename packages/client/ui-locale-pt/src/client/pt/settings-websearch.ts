@@ -1,0 +1,21 @@
+/** pt-BR dictionary for the `settings.webSearch` namespace. */
+export const pt: Record<string, string> = {
+  'title': 'Pesquisa na web',
+  'description': 'Configure o provedor de pesquisa DeepSeek.',
+  'apiKey': 'Chave de API',
+  'apiKeyHint': 'Armazenada fora do arquivo de configurações. Deixe em branco para manter a chave atual.',
+  'apiKeySet': 'Há uma chave configurada.',
+  'apiKeyUnset': 'Nenhuma chave está configurada; apenas conversas que usam um modelo da Conta DeepSeek podem pesquisar, pelo endpoint padrão.',
+  'baseUrl': 'Endpoint',
+  'baseUrlHint': 'Deixe em branco para usar o padrão do provedor.',
+  'maxUses': 'Máximo de pesquisas por requisição',
+  'maxUsesHint': 'Quantas vezes uma requisição pode pesquisar antes de precisar responder.',
+  'overridden': 'Substituído',
+  'reset': 'Restaurar padrão',
+  'readOnly': 'Esta instalação armazena as configurações como somente leitura.',
+  'unavailable': 'Este plugin não está carregado, portanto não pode ser configurado agora.',
+  'save': 'Salvar',
+  'saving': 'Salvando…',
+  'saveFailed': 'A instalação não aceitou estes valores; eles foram mantidos para você corrigir.',
+  'invalidNumber': 'Insira um número ou deixe em branco para usar o padrão.',
+}

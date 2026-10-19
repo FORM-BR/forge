@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Browser Use (Playwright)",
+    "description": "Permite que o modelo navegue e opere páginas web por meio do Playwright MCP em um Chromium iniciado."
+  }
+}

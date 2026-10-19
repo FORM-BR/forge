@@ -1,0 +1,8 @@
+# Bundle FORGE: cua-border — moldura teal de computer use no SO
+# O `name` pode ser o caminho absoluto do index.js (o loader reescreve para
+# file:// e importa direto). Ajuste o caminho para o seu checkout, ou instale
+# o pacote (@forge/cua-border) e use o nome do pacote.
+- insert:
+    - id: experimental-cua-screen-border
+      name: 'C:/Users/Felipe/Dev/<checkout>/forge/plugins/cua-border/index.js'
+      config: {}
