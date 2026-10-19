@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Computer Use (Cua Driver)",
+    "description": "Permite que o modelo opere a área de trabalho com o runtime do Cua Driver incluído; requer permissões de área de trabalho para o aplicativo que inicia o dsh."
+  }
+}
