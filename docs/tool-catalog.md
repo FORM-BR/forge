@@ -17,6 +17,7 @@ This table connects model-visible tool names to the plugin package and service s
 | --- | --- | --- | --- | --- | --- |
 | `@deepseek-ai/dsh-plugin-manager` | `plugin_manager` | `ctx.tools`, `ctx.pluginManager`, `ctx.sandboxPolicy` | `tool/call`, `tool/result`, `user/message` | - | - |
 | `@deepseek-ai/dsh-mcp-resources` | `list_mcp_resource_templates`, `list_mcp_resources`, `read_mcp_resource` | `ctx.tools`, `ctx.mcpResources` | `tool/call`, `tool/result` | - | - |
+| `@deepseek-ai/dsh-api-mcp-status` | `mcp_servers` | `ctx.tools`, `ctx.mcpServerStatus` | `tool/call`, `tool/result` | - | mcp_servers is read-only and mounted only by presets that opt in, such as the shipped mcp preset. |
 | `@deepseek-ai/dsh-experimental-browser-use-stagehand-native` | `stagehand_act`, `stagehand_extract`, `stagehand_navigate`, `stagehand_observe`, `stagehand_screenshot`, `stagehand_tabs` | `ctx.browserUse`, `ctx.agents`, `ctx.tools`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-ask-user` | `ask_user_question` | `ctx.tools`, `ctx.userQuestions` | `tool/call`, `tool/result after a UI/provider answers the question` | - | ask_user_question pauses the tool call until the active UI provider returns a human answer. |
 | `@deepseek-ai/dsh-tools` | `run_code` | `ctx.tools`, `ctx.ptcRuntime (execution time)`, `ctx.systemPrompt` | `tool/call`, `one tool/ptc-dispatch-start + tool/ptc-dispatch pair per bridged sub-call`, `tool/result` | - | Owned by the tool registry as a reserved transport outside filterable capability layers under `mode: ptc` / `mode: both` (see the PTC mode Agent Note). Under `ptc` it is the registry's only wire contribution; the other visible capabilities are declared in a generated SDK section in the loaded runtime's language, and a program calls them through bindings scheduled under the native concurrency contract (submission-ordered starts and policy; concurrency-safe bodies overlap up to `maxParallelSubCalls`) that re-enter the complete guarded tool pipeline and link each nested execution to this outer result. |
@@ -195,6 +196,25 @@ Read an MCP resource by URI from the named server. Use a listed URI or an expand
 ```
 
 Source: [`packages/mcp/mcp-resources/src/tools.ts`](../packages/mcp/mcp-resources/src/tools.ts)
+
+<a id="deepseek-aidsh-api-mcp-status"></a>
+
+## `@deepseek-ai/dsh-api-mcp-status`
+
+### `mcp_servers`
+
+List the MCP servers configured for this profile with what the Settings > MCP servers panel shows: connection state (connecting, connected, error, disabled), transport, tool count, the last error with secrets removed, retry/halt reasons, and for each definition found in a patch file its source (profile or home) plus an editable view in which every secret value is hidden (environment variables and headers appear by name only, credential-like arguments and URL credentials are replaced by bullets). `management` says whether the profile file can be edited and where the files are. Read-only; call it before changing the configuration and again afterwards to confirm the effect.
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+Source: [`packages/api/mcp-status/src/tool.ts`](../packages/api/mcp-status/src/tool.ts)
+
+mcp_servers is read-only and mounted only by presets that opt in, such as the shipped mcp preset.
 
 <a id="deepseek-aidsh-experimental-browser-use-stagehand-native"></a>
 

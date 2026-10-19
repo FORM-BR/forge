@@ -21,6 +21,7 @@
 | --- | --- | --- | --- | --- | --- |
 | `@deepseek-ai/dsh-plugin-manager` | `plugin_manager` | `ctx.tools`, `ctx.pluginManager`, `ctx.sandboxPolicy` | `tool/call`, `tool/result`, `user/message` | - | - |
 | `@deepseek-ai/dsh-mcp-resources` | `list_mcp_resource_templates`, `list_mcp_resources`, `read_mcp_resource` | `ctx.tools`, `ctx.mcpResources` | `tool/call`, `tool/result` | - | - |
+| `@deepseek-ai/dsh-api-mcp-status` | `mcp_servers` | `ctx.tools`, `ctx.mcpServerStatus` | `tool/call`, `tool/result` | - | mcp_servers 是只读的，只由选择启用它的预设（例如随附的 mcp 预设）挂载。 |
 | `@deepseek-ai/dsh-experimental-browser-use-stagehand-native` | `stagehand_act`、`stagehand_extract`、`stagehand_navigate`、`stagehand_observe`、`stagehand_screenshot`、`stagehand_tabs` | `ctx.browserUse`、`ctx.agents`、`ctx.tools`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-ask-user` | `ask_user_question` | `ctx.tools`、`ctx.userQuestions` | `tool/call`、`tool/result after a UI/provider answers the question` | - | ask_user_question 会暂停工具调用，直到当前 UI 提供方返回人类答案。 |
 | `@deepseek-ai/dsh-tools` | `run_code` | `ctx.tools`、`ctx.ptcRuntime (execution time)`、`ctx.systemPrompt` | `tool/call`、`one tool/ptc-dispatch-start + tool/ptc-dispatch pair per bridged sub-call`、`tool/result` | - | 在 `mode: ptc`／`mode: both` 下，它由工具注册表所有，作为可过滤能力层之外的保留传输机制（参见 PTC mode Agent Note）。在 `ptc` 下，它是注册表对协议格式（wire format）的唯一贡献；其他可见能力在使用已加载运行时语言生成的 SDK 章节中声明。程序通过 binding 调用这些能力，调用按照原生并发约定调度：启动顺序和策略遵循提交顺序，并发安全的函数体最多重叠执行 `maxParallelSubCalls` 个。调用会重新进入完整且受守卫保护的工具流水线，并将每个嵌套执行关联到此外层结果。 |
@@ -199,6 +200,25 @@
 ```
 
 来源： [`packages/mcp/mcp-resources/src/tools.ts`](../packages/mcp/mcp-resources/src/tools.ts)
+
+<a id="deepseek-aidsh-api-mcp-status"></a>
+
+## `@deepseek-ai/dsh-api-mcp-status`
+
+### `mcp_servers`
+
+列出当前配置档中配置的 MCP 服务器，内容与「设置 > MCP 服务器」面板一致：连接状态（连接中、已连接、出错、已停用）、传输方式、工具数量、已清除密钥的最近一次错误、重试与停止原因；对于在补丁文件中找到的定义，还包括其来源（配置档或用户级）以及隐藏了所有密钥取值的可编辑视图（环境变量和请求头只显示名称，形似凭据的参数和 URL 凭据以圆点替换）。`management` 说明配置档文件能否编辑以及文件所在位置。只读；修改配置前先调用，修改后再调用一次以确认效果。
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+来源： [`packages/api/mcp-status/src/tool.ts`](../packages/api/mcp-status/src/tool.ts)
+
+mcp_servers 是只读的，只由选择启用它的预设（例如随附的 mcp 预设）挂载。
 
 <a id="deepseek-aidsh-experimental-browser-use-stagehand-native"></a>
 

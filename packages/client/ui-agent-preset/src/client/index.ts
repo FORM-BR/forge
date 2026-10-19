@@ -55,6 +55,28 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
+/**
+ * Lets another surface land a new session on a shipped agent preset, the way the
+ * settings section's Creator-mode button does. Present only while the conversation
+ * flow exists (it lives and dies with that scope).
+ */
+export interface AgentPresetLauncher {
+  /** Whether a session on a shipped preset can start now: it needs Developer tools. */
+  available(): boolean
+  /**
+   * Stage the preset and open a new session on it.
+   * @param presetId - roster id of the shipped preset.
+   */
+  start(presetId: string): void
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /** Starts a new session on a shipped agent preset. */
+    agentPresetLauncher: AgentPresetLauncher
+  }
+}
+
 export type { AgentPresetLabelInjected, AgentPresetLabelProps } from './AgentPresetLabel.tsx'
 export type { AgentPresetSeatInjected, AgentPresetSeatProps } from './AgentPresetSeat.tsx'
 export type { AgentPresetSectionInjected, AgentPresetSectionProps } from './AgentPresetSection.tsx'
@@ -192,12 +214,17 @@ export function apply(ctx: ClientContext): void {
     })
 
     scope.effect(() => {
-      creatorDraft = () => {
+      const startOn = (presetId: string): void => {
         const seat = mainBlankSeat() ?? unboundSeat
-        seat.stage('cordis', true)
+        seat.stage(presetId, true)
         scope.uiWorkspace.startSession()
         void seat.apply()
       }
+      creatorDraft = () => { startOn('cordis') }
+      const disposeLauncher = scope.reflect.provide('agentPresetLauncher', {
+        available: () => ctx.configForms.developerTools.enabled.getSnapshot(),
+        start: startOn,
+      })
       const chip = scope.slots.register({
         name: 'conversation.hero.agentPreset',
         locale: 'settings.agentPreset',
@@ -213,6 +240,7 @@ export function apply(ctx: ClientContext): void {
       }, AgentPresetLabel)
       return () => {
         creatorDraft = undefined
+        void disposeLauncher()
         chip()
         label()
       }

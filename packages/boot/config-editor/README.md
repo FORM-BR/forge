@@ -30,7 +30,7 @@ Mount this service in a profile application with Loader and `profileContext`. It
   name: '@deepseek-ai/dsh-config-editor'
 ```
 
-Use [settings](../../settings/settings/README.md) for forms restricted to live fields. Callers that edit complete configuration can use `ctx.configEditor.edit()`; ordinary fields retain Loader’s normal lifecycle.
+Use [settings](../../settings/settings/README.md) for forms restricted to live fields. Callers that edit complete configuration can use `ctx.configEditor.edit()`; ordinary fields retain Loader’s normal lifecycle. Callers that add, remove, or toggle whole rows can use `ctx.configEditor.editDocument(change, { requiredIds })`: it hands the current patch text to `change`, writes the result atomically under the same lock, and reloads the profile in place. A rejected reload restores the file. It answers `applied`, `pending` when the reload outlasts the settle window (it finishes in the background and still restores the file on failure), or `restart-required` when the Host has no root Include entry to reload.
 
 <a id="understand-the-implementation"></a>
 ## Understand the implementation

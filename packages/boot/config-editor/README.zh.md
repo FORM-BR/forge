@@ -30,7 +30,7 @@ kind: "package-reference"
   name: '@deepseek-ai/dsh-config-editor'
 ```
 
-使用 [settings](../../settings/settings/README.zh.md) 提供只编辑即时字段的表单。编辑完整配置的调用方可使用 `ctx.configEditor.edit()`；普通字段保留 Loader 的正常生命周期。
+使用 [settings](../../settings/settings/README.zh.md) 提供只编辑即时字段的表单。编辑完整配置的调用方可使用 `ctx.configEditor.edit()`；普通字段保留 Loader 的正常生命周期。需要添加、删除或启停整行的调用方可使用 `ctx.configEditor.editDocument(change, { requiredIds })`：它把当前补丁文本交给 `change`，在同一把锁下原子写入结果，并就地重新加载配置档。重新加载被拒绝时会恢复文件。结果为 `applied`；重新加载超过等待窗口时为 `pending`（在后台完成，失败时仍会恢复文件）；Host 没有可供重载的根 Include 条目时为 `restart-required`。
 
 <a id="understand-the-implementation"></a>
 ## 理解实现

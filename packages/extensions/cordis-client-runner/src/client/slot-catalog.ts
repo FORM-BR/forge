@@ -2657,7 +2657,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       },
     ],
     ownerProps: [
-      '/** Owner share of a Plugins tab (the section supplies nothing). */\nexport interface SettingsPluginsTabOwnerProps {\n  /** Marker field: tab owner props are intentionally empty. */\n  children?: never\n}',
+      '/** Owner share of a Plugins tab: the section\'s `close`, for tabs that leave settings (starting a session). */\nexport interface SettingsPluginsTabOwnerProps {\n  /** Close the settings panel (the shell owns the open state). */\n  close: () => void\n  children?: never\n}',
     ],
     ownerPropsReferences: [],
     standardProps: [
@@ -2674,6 +2674,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: '',
     declaredBy: 'an entry in \'settings.section\' (client-ui-settings-plugins), so it exists while that entry is mounted',
     occupants: [
+      'client-ui-settings-mcp McpSettingsTab id \'mcp\'',
       'client-ui-settings-plugin-inventory PluginInventorySettingsTab id \'all\'',
     ],
     replaceRisk: 'none',

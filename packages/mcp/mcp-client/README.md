@@ -92,6 +92,10 @@ The server's tools appear before the harness starts its first turn. When the ser
 
 When a server connection drops — for example a local server process crashes — the plugin reconnects automatically with delays that double from 500 ms up to 30 s and then refreshes the tool set; reconnect progress is visible in the logs. During an outage the last known tools stay listed but calls to them fail until the server recovers. After ten consecutive failed attempts the server's tools are removed and reconnection stops until you reload the configuration or restart the harness; a server that stays connected for a while resets that counter. Set `reconnect.enabled: false` to disable automatic reconnection — tools then stay listed but fail until you reload. Editing the configuration entry reloads the server connection in place, and unchanged names stay unchanged.
 
+### Connection status
+
+When a status registry is composed, each server plugin reports its state to it: `connecting`, `connected`, or `error`, with the tool count, the last failure, the reconnect attempt counter, and — once no further attempt will run — why. The shipped Web bundle composes the registry from [`api-mcp-status`](../../api/mcp-status/README.md), and the Settings [MCP servers tab](../../client/ui-settings-mcp/README.md) shows it. A report never carries `env`, `headers`, `args`, the command, or a URL beyond its host, and failure messages have configured secret values, URL paths and queries, and `Bearer`/`Basic` credentials replaced and are cut at 240 characters. Without a registry, nothing changes.
+
 -----
 
 <a id="understand-the-implementation"></a>
@@ -117,6 +121,7 @@ This section explains the design decisions behind the bridge and points at the c
 | [`src/index.ts`](src/index.ts) | Plugin entry: `Config` schema, `serverName` reservation, activation await |
 | [`src/connection.ts`](src/connection.ts) | Connection supervisor: client generations, reconnect policy, attempt budget, disposal |
 | [`src/server-context.ts`](src/server-context.ts) | Resource-provider registration and literal server instructions |
+| [`src/status.ts`](src/status.ts) | Secret-free status snapshot, the `mcpServerStatus` registry types, and failure-message redaction |
 | [`src/tools.ts`](src/tools.ts) | Tool bridge: discovery, naming, registration swap, execution, image projection |
 | [`src/transport.ts`](src/transport.ts) | Transport factory: stdio spawn with scrubbed env, Streamable HTTP |
 | — | No runtime invariant companion is published; MCP generations contribute through the tool registry, but the bridge exposes no independent server-to-tool snapshot after an asynchronous resync. |

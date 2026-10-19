@@ -92,6 +92,10 @@ kind: "package-reference"
 
 服务器连接断开时——例如本地服务器进程崩溃——插件会以从 500 ms 起逐次翻倍、上限 30 s 的延迟自动重连，并刷新工具集；重连进度在日志中可见。中断期间最后已知的工具仍会列出，但对它们的调用会失败，直到服务器恢复。连续失败十次后，该服务器的工具会被移除，重连停止，直到你重载配置或重启 harness；服务器持续连接一段时间后，该计数会重置。设置 `reconnect.enabled: false` 可禁用自动重连——此时工具在断开后仍会列出，但调用失败，直到你重载。编辑配置项会在原地重载服务器连接，未变的名称保持不变。
 
+### 连接状态
+
+组合了状态注册表时，每个服务器插件都会向它上报状态：`connecting`、`connected` 或 `error`，并附带工具数量、最近一次失败、重连尝试计数，以及在不会再有后续尝试时的原因。随附的 Web 捆绑包通过 [`api-mcp-status`](../../api/mcp-status/README.zh.md) 组合该注册表，由设置中的 [MCP 服务器标签页](../../client/ui-settings-mcp/README.zh.md)展示。上报内容从不包含 `env`、`headers`、`args`、命令，也不包含主机之外的 URL 部分；失败信息中配置的密钥值、URL 路径与查询、`Bearer`/`Basic` 凭据都会被替换，并截断为 240 个字符。没有注册表时，行为不受任何影响。
+
 -----
 
 <a id="understand-the-implementation"></a>
@@ -117,6 +121,7 @@ kind: "package-reference"
 | [`src/index.ts`](src/index.ts) | 插件入口：`Config` schema、`serverName` 预留、激活等待 |
 | [`src/connection.ts`](src/connection.ts) | 连接监督器：客户端世代、重连策略、尝试预算、dispose（资源释放） |
 | [`src/server-context.ts`](src/server-context.ts) | 资源提供方注册与字面服务器指令 |
+| [`src/status.ts`](src/status.ts) | 无密钥的状态快照、`mcpServerStatus` 注册表类型与失败信息脱敏 |
 | [`src/tools.ts`](src/tools.ts) | 工具桥接：发现、命名、注册交换、执行、图片投影 |
 | [`src/transport.ts`](src/transport.ts) | 传输工厂：带清洗环境的 stdio spawn、Streamable HTTP |
 | — | 不发布运行时不变式伴生入口；MCP 世代会通过工具注册表发挥作用，但桥接在异步重新同步后不提供独立的服务器工具映射快照。 |

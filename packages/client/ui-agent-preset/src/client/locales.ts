@@ -21,6 +21,8 @@ export type AgentPresetSettingsKey =
   | 'presetMinimalDescription'
   | 'presetCordisName'
   | 'presetCordisDescription'
+  | 'presetMcpName'
+  | 'presetMcpDescription'
   | 'inUse'
   | 'noDescription'
   | 'brokenBadge'
@@ -60,6 +62,9 @@ export const en: Record<AgentPresetSettingsKey, string> = {
   presetCordisName: 'Creator mode',
   presetCordisDescription:
     'Customize FORGE through conversation. Let the agent write plugins that add features or UI, or combine tools and prompts to create your own mode.',
+  presetMcpName: 'MCP assistant',
+  presetMcpDescription:
+    'Helps connect, edit, and troubleshoot MCP servers. It reads the same status as the MCP servers settings page, shows each change before writing it, and never repeats secrets.',
 
   inUse: 'New task default',
 
@@ -103,6 +108,8 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
   presetMinimalDescription: 'Agent 仅使用终端工具完成任务，适合测试和对比其基础表现。',
   presetCordisName: '创造模式',
   presetCordisDescription: '用对话定制 FORGE：让 Agent 编写插件，添加新功能或界面；也能组合工具和提示词，创建自己的模式。',
+  presetMcpName: 'MCP 助手',
+  presetMcpDescription: '帮助连接、修改和排查 MCP 服务器。它读取与「MCP 服务器」设置页相同的状态，写入前先展示改动，并且不会复述任何密钥。',
 
   inUse: '新任务默认',
 

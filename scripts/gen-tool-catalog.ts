@@ -68,6 +68,7 @@ import type PluginManager from '@deepseek-ai/dsh-plugin-manager'
 import * as PluginManagerTools from '@deepseek-ai/dsh-plugin-manager/tools'
 import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy'
 import McpResources from '@deepseek-ai/dsh-mcp-resources'
+import * as McpStatusTool from '@deepseek-ai/dsh-api-mcp-status/tool'
 import * as ToolSubagent from '@deepseek-ai/dsh-tool-subagent'
 import { registerListSubagentModels } from '../packages/subagent/tool-subagent/src/list-models.ts'
 import * as ToolWeb from '@deepseek-ai/dsh-tool-web'
@@ -228,6 +229,19 @@ const TOOL_PACKAGES: ToolPackage[] = [
         request: () => Promise.reject(new Error('gen-tool-catalog: MCP requests are unreachable during schema harvest')),
       })
     },
+  },
+  {
+    pkg: '@deepseek-ai/dsh-api-mcp-status',
+    dir: 'mcp-status',
+    source: 'packages/api/mcp-status/src/tool.ts',
+    requires: ['ctx.tools', 'ctx.mcpServerStatus'],
+    writes: ['tool/call', 'tool/result'],
+    async mount(ctx) {
+      // Schema harvest never reads a snapshot: the registry only has to exist.
+      ctx.provide('mcpServerStatus', { register: () => () => undefined })
+      await ctx.plugin(McpStatusTool)
+    },
+    note: 'mcp_servers is read-only and mounted only by presets that opt in, such as the shipped mcp preset.',
   },
   {
     pkg: '@deepseek-ai/dsh-experimental-browser-use-stagehand-native',

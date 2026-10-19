@@ -27,8 +27,11 @@
   en: cad16c6102b0e316
   zh: 03841eea6ead54cd
 /deepseek-ai-dsh-mcp-client/use-this-package/startup-updates-and-reconnection:
-  en: d7b393106cf6b8fc
-  zh: a95bdc34e914b0da
+  en: 4826f61de29ee659
+  zh: 79ddb47b664fc871
+/deepseek-ai-dsh-mcp-client/use-this-package/connection-status:
+  en: 6288c2616a8c7773
+  zh: 807a48fe80137364
 /deepseek-ai-dsh-mcp-client/understand-the-implementation:
   en: d33ddd080880b3f5
   zh: 64328f5239c26752
@@ -36,8 +39,8 @@
   en: 4e213d68082b07f0
   zh: 7617949ba46a3b63
 /deepseek-ai-dsh-mcp-client/understand-the-implementation/source-map:
-  en: ab2bbaa701f24c2c
-  zh: c6db79438239388e
+  en: f3b370241113015a
+  zh: 73daa4cdfe79907a
 /deepseek-ai-dsh-mcp-client/understand-the-implementation/lifecycle-and-sync:
   en: ae9029b48b2a2e4e
   zh: 048f08361b799667
