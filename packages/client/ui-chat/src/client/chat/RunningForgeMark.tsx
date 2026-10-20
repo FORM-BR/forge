@@ -1,26 +1,24 @@
-/** Anvil-and-hammer mark Chat shows while the Session runs: the FORGE logo is the hammer head. */
+/** Anvil-and-hammer mark Chat shows while the Session runs: the FORGE logo is the hammer. */
 import css from './RunningForgeMark.module.css'
 
 /**
- * Render the FORGE work mark: an anvil on its pedestal, a hammer whose head is
- * the FORGE logo, and an amber spark burst on impact. The stylesheet owns every
- * pose so reduced motion can hold the hammer raised without React re-rendering.
+ * Render the FORGE work mark: the logo itself swung onto an anvil, its pointed
+ * tip leading like a hammer head and its upright stroke trailing as the handle,
+ * with a few short sparks off the impact. The stylesheet owns every pose so
+ * reduced motion can hold the logo raised without React re-rendering.
  * @returns the animated svg, hidden from the accessibility tree.
  */
 export function RunningForgeMark() {
   return (
     <span className={css.icon} aria-hidden="true">
       <svg width="100%" height="100%" viewBox="0 0 32 32" fill="none">
-        <g className={css.sparks} data-forge-sparks>
-          <line x1="12.1" y1="19" x2="8.4" y2="15.4" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
-          <line x1="12.1" y1="19" x2="10" y2="14" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
-          <line x1="12.1" y1="19" x2="12.4" y2="13.4" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
-          <line x1="12.1" y1="19" x2="14.8" y2="14.2" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
-          <line x1="12.1" y1="19" x2="16.6" y2="15.6" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
-          <line x1="12.1" y1="19" x2="9.2" y2="17.6" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
-          <circle cx="8.6" cy="13.6" r="1" fill="currentColor" />
-          <circle cx="14.2" cy="13.2" r="0.8" fill="currentColor" />
-          <circle cx="16.9" cy="14.6" r="1" fill="currentColor" />
+        <g className={css.sparks} data-forge-sparks strokeWidth="0.9" strokeLinecap="round">
+          <line x1="14" y1="18.1" x2="12.4" y2="16.4" stroke="currentColor" />
+          <line x1="14.6" y1="17.7" x2="14.1" y2="15.3" stroke="currentColor" />
+          <line x1="15.2" y1="17.8" x2="16.5" y2="16.2" stroke="currentColor" />
+          <line x1="15.6" y1="18.2" x2="17.7" y2="17.7" stroke="currentColor" />
+          <circle cx="11.9" cy="15.4" r="0.5" fill="currentColor" stroke="none" />
+          <circle cx="17.9" cy="15.1" r="0.45" fill="currentColor" stroke="none" />
         </g>
         <g className={css.anvil} data-forge-anvil fill="currentColor">
           <path d="M2 21.2 8.4 19.4V22.6Z" />
@@ -29,9 +27,7 @@ export function RunningForgeMark() {
           <path d="M12.2 25.4h3.6l2.8 4H9.4Z" />
         </g>
         <g className={css.hammer} data-forge-hammer>
-          <line x1="27.5" y1="3.5" x2="14.5" y2="9.5" stroke="currentColor" strokeWidth={2.2}
-            strokeLinecap="round" />
-          <g transform="translate(5.5 4.5) scale(0.0390625)">
+          <g transform="translate(17.43 12.67) rotate(135) scale(0.062) translate(-123 -130)">
             <path d="M24 241.5V68.5H147.5V88.5H44V241.5Z" fill="currentColor" />
             <path d="M62.5 241.5V107H147.5V127H82.5V241.5Z" fill="currentColor" />
             <polyline points="126.55,38 186.3,97.75 150.41,133.64" fill="none" stroke="currentColor"
