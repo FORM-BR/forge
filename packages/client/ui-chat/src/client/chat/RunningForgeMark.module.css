@@ -5,6 +5,10 @@
   flex: none;
   width: calc(30px + var(--dsh-content-font-delta, 0px));
   height: calc(30px + var(--dsh-content-font-delta, 0px));
+  /* A flex item's baseline is its bottom edge, and the anvil's base sits 29.4
+     of 32 units up from that edge; the offset closes the gap so the base lands
+     on the text baseline instead of floating above it. */
+  transform: translateY(calc((30px + var(--dsh-content-font-delta, 0px)) * 0.08125));
 }
 
 .hammer {
