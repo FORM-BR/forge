@@ -26,11 +26,29 @@
   line-height: 16px;
   cursor: pointer;
   transition: background 100ms ease, color 100ms ease;
+  /* Slow breath, not a strobe: the chip has to survive being on screen for minutes while the model
+     works, so the cycle stays long and the amplitude stays inside the grey family. */
+  animation: offerBreath 2200ms ease-in-out infinite;
 }
 
 .trigger:hover,
+.trigger:focus-visible,
 .trigger[aria-expanded='true'] {
   background: var(--dsw-alias-interactive-bg-hover-accent);
+  animation: none;
+}
+
+@keyframes offerBreath {
+  0%,
+  100% {
+    background: var(--dsw-alias-interactive-bg-active);
+    box-shadow: 0 0 0 0 transparent;
+  }
+
+  50% {
+    background: var(--dsw-alias-interactive-bg-hover-accent);
+    box-shadow: 0 0 0 2px var(--dsw-alias-interactive-bg-active);
+  }
 }
 
 .count {
@@ -197,5 +215,12 @@
   .trigger,
   .open {
     transition: none;
+  }
+
+  /* Without the breath the chip keeps the peak of the cycle, so it still reads as the newest thing
+     on the header instead of falling back to the resting wash. */
+  .trigger {
+    animation: none;
+    background: var(--dsw-alias-interactive-bg-hover-accent);
   }
 }
