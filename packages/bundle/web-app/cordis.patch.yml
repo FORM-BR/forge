@@ -591,6 +591,9 @@
 - id: tool-todo
   disabled: true
 
+- id: tool-parallel-sessions
+  disabled: true
+
 - id: tool-web
   disabled: true
 
