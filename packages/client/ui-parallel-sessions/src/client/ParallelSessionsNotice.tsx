@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   IconChevronDownOutlineRegular, IconCloseOutlineRegular, IconCompareSplitOutlineRegular, IconPlayOutlineRegular,
-  Menu,
+  IconQuestionOutlineRegular, Menu, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ParallelOfferSource, ParallelStartMode, ParallelTask } from './offer-store.ts'
@@ -83,12 +83,16 @@ export function ParallelSessionsNotice(props: ParallelSessionsNoticeProps) {
             : state === 'opened' ? props.t('row.opened') : props.t('row.open')
           return (
             <li key={task.title} className={css.task}>
-              <span className={css.taskText}>
-                <span className={css.taskTitle}>{task.title}</span>
-                <span className={css.taskPrompt}>{task.prompt}</span>
-              </span>
+              <span className={css.taskTitle}>{task.title}</span>
+              <Tooltip label={task.prompt} side="bottom" portal maxWidth={340} openOnClick>
+                <button type="button" className={css.details} aria-label={props.t('notice.details')}>
+                  <IconQuestionOutlineRegular size={13} />
+                </button>
+              </Tooltip>
               <Menu
                 open={menuTask === task.title}
+                align="end"
+                portal
                 anchor={(
                   <button
                     type="button"

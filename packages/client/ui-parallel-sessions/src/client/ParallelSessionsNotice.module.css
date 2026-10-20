@@ -73,37 +73,45 @@
 .task {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 8px 12px;
-  padding: 10px 12px;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 5px 12px;
 }
 
 .task + .task {
   border-top: 0.5px solid var(--dsw-alias-border-l1);
 }
 
-.taskText {
-  display: flex;
-  flex: 1 1 240px;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
+/* The offer shows only the session title; the prompt rides the `?` tooltip. */
 .taskTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--dsh-content-font-size-secondary, 13px);
-  font-weight: 500;
   color: var(--dsw-alias-label-primary);
 }
 
-.taskPrompt {
-  display: -webkit-box;
-  overflow: hidden;
-  font-size: 12px;
-  line-height: 17px;
-  color: var(--dsw-alias-label-tertiary);
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+.details {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: var(--dsw-radius-md, 6px);
+  background: transparent;
+  color: var(--dsw-alias-label-caption);
+  cursor: help;
+}
+
+.details:hover,
+.details:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover-solid);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .taskError {

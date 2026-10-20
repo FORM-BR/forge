@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+﻿// @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -56,12 +56,23 @@ describe('ParallelSessionsNotice', () => {
     const view = render(<ParallelSessionsNotice {...props(offers, { startSession, settle })} />)
     expect(view.getByText('Suggested 2 parallel sessions')).toBeTruthy()
     expect(view.getByText('Waitlist copy')).toBeTruthy()
+    // The card lists titles only: each prompt lives behind the row's `?` control.
+    expect(view.queryByText(TASKS[0]!.prompt)).toBeNull()
+    expect(screen.getAllByRole('button', { name: 'Task details' })).toHaveLength(2)
     expect(screen.getAllByRole('button', { name: 'Open' })).toHaveLength(2)
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Open' })[0]!)
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Open in this workspace' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Local' }))
     expect(startSession).toHaveBeenCalledWith(TASKS[0], 'local')
     await waitFor(() => { expect(settle).toHaveBeenCalledWith('Waitlist copy') })
+  })
+
+  it('reveals the prompt from the row details control', () => {
+    const offers = createParallelOfferStore()
+    offers.publish(SESSION, { callId: 'call-1', tasks: TASKS })
+    render(<ParallelSessionsNotice {...props(offers)} />)
+    fireEvent.mouseEnter(screen.getAllByRole('button', { name: 'Task details' })[0]!)
+    expect(screen.getByRole('tooltip').textContent).toContain(TASKS[0]!.prompt)
   })
 
   it('offers a worktree checkout as the other place to start the session', () => {
@@ -70,7 +81,7 @@ describe('ParallelSessionsNotice', () => {
     const startSession = vi.fn(() => Promise.resolve())
     render(<ParallelSessionsNotice {...props(offers, { startSession })} />)
     fireEvent.click(screen.getAllByRole('button', { name: 'Open' })[1]!)
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Open in a git worktree' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Worktree' }))
     expect(startSession).toHaveBeenCalledWith(TASKS[1], 'worktree')
   })
 
@@ -83,7 +94,7 @@ describe('ParallelSessionsNotice', () => {
       settle,
     })} />)
     fireEvent.click(screen.getAllByRole('button', { name: 'Open' })[0]!)
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Open in this workspace' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Local' }))
     await waitFor(() => { expect(screen.getByText('Could not start the session')).toBeTruthy() })
     expect(settle).not.toHaveBeenCalled()
     expect(screen.getAllByRole('button', { name: 'Open' })).toHaveLength(2)

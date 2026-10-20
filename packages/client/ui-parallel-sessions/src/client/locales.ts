@@ -8,13 +8,14 @@ export const zh = {
   'row.title': '建议 {n} 个并行会话',
   'row.preparing': '正在建议并行会话',
   'row.open': '打开',
-  'row.openLocal': '在本工作区打开',
-  'row.openWorktree': '在 git worktree 中打开',
+  'row.openLocal': '本地',
+  'row.openWorktree': 'Worktree',
   'row.opening': '正在启动…',
   'row.opened': '已打开',
   'row.failed': '无法启动会话',
   'row.pinned': '卡片固定在顶部',
   'notice.close': '关闭卡片',
+  'notice.details': '查看任务说明',
 } satisfies Record<string, string>
 
 /** The parallelSessions namespace key union. */
@@ -25,11 +26,12 @@ export const en = {
   'row.title': 'Suggested {n} parallel sessions',
   'row.preparing': 'Suggesting parallel sessions',
   'row.open': 'Open',
-  'row.openLocal': 'Open in this workspace',
-  'row.openWorktree': 'Open in a git worktree',
+  'row.openLocal': 'Local',
+  'row.openWorktree': 'Worktree',
   'row.opening': 'Starting…',
   'row.opened': 'Opened',
   'row.failed': 'Could not start the session',
   'row.pinned': 'Card pinned above',
   'notice.close': 'Close card',
+  'notice.details': 'Task details',
 } satisfies Record<ParallelSessionsKey, string>
