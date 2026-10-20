@@ -10,13 +10,13 @@ describe('RunningForgeMark', () => {
   it('draws the anvil, the FORGE hammer head and the impact sparks', () => {
     const view = render(<RunningForgeMark />)
     expect(view.container.firstElementChild?.getAttribute('aria-hidden')).toBe('true')
-    expect(view.container.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 24 24')
+    expect(view.container.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 32 32')
     expect(view.container.querySelector('[data-forge-anvil]')).not.toBeNull()
     const hammer = view.container.querySelector('[data-forge-hammer]')
     expect(hammer?.querySelectorAll('path')).toHaveLength(2)
     expect(hammer?.querySelectorAll('polyline')).toHaveLength(2)
     expect(hammer?.querySelector('polyline')?.getAttribute('points')).toBe('126.55,38 186.3,97.75 150.41,133.64')
-    expect(view.container.querySelectorAll('[data-forge-sparks] line')).toHaveLength(3)
+    expect(view.container.querySelectorAll('[data-forge-sparks] line')).toHaveLength(6)
   })
 
   it('leaves the poses to the stylesheet instead of SMIL', () => {
