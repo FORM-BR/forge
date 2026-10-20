@@ -8,7 +8,9 @@
 
 .hammer {
   transform-box: view-box;
-  transform-origin: 14.5px 18.5px;
+  /* Pivot at the handle grip, so the logo swings like a hammer and the head
+     travels in an arc instead of spinning around its own striking face. */
+  transform-origin: 17px 4px;
   animation: forge-strike 1.5s cubic-bezier(0.55, 0.05, 0.45, 1) infinite;
 }
 
