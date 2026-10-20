@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
-  IconCompareSplitOutlineRegular, IconPlayOutlineRegular, TextShimmer,
+  IconChevronDownOutlineRegular, IconCompareSplitOutlineRegular, IconPlayOutlineRegular,
+  Menu, TextShimmer,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { StartedToolCallViewProps, ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
@@ -12,14 +13,18 @@ export interface ParallelTask {
   readonly prompt: string
 }
 
+/** Where the offered session works: this workspace, or a checkout of its own. */
+export type ParallelStartMode = 'local' | 'worktree'
+
 /** What the plugin provides to the card. */
 export interface ParallelSessionsInjected {
   /**
    * Create the offered session, send its prompt, and open it in the main region.
    * @param task - the offered title and prompt.
+   * @param mode - run in the offering workspace, or in a new git worktree beside it.
    * @returns completion once the session is created, prompted, and opened.
    */
-  startSession: (task: ParallelTask) => Promise<void>
+  startSession: (task: ParallelTask, mode: ParallelStartMode) => Promise<void>
 }
 
 type ParallelSessionsRowProps =
@@ -99,11 +104,12 @@ export function ParallelSessionsRow(props: ParallelSessionsRowProps) {
 function OfferedSessions({ block, startSession, t }: Exclude<ParallelSessionsRowProps, { phase: 'preparing' }>) {
   const tasks = parseTasks(argsOf(block))
   const [states, setStates] = useState<Record<string, StartState>>({})
+  const [menuTask, setMenuTask] = useState<string | null>(null)
   const failed = 'kind' in block && block.isError
   const failure = failed ? firstLine(block) : null
-  const start = (task: ParallelTask): void => {
+  const start = (task: ParallelTask, mode: ParallelStartMode): void => {
     setStates(current => ({ ...current, [task.title]: 'starting' }))
-    void startSession(task).then(
+    void startSession(task, mode).then(
       () => { setStates(current => ({ ...current, [task.title]: 'opened' })) },
       () => { setStates(current => ({ ...current, [task.title]: 'failed' })) },
     )
@@ -128,16 +134,32 @@ function OfferedSessions({ block, startSession, t }: Exclude<ParallelSessionsRow
                   <span className={css.taskTitle}>{task.title}</span>
                   <span className={css.taskPrompt}>{task.prompt}</span>
                 </span>
-                <button
-                  type="button"
-                  className={css.open}
-                  data-state={state ?? 'idle'}
-                  disabled={state === 'starting' || state === 'opened'}
-                  onClick={() => { start(task) }}
-                >
-                  <IconPlayOutlineRegular size={12} />
-                  {label}
-                </button>
+                <Menu
+                  open={menuTask === task.title}
+                  anchor={(
+                    <button
+                      type="button"
+                      className={css.open}
+                      data-state={state ?? 'idle'}
+                      disabled={state === 'starting' || state === 'opened'}
+                      aria-haspopup="menu"
+                      onClick={() => { setMenuTask(current => current === task.title ? null : task.title) }}
+                    >
+                      <IconPlayOutlineRegular size={12} />
+                      {label}
+                      <IconChevronDownOutlineRegular size={12} />
+                    </button>
+                  )}
+                  items={[
+                    { id: 'local', label: t('row.openLocal') },
+                    { id: 'worktree', label: t('row.openWorktree') },
+                  ]}
+                  onSelect={(id) => {
+                    setMenuTask(null)
+                    start(task, id === 'worktree' ? 'worktree' : 'local')
+                  }}
+                  onClose={() => { setMenuTask(null) }}
+                />
                 {state === 'failed' ? <span className={css.taskError}>{t('row.failed')}</span> : null}
               </li>
             )

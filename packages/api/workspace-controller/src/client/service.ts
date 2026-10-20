@@ -4,7 +4,7 @@ import { Service, type Context } from '@deepseek-ai/cordis'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { RemoteFailure } from '@deepseek-ai/dsh-typert-protocol'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
-import type { WorkspaceGitInfoValue, WorkspaceView } from '../types.ts'
+import type { WorkspaceGitInfoValue, WorkspaceView, WorkspaceWorktreeValue } from '../types.ts'
 import type { ClientWorkspaceModel, WorkspaceSnapshot } from './model.ts'
 
 /** Structured create failure for callers that distinguish Host business errors. */
@@ -53,6 +53,15 @@ export interface IWorkspaces {
    * @returns the created or idempotently resolved Workspace.
    */
   create(input: { path: string }): Promise<WorkspaceView>
+  /**
+   * Create a git worktree beside the repository containing `cwd`, so work that
+   * needs its own checkout never shares the current one.
+   * @param input - directory inside the repository and the task title naming the worktree.
+   * @param signal - caller lifetime.
+   * @returns the worktree path and its branch.
+   * @throws when the directory is outside a repository or git refuses.
+   */
+  createWorktree(input: { cwd: string; title: string }, signal?: AbortSignal): Promise<WorkspaceWorktreeValue>
   /**
    * Initialize or reuse the default Workspace.
    * @param signal - caller lifetime.
@@ -139,6 +148,12 @@ export class WorkspaceController extends Service implements IWorkspaces {
     const result = await this.model.create(input)
     if (!result.ok) throw new WorkspaceCreateError(result.error)
     return result.value.workspace
+  }
+
+  async createWorktree(input: { cwd: string; title: string }, signal?: AbortSignal): Promise<WorkspaceWorktreeValue> {
+    const result = await this.model.createWorktree(input, signal)
+    if (!result.ok) throw commandError('worktree', result.error)
+    return result.value
   }
 
   async initializeDefault(signal?: AbortSignal): Promise<WorkspaceView | undefined> {

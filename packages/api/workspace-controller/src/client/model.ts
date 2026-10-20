@@ -19,6 +19,8 @@ import type {
   WorkspaceUnarchiveSessionRequest,
   WorkspaceUnpinSessionRequest,
   WorkspaceValue,
+  WorkspaceWorktreeRequest,
+  WorkspaceWorktreeValue,
   WorkspaceId,
   WorkspaceView,
 } from '../types.ts'
@@ -103,11 +105,21 @@ export class ClientWorkspaceModel implements WorkspaceFollowSink {
   }
 
   /**
-   * Initialize the default Workspace and merge its authoritative row.
+   * Create a worktree beside the repository containing a directory. Git-side
+   * work only: the worktree is not a Workspace until its own row is created.
+   * @param input - directory inside the repository and the task title.
    * @param signal - caller lifetime.
    * @returns generated Remote result.
    */
-  async initializeDefault(signal?: AbortSignal): Promise<RemoteResult<WorkspaceValue | undefined>> {
+  createWorktree(input: WorkspaceWorktreeRequest, signal?: AbortSignal): Promise<RemoteResult<WorkspaceWorktreeValue>> {
+    return this.remote.createWorktree(input, signal)
+  }
+
+  /**
+   * Initialize the default Workspace and merge its authoritative row.
+   * @param signal - caller lifetime.
+   * @returns generated Remote result.
+   */  async initializeDefault(signal?: AbortSignal): Promise<RemoteResult<WorkspaceValue | undefined>> {
     const result = await this.remote.initializeDefault(signal)
     if (result.ok && result.value !== undefined) this.upsert(result.value.workspace)
     return result

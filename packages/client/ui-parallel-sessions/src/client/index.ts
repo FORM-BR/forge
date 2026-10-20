@@ -14,7 +14,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: pulls the `uiWorkspace` Context merge and the service type.
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { ParallelSessionsRow, type ParallelSessionsInjected, type ParallelTask } from './ParallelSessionsRow.tsx'
+import { ParallelSessionsRow, type ParallelSessionsInjected, type ParallelStartMode, type ParallelTask } from './ParallelSessionsRow.tsx'
 import { en, NS, zh, type ParallelSessionsKey } from './locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -43,10 +43,22 @@ export function apply(ctx: Context): void {
   const workspaces = ctx.get('workspaces') as IWorkspaces
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-parallel-sessions: dictionaries')
 
-  const startSession = async (sessionId: SessionId, task: ParallelTask): Promise<void> => {
+  const startSession = async (
+    sessionId: SessionId,
+    task: ParallelTask,
+    mode: ParallelStartMode,
+  ): Promise<void> => {
     // The offer was made in this session's workspace, so its copy starts where the work is.
-    const workspaceId = workspaces.list.getSnapshot().items
+    let workspaceId = workspaces.list.getSnapshot().items
       .find(item => item.sessionIds.includes(sessionId))?.workspaceId
+    if (mode === 'worktree') {
+      const cwd = sessions.list.getSnapshot().byId[sessionId]?.cwd
+      if (cwd === undefined || cwd === '') throw new Error('the offering session has no working directory')
+      const worktree = await workspaces.createWorktree({ cwd, title: task.title })
+      // A worktree is its own checkout, so it becomes its own Workspace row: the
+      // session can commit there without touching the offering session's tree.
+      workspaceId = (await workspaces.create({ path: worktree.path })).workspaceId
+    }
     const created = await sessions.create(workspaceId === undefined ? {} : { workspaceId })
     await sessions.using(created, { source: 'parallelSessions' }, async (reference) => {
       const binding = await reference.ready
@@ -62,7 +74,7 @@ export function apply(ctx: Context): void {
       key: 'suggest_parallel_sessions',
       locale: NS,
       inject: (sessionId: SessionId): ParallelSessionsInjected => ({
-        startSession: task => startSession(sessionId, task),
+        startSession: (task, mode) => startSession(sessionId, task, mode),
       }),
     },
     ParallelSessionsRow,

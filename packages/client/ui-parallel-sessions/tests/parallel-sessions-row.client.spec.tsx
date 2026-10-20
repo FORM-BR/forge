@@ -63,26 +63,40 @@ describe('ParallelSessionsRow', () => {
     expect(view.queryByRole('button')).toBeNull()
   })
 
-  it('lists every offered task with its prompt and starts the chosen one', async () => {
-    const startSession = vi.fn<(task: { title: string; prompt: string }) => Promise<void>>(() => Promise.resolve())
+  it('lists every offered task with its prompt and starts the chosen one where the user picks', async () => {
+    const startSession = vi.fn<(task: { title: string; prompt: string }, mode: 'local' | 'worktree') => Promise<void>>(
+      () => Promise.resolve(),
+    )
     const view = render(<ParallelSessionsRow {...props(settled(), startSession)} />)
     expect(view.getByText('Suggested 2 parallel sessions')).toBeTruthy()
     expect(view.getByText('Waitlist copy')).toBeTruthy()
     expect(view.getByText('Compare the three plans and list the missing rows.')).toBeTruthy()
-    expect(view.getAllByRole('button', { name: 'Open session' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'Open' })).toHaveLength(2)
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Open session' })[0]!)
-    expect(startSession).toHaveBeenCalledWith(TASKS[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'Open' })[0]!)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Open in this workspace' }))
+    expect(startSession).toHaveBeenCalledWith(TASKS[0], 'local')
     await waitFor(() => { expect(screen.getByRole('button', { name: 'Opened' })).toBeTruthy() })
-    expect(screen.getAllByRole('button', { name: 'Open session' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Open' })).toHaveLength(1)
+  })
+
+  it('offers a worktree checkout as the other place to start the session', async () => {
+    const startSession = vi.fn<(task: { title: string; prompt: string }, mode: 'local' | 'worktree') => Promise<void>>(
+      () => Promise.resolve(),
+    )
+    render(<ParallelSessionsRow {...props(settled(), startSession)} />)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Open' })[1]!)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Open in a git worktree' }))
+    expect(startSession).toHaveBeenCalledWith(TASKS[1], 'worktree')
   })
 
   it('reports a failed start without losing the other tasks', async () => {
     const startSession = vi.fn(() => Promise.reject(new Error('host refused')))
     render(<ParallelSessionsRow {...props(settled(), startSession)} />)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Open session' })[0]!)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Open' })[0]!)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Open in this workspace' }))
     await waitFor(() => { expect(screen.getByText('Could not start the session')).toBeTruthy() })
-    expect(screen.getAllByRole('button', { name: 'Open session' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'Open' })).toHaveLength(2)
   })
 
   it('shows a rejected call as its message rather than as tasks', () => {

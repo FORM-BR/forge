@@ -1,3 +1,8 @@
+---
+description: "Web card for a suggest_parallel_sessions call: the offered tasks as a list whose Open menu starts a session in this workspace or in a new git worktree beside the repository; for users and maintainers of parallel-session offers."
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-parallel-sessions
 
 English | [中文](README.zh.md)
@@ -33,7 +38,7 @@ The plugin takes no configuration:
 
 ### What the card does
 
-The header counts the offered tasks and names the state of the call. Every task shows its title and its prompt, with one button that creates a session in the offering session's workspace, sends the offered prompt as the session's first turn, and opens the session in the main region. The button reports `Starting…`, then `Opened`, or `Could not start the session` for that task alone.
+The header counts the offered tasks and names the state of the call. Every task shows its title and its prompt, with an `Open` button that opens a menu: `Open in this workspace` creates the session in the offering session's workspace, and `Open in a git worktree` first creates a worktree beside the repository and adopts it as its own Workspace, so the parallel session writes in a checkout of its own. Either choice sends the offered prompt as the session's first turn and opens the session in the main region. The button reports `Starting…`, then `Opened`, or `Could not start the session` for that task alone.
 
 -----
 
@@ -45,6 +50,8 @@ The header counts the offered tasks and names the state of the call. Every task 
 The card is a projection of the log plus one user gesture. It declares the keyed `tool.call.toolview` entry for `suggest_parallel_sessions`, so the generic Tool row is replaced without touching the Tool layer. Per-task outcomes are component-local: they describe what this visit did, not durable session state, and a remount legitimately forgets them.
 
 Session creation is the client's job because the offer is a suggestion, never a side effect of the model's call: the tool only records what it proposed.
+
+The worktree destination is `workspaces.createWorktree`, a Host command that runs `git worktree add` on a new `forge/<slug>` branch in a sibling `<repo>-worktrees/<slug>` directory. The card never invents a checkout in the browser: it asks the Host, then registers the resulting path as a Workspace so the new session has a row in the sidebar like any other.
 
 ### Source map
 
@@ -97,6 +104,16 @@ None.
 ## Known Limitations and Deferred Work
 
 - **No durable record of which offers were started.** A replayed session shows every task as available again, even after the user started it.
+- **A worktree starts from the current HEAD.** Uncommitted work in the offering checkout is not carried over, and the new branch stays local until the user pushes it.
 - **No parallel start.** Each button starts one session; the card never opens several at once.
 - **No placeholder for duplicated work.** Two users (or one user twice) can start the same task twice.
 - **The prompt is sent as a plain first turn.** Slash commands in an offered prompt are not arbitration-checked by the composer.
+
+### Dev Note
+
+<details>
+<summary>Working context for maintainers - click to expand</summary>
+
+None.
+
+</details>
