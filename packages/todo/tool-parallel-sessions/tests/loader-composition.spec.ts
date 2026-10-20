@@ -66,7 +66,7 @@ function resultText(result: { content: { type: string; text?: string }[] }): str
 
 const TASKS = [
   { title: 'Waitlist copy', prompt: 'Rewrite the waitlist page copy to name the launch date.' },
-  { title: 'Pricing table', prompt: 'Compare the three plans and list the missing rows in docs/pricing.md.' },
+  { title: 'Pricing table', prompt: 'Compare the three plans and list the missing rows in the pricing table.' },
 ]
 
 describe('tool-parallel-sessions through cordis.yml', () => {

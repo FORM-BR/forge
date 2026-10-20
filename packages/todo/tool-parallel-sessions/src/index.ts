@@ -10,7 +10,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 
 export const name = 'tool-parallel-sessions'
-export const inject = ['tools']
+export const inject = ['tools', 'systemPrompt']
 
 /** One suggested session: the tab title, and the self-contained prompt that starts it. */
 export interface ParallelTask {
@@ -27,9 +27,24 @@ const MAX_TASKS = 4
 const DESCRIPTION =
   'Offer to run independent work as parallel sessions. Call this when the remaining work has 2 to 4 '
   + 'tasks that do not depend on each other and can run at the same time in separate sessions. '
+  + 'Call it as well when the user asks for new or parallel sessions in their own words, without naming '
+  + 'this tool. '
   + 'Each task needs a short title and a prompt that stands on its own, without relying on the current '
   + 'conversation. The user decides which sessions to start, so propose only work you would start '
   + 'yourself.'
+
+/**
+ * Model-facing guidance registered as a system section, so offering parallel work
+ * does not depend on the user naming the tool. The closing list mirrors how users
+ * actually ask for it; the model needs those words to reach the tool.
+ */
+const GUIDANCE =
+  'Work here can run in parallel sessions: separate conversations in the same workspace, each started from a '
+  + 'prompt of its own and keeping its own transcript. When the remaining work splits into two or more parts '
+  + 'that do not depend on each other, offer them with `suggest_parallel_sessions`; the user starts them, so the '
+  + 'offer is the whole action and you start no session yourself. The user may call this parallel sessions, '
+  + 'sessions side by side, a session chip, or splitting the work — treat those requests as this tool, and never '
+  + 'ask the user for a tool name.'
 
 /**
  * Validate the bounds the parameter schema cannot express and build the canonical
@@ -66,10 +81,16 @@ function toTaskList(raw: ParallelTask[]): ParallelTask[] {
 }
 
 /**
- * Register the `suggest_parallel_sessions` tool on `ctx.tools`.
- * @param ctx - registrant context carrying the tool registry.
+ * Register the `suggest_parallel_sessions` tool on `ctx.tools` and the guidance
+ * that makes the offer reachable without the user naming it.
+ * @param ctx - registrant context carrying the tool and prompt registries.
  */
 export function apply(ctx: Context): void {
+  ctx.systemPrompt.section({
+    name: 'parallel-sessions',
+    order: ctx.systemPrompt.getSectionOrder('TOOL_PARALLEL_SESSIONS'),
+    text: GUIDANCE,
+  })
   ctx.tools.register(defineTool({
     name: 'suggest_parallel_sessions',
     description: DESCRIPTION,
