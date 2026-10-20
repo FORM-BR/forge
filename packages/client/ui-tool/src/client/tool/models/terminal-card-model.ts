@@ -272,6 +272,17 @@ function parseExitStatus(text: string): { output: string; exitCode?: number; sig
 }
 
 /**
+ * Read the command text of one bash or PowerShell call.
+ * @param block - preparing, dispatched, or settled Tool block.
+ * @returns the command, or undefined when the call is not a valid shell call.
+ */
+export function shellCommand(block: ToolCallBlock): string | undefined {
+  const parsed = parsedToolCall(block)
+  if (parsed === null) return undefined
+  return shellCall(parsed.name, parsed.args)?.command
+}
+
+/**
  * Derive terminal props for supported shell and terminal-send calls, including
  * nested PTC dispatch calls. Standard shell results parse their final status
  * marker; persistent shell results, spill previews, background calls, errors,

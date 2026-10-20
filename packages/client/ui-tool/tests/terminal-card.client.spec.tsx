@@ -430,6 +430,16 @@ describe('BashRow terminal card', () => {
     expect(view.getByText('List files')).toBeTruthy()
   })
 
+  // A Git call leads with the glyph of its own subcommand; other shell calls
+  // keep the generic API icon.
+  it('leads a Git command row with its subcommand glyph', () => {
+    const view = render(<BashRow {...rowProps(running({ argsRaw: shellArgs({ command: 'git commit -m "fix: x"' }) }))} />)
+    expect(view.container.querySelector('[data-git-action="commit"]')).not.toBeNull()
+    cleanup()
+    const plain = render(<BashRow {...rowProps(running())} />)
+    expect(plain.container.querySelector('[data-git-action]')).toBeNull()
+  })
+
   // The row's running state and the card's run-state dot describe the same
   // command, so a running row whose card claimed 'done' would contradict itself.
   it('agrees with the summary row about the run state', () => {
