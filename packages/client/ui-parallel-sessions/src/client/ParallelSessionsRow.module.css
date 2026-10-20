@@ -1,0 +1,48 @@
+/* Transcript line for an offer: its count, and where the actionable card sits. */
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 0;
+}
+
+.leading {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.hint {
+  flex: none;
+  font-size: 12px;
+  color: var(--dsw-alias-label-caption);
+}
+
+.failure {
+  min-width: 0;
+  margin: 0;
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-When an agent asks a question in the Web client, this package replaces the chat composer with an interactive question surface. Users can move through questions, choose one or multiple options, enter custom answers, skip items, and submit one structured answer batch. Single-choice selections advance immediately, while drafts survive Session navigation for the lifetime of the page. A single question with a supported presentation intent can use a dedicated surface, including the plan-review card with `Request changes` and `Approve` actions.
+When an agent asks a question in the Web client, this package pins an interactive question surface above the transcript. Users can move through questions, choose one or multiple options, enter custom answers, skip items, and submit one structured answer batch. Single-choice selections advance immediately, while drafts survive Session navigation for the lifetime of the page. A single question with a supported presentation intent can use a dedicated surface, including the plan-review card with `Request changes` and `Approve` actions.
 
 ## Table of Contents
 
@@ -25,7 +25,7 @@ When an agent asks a question in the Web client, this package replaces the chat 
 <a id="use-this-package"></a>
 ## Use this package
 
-When the agent asks a question, the composer becomes the question surface: answer each question, navigate with the pager, or skip it. Single-select choices advance immediately; Enter continues the flow and submits once every question is answered or skipped, while Shift+Enter breaks a line instead (during IME composition Enter only confirms the input candidate without advancing).
+When the agent asks a question, a panel pinned above the transcript becomes the question surface: answer each question, navigate with the pager, or skip it. The composer seat shows a pointer strip instead of the input, so the turn's draft cannot be typed while the answer is outstanding. Single-select choices advance immediately; Enter continues the flow and submits once every question is answered or skipped, while Shift+Enter breaks a line instead (during IME composition Enter only confirms the input candidate without advancing).
 
 ### Answering
 
@@ -68,7 +68,7 @@ A plan review exposes `conversation.plan-review.actions` with its request key, f
 
 These pages cover the composer host, the tool seam, and the plan-mode consumer.
 
-- [ui-conversation](../ui-conversation/README.md) — the chat surface owning the `conversation.composer` chain.
+- [ui-conversation](../ui-conversation/README.md) - the chat surface owning the `conversation.notice` and `conversation.composer` chains.
 - [tool-ask-user](../../interaction/tool-ask-user/README.md) — the model-facing tool whose schema and answers this UI renders.
 - [ui-plan](../ui-plan/README.md) — the plan-mode surface that sets the `plan-review` intent.
 - [user-questions](../../interaction/user-questions/README.md) — the Host-side question seam and its answerer waterfall.

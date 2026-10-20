@@ -78,6 +78,10 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'directory-picker/exists': { readonly path: string }
     /** The parent is not fully qualified, the name is not one segment, or creation failed. */
     'directory-picker/create-failed': { readonly path: string }
+    /** The requested directory is not inside a git repository. */
+    'workspace/not-a-repository': { readonly path: string }
+    /** git refused to create the worktree, or its parent directory is unwritable. */
+    'workspace/worktree-failed': { readonly path: string }
   }
 }
 
@@ -90,6 +94,22 @@ export interface WorkspaceCreateRequest {
 export interface WorkspaceCreateValue {
   readonly workspace: WorkspaceView
   readonly created: boolean
+}
+
+/** New worktree requested beside the repository containing `cwd`. */
+export interface WorkspaceWorktreeRequest {
+  /** Directory inside the repository; git resolves the repository root from it. */
+  readonly cwd: string
+  /** Task title that names the directory and branch. */
+  readonly title: string
+}
+
+/** Created worktree checkout. */
+export interface WorkspaceWorktreeValue {
+  /** Fully qualified worktree directory. */
+  readonly path: string
+  /** New branch checked out in the worktree. */
+  readonly branch: string
 }
 
 /** Workspace title mutation. */

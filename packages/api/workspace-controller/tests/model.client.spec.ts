@@ -20,6 +20,8 @@ import type {
   WorkspaceUnarchiveSessionRequest,
   WorkspaceUnpinSessionRequest,
   WorkspaceValue,
+  WorkspaceWorktreeRequest,
+  WorkspaceWorktreeValue,
   WorkspaceId,
   WorkspaceView,
 } from '../src/types.ts'
@@ -106,6 +108,13 @@ class FakeWorkspaceRemote implements WorkspaceRemote {
 
   readonly gitInfo = vi.fn<WorkspaceRemote['gitInfo']>(async (path: string): Promise<RemoteResult<WorkspaceGitInfoValue>> =>
     remoteOk({ path, git: { repoName: 'repo', root: path, branch: 'main', detached: false } }))
+
+  readonly createWorktree = vi.fn<WorkspaceRemote['createWorktree']>(async (
+    request: WorkspaceWorktreeRequest,
+  ): Promise<RemoteResult<WorkspaceWorktreeValue>> => remoteOk({
+    path: `${request.cwd}-worktrees/work`,
+    branch: 'forge/work',
+  }))
 
   create(request: WorkspaceCreateRequest): Promise<RemoteResult<WorkspaceCreateValue>> {
     this.record('create', request)

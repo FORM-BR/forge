@@ -381,6 +381,8 @@
 
     - id: ui-workspace
       name: '@deepseek-ai/dsh-client-ui-workspace'
+    - id: ui-parallel-sessions
+      name: '@deepseek-ai/dsh-client-ui-parallel-sessions'
 
     # Durable workflow lifecycle as an independent Chat node after the
     # existing generic workflow tool row.
@@ -589,6 +591,9 @@
   disabled: true
 
 - id: tool-todo
+  disabled: true
+
+- id: tool-parallel-sessions
   disabled: true
 
 - id: tool-web

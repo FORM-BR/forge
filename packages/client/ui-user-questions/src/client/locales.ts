@@ -17,6 +17,7 @@ export const zh = {
   'plan.approve': '同意执行',
   'plan.decline': '拒绝',
   'plan.discuss': '要求修改',
+  'composer.waiting': '问题已置顶，请在上方作答',
 } satisfies Record<string, string>
 
 /** The question namespace key union. */
@@ -39,4 +40,5 @@ export const en = {
   'plan.approve': 'Approve',
   'plan.decline': 'Refuse',
   'plan.discuss': 'Request changes',
+  'composer.waiting': 'The question is pinned above — answer it there',
 } satisfies Record<QuestionKey, string>

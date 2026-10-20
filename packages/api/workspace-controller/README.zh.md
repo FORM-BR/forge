@@ -8,7 +8,7 @@ kind: "package-reference"
 
 ## 概述
 
-`@deepseek-ai/dsh-api-workspace-controller` 拥有 Host 的 `ctx.workspaceController` 服务和生成的 Client `ctx.remote.workspace` namespace。它的 Remote 方法负责创建、重命名、移除和重排 Workspace，在 Workspace 内重排 Session，归档与取消归档 Session，以及跟随完整的 Workspace 投影。当 Client 必须修改或跟随 Workspace 导航时，请通过 API 网关使用它。本包同时拥有 `ctx.directoryPickerController` 与生成的 `ctx.remote.directoryPicker` namespace，因为它承载的选目录 seam 是抽象的，自身从不作为 Loader entry。
+`@deepseek-ai/dsh-api-workspace-controller` 拥有 Host 的 `ctx.workspaceController` 服务和生成的 Client `ctx.remote.workspace` namespace。它的 Remote 方法负责创建、重命名、移除和重排 Workspace，在 Workspace 内重排 Session，归档与取消归档 Session，跟随完整的 Workspace 投影，以及在仓库旁为并行工作创建 git worktree。当 Client 必须修改或跟随 Workspace 导航时，请通过 API 网关使用它。本包同时拥有 `ctx.directoryPickerController` 与生成的 `ctx.remote.directoryPicker` namespace，因为它承载的选目录 seam 是抽象的，自身从不作为 Loader entry。
 
 ## 目录
 
@@ -27,6 +27,8 @@ Host 控制器会串行执行正确性取决于当前注册表状态的变更，
 Client 入口提供 `ClientWorkspaceModel` 和 `createWorkspaceStateStream()`。该模型拥有 Workspace 行、registry 顺序、归档与置顶会话身份、一元变更回显，以及流与一元调用的竞态处理。较新的 Host 行按 `updatedAt` 获胜；已提交的流顺序优先于较旧的一元响应；已经移除的 Workspace id 不会被延迟数据复活。置顶快照仅在会话身份或顺序变化时更新。该包公开与框架无关的快照和订阅，把导航策略与 React 钩子留给 UI owner。`WorkspaceController.archiveSession(sessionId, { stopActivity })` 抛出携带 Host `rpcError` 的 `WorkspaceArchiveError`，界面因此能区分"仍有工作在跑"的拒绝与会话缺失或载体故障，并提议停止这些工作。
 
 `workspace.gitInfo(path, signal)` 是供状态显示使用的只读查询：它在完全限定的 Host 目录中运行 `git`，返回回显的路径；位于仓库内时还返回仓库名（顶层目录的 basename）、仓库根目录、当前分支，以及 HEAD 是否游离（此时分支字段为缩写提交）。目录不在任何仓库内、目录不存在、缺少 `git` 可执行文件、以及超时，都只返回路径；相对路径以 `gateway/bad-request` 失败，调用方中止则以 `gateway/cancelled` 失败。Client 服务将其暴露为 `workspaces.gitInfo(path, signal?)`，Host 失败时会 reject。
+
+`workspace.createWorktree({ cwd, title }, signal)` 会创建 git worktree，让并行会话在自己的检出中写作：它从 `cwd` 解析仓库根目录，用标题推导目录与分支片段，并运行 `git worktree add -b forge/<slug>` 到同级的 `<repo>-worktrees/<slug>` 目录。路径已被占用时顺延编号后缀。它返回 `{ path, branch }`；目录不在仓库内为 `workspace/not-a-repository`，git 拒绝则为 `workspace/worktree-failed`，两者都带上出错的目录。Client 服务将其暴露为 `workspaces.createWorktree(input, signal?)`。把新路径采用为工作区仍是单独的 `create` 调用，因此 git 操作与注册表行各自独立提交。
 
 <a id="first-use-workspace"></a>
 ### 首次使用工作区

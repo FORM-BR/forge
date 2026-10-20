@@ -357,6 +357,35 @@ button.crumb:hover {
   --dsh-composer-text-max-height: 336px;
 }
 
+/* Selector-elected panel pinned above the transcript: it floats over the top of
+   the column, so a question or an offer reaches the user wherever the scroll is
+   without pushing the transcript down. The seat keeps the composer card's width
+   axis and lets pointer events through to the transcript around the card. */
+.noticeSeat {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  width: calc(100% - 2 * var(--dsh-composer-side-clearance));
+  max-width: var(--dsh-composer-card-max-width);
+  max-height: 70%;
+  min-height: 0;
+  padding: 8px 0 0;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/* An elected entry that renders nothing leaves the seat empty: no box, no gap. */
+.noticeSeat:empty {
+  display: none;
+}
+
+.noticeSeat > * {
+  pointer-events: auto;
+}
+
 /* Active phase: header is ordinary column chrome above the scrollport (not
    sticky). The scroll body holds the transcript and the sticky composer seat
    so wheel over the footer moves the flow. */

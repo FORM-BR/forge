@@ -179,6 +179,13 @@ export function ConversationContent(props: ConversationContentProps) {
     { fallback: composerBar, fallbackOnly: sessionId === undefined, overlay: true },
   )
 
+  // A pending interaction also pins a panel above the transcript: the composer
+  // seat is at the end of the scroll body, so a user reading history would
+  // otherwise answer from a control they never scrolled to.
+  const notice = sessionId === undefined
+    ? null
+    : renderSlotChain('conversation.notice', { sessionId, session, pendingInteraction })
+
   // Sticky wraps the whole chain output (fallback + elected overlay), not
   // only `.composerStack`: overlay:true renders those as siblings, and sticky
   // on the fallback alone would leave a business-owned takeover at the content
@@ -198,6 +205,7 @@ export function ConversationContent(props: ConversationContentProps) {
       data-conversation-region="chat"
       data-content-phase={phase}
     >
+      {notice === null ? null : <div className={css.noticeSeat} data-conversation-region="notice">{notice}</div>}
       <div className={css.scrollBody} data-conversation-scroll="">
         {sessionId === undefined ? null : <Views />}
         {composerSeat}

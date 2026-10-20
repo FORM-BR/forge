@@ -223,7 +223,7 @@ export type QuestionWait = PendingQuestion
  * whole behavior surface.
  */
 export type QuestionComposerProps =
-  PropsRuntime<'conversation.composer'>
+  PropsRuntime<'conversation.notice'>
   & PropsStore<ReturnType<typeof createQuestionDraftStore>>
   & PropsRenderSlots<'conversation.plan-review.actions'>
   & { matched: QuestionWait }

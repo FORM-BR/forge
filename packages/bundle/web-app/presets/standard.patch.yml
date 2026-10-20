@@ -134,6 +134,8 @@
             name: '@deepseek-ai/dsh-tool-todo'
             config:
               allowParallelInProgress: true
+          - id: tool-parallel-sessions
+            name: '@deepseek-ai/dsh-tool-parallel-sessions'
           - id: tool-web
             name: '@deepseek-ai/dsh-tool-web'
             config:

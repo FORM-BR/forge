@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-当 agent（智能体）在 Web 客户端中提问时，本包会用交互式提问界面接管聊天编辑器。用户可以在问题之间导航、选择一个或多个选项、输入自定义答案、跳过问题，并提交一批结构化答案。选择单选项后会立即前进，而草稿会在当前页面的生命周期内跨会话导航保留。若唯一的问题声明了受支持的呈现意图，则可使用专用界面，包括带 `Request changes` 和 `Approve` 操作的 plan-review 卡片。
+当 agent（智能体）在 Web 客户端中提问时，本包会在转录上方固定一个交互式提问界面。用户可以在问题之间导航、选择一个或多个选项、输入自定义答案、跳过问题，并提交一批结构化答案。选择单选项后会立即前进，而草稿会在当前页面的生命周期内跨会话导航保留。若唯一的问题声明了受支持的呈现意图，则可使用专用界面，包括带 `Request changes` 和 `Approve` 操作的 plan-review 卡片。
 
 ## 目录
 
@@ -25,7 +25,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-当 agent 提问时，编辑器变成提问界面：回答每个问题、用翻页器导航，或跳过它。选择单选选项后会立即前进；Enter 继续流程，并在所有问题均已回答或跳过后提交，而 Shift+Enter 改为换行（IME 组合输入期间按 Enter 只会确认输入候选，不会前进）。
+当 agent 提问时，转录上方固定的面板成为提问界面：回答每个问题、用翻页器导航，或跳过它。编辑器位置改为显示提示条，因此答案未决期间无法在输入框中打字。选择单选选项后会立即前进；Enter 继续流程，并在所有问题均已回答或跳过后提交，而 Shift+Enter 改为换行（IME 组合输入期间按 Enter 只会确认输入候选，不会前进）。
 
 ### 作答
 
@@ -68,7 +68,7 @@ kind: "package-reference"
 
 以下页面覆盖编辑器宿主、工具 seam 与 plan-mode 消费方。
 
-- [ui-conversation](../ui-conversation/README.zh.md)——拥有 `conversation.composer` 链的聊天界面。
+- [ui-conversation](../ui-conversation/README.zh.md)——拥有 `conversation.notice` 与 `conversation.composer` 链的聊天界面。
 - [tool-ask-user](../../interaction/tool-ask-user/README.zh.md)——面向模型的工具；本 UI 会渲染其 schema 与答案。
 - [ui-plan](../ui-plan/README.zh.md)——设置 `plan-review` 意图的 plan-mode 界面。
 - [user-questions](../../interaction/user-questions/README.zh.md)——Host 侧提问 seam 及其应答方 waterfall（瀑布式事件）。

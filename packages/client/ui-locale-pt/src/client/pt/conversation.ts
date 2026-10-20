@@ -277,6 +277,7 @@ export const pt: Record<string, string> = {
   'detail.matches.capped': 'Limite de resultados atingido; refine a pesquisa para ver mais',
   'detail.event.neighbors': 'Eventos ao redor',
   'todo.completed': '{done}/{total} concluídas',
+  'todo.parallelHint': '{n} abertas · podem rodar em paralelo',
   'command.attachmentsUnsupported': '/{command} não aceita anexos; remova-os primeiro',
   'ask.rowTitle': 'Fazer pergunta',
   'ask.waiting': 'aguardando',

@@ -34,16 +34,24 @@ const PARALLEL: TodoItem[] = [
 
 describe('planSummary', () => {
   it('counts done/total and names the single active item with no extra count', () => {
-    expect(planSummary(LIST)).toEqual({ done: 1, total: 3, activeContent: '写组件', activeExtra: 0 })
+    expect(planSummary(LIST)).toEqual({ done: 1, total: 3, pending: 1, activeContent: '写组件', activeExtra: 0 })
   })
 
   it('reports the extra active count separately when several items are in progress', () => {
-    expect(planSummary(PARALLEL)).toEqual({ done: 1, total: 5, activeContent: '写组件', activeExtra: 2 })
+    expect(planSummary(PARALLEL)).toEqual({ done: 1, total: 5, pending: 1, activeContent: '写组件', activeExtra: 2 })
+  })
+
+  it('counts pending items, the parallel-session hint source', () => {
+    expect(planSummary([
+      { content: 'a', status: 'pending' },
+      { content: 'b', status: 'pending' },
+      { content: 'c', status: 'completed' },
+    ]).pending).toBe(2)
   })
 
   it('has no hint when nothing is in progress', () => {
     expect(planSummary([{ content: '都完了', status: 'completed' }]))
-      .toEqual({ done: 1, total: 1, activeContent: null, activeExtra: 0 })
+      .toEqual({ done: 1, total: 1, pending: 0, activeContent: null, activeExtra: 0 })
   })
 
   it('has no hint when the first active item carries no usable content', () => {
@@ -56,7 +64,7 @@ describe('planSummary', () => {
   })
 
   it('is empty-safe', () => {
-    expect(planSummary([])).toEqual({ done: 0, total: 0, activeContent: null, activeExtra: 0 })
+    expect(planSummary([])).toEqual({ done: 0, total: 0, pending: 0, activeContent: null, activeExtra: 0 })
   })
 })
 
@@ -99,6 +107,19 @@ describe('TodoRow', () => {
     const args = JSON.stringify({ todos: [{ content: 'x', status: 'completed' }] })
     render(<TodoRow {...rowProps({ phase: 'start' as const, callId: 'c1', name: 'todo_write', argsRaw: args, turn: 1, step: 1, time: 1_000, subCalls: [] })} />)
     expect(screen.getByText('1/1 已完成')).toBeTruthy()
+  })
+
+  it('hints at parallel sessions once two items are open', () => {
+    const args = JSON.stringify({ todos: [
+      { content: '写组件', status: 'in_progress' },
+      { content: '补测试', status: 'pending' },
+      { content: '读源码', status: 'pending' },
+    ] })
+    const two = render(<TodoRow {...rowProps(resultNode(args))} />)
+    expect(two.getByText('0/3 已完成 · 写组件 · 2 个未完成 · 可并行')).toBeTruthy()
+    two.unmount()
+    const single = render(<TodoRow {...rowProps(resultNode(JSON.stringify({ todos: LIST })))} />)
+    expect(single.container.textContent).not.toContain('可并行')
   })
 
   it('keeps the counts when an active item has unusable content', () => {

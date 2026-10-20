@@ -13,7 +13,8 @@
     "src/directory-picker.ts",
     "src/feed.ts",
     "src/default-directory.ts",
-    "src/git-info.ts"
+    "src/git-info.ts",
+    "src/worktree.ts"
   ],
   "references": [
     { "path": "../../../vendor/cordis" },

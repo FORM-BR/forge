@@ -15,4 +15,5 @@ export const pt: Record<string, string> = {
   'plan.approve': 'Aprovar',
   'plan.decline': 'Recusar',
   'plan.discuss': 'Solicitar alterações',
+  'composer.waiting': 'A pergunta está fixada no topo — responda por lá',
 }
