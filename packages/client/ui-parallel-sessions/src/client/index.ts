@@ -1,8 +1,9 @@
 /**
- * Parallel-session offer card, browser half. It owns the `suggest_parallel_sessions` keyed tool
- * row and its dictionaries. The card reads only the logged call, so a replayed session rebuilds the
- * same offer; starting a task is the user's gesture here, never the model's — this plugin creates
- * the session, sends the offered prompt, and opens it in the main region.
+ * Parallel-session offer, browser half. It owns the `suggest_parallel_sessions` transcript line, the
+ * card pinned above the transcript, and their dictionaries. The card reads only the logged call, so
+ * a replayed session rebuilds the same offer; starting a task is the user's gesture here, never the
+ * model's — this plugin creates the session, sends the offered prompt, and opens it in the main
+ * region.
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -14,8 +15,16 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: pulls the `uiWorkspace` Context merge and the service type.
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { ParallelSessionsRow, type ParallelSessionsInjected, type ParallelStartMode, type ParallelTask } from './ParallelSessionsRow.tsx'
+import { ParallelSessionsRow } from './ParallelSessionsRow.tsx'
+import {
+  ParallelSessionsNotice, type ParallelSessionsNoticeInjected,
+} from './ParallelSessionsNotice.tsx'
+import {
+  createParallelOfferStore, type ParallelOffer, type ParallelStartMode, type ParallelTask,
+} from './offer-store.ts'
 import { en, NS, zh, type ParallelSessionsKey } from './locales.ts'
+
+export type { ParallelOffer, ParallelStartMode, ParallelTask } from './offer-store.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -35,12 +44,19 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
 export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'uiWorkspace']
 
 /**
- * Register the dictionaries and the keyed offer card.
+ * The notice chain elects one entry per Session. A pending question takes the seat, so this entry
+ * yields to it and renders nothing while the Session carries no offer.
+ */
+const NOTICE_PRIORITY = 10
+
+/**
+ * Register the dictionaries, the transcript line, and the pinned card.
  * @param ctx - client root context.
  */
 export function apply(ctx: Context): void {
   const sessions = ctx.get('sessions') as ISessions
   const workspaces = ctx.get('workspaces') as IWorkspaces
+  const offers = createParallelOfferStore()
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-parallel-sessions: dictionaries')
 
   const startSession = async (
@@ -68,15 +84,35 @@ export function apply(ctx: Context): void {
     ctx.uiWorkspace.openSession(created)
   }
 
+  // The call is the only place the offer exists, so the row that renders it publishes the tasks
+  // and the pinned card reads them.
   ctx.slots.inject('tool.call.toolview', () => ctx.slots.register(
     {
       name: 'tool.call.toolview',
       key: 'suggest_parallel_sessions',
       locale: NS,
-      inject: (sessionId: SessionId): ParallelSessionsInjected => ({
-        startSession: (task, mode) => startSession(sessionId, task, mode),
+      inject: (sessionId: SessionId) => ({
+        publishOffer: (offer: ParallelOffer) => { offers.publish(sessionId, offer) },
+        clearOffer: () => { offers.clear(sessionId) },
       }),
     },
     ParallelSessionsRow,
+  ))
+
+  ctx.slots.inject('conversation.notice', () => ctx.slots.register(
+    {
+      name: 'conversation.notice',
+      priority: NOTICE_PRIORITY,
+      // The card owns its own visibility: an elected seat with no offer renders nothing.
+      select: (): true => true,
+      locale: NS,
+      inject: (sessionId: SessionId): ParallelSessionsNoticeInjected => ({
+        hooks: { parallelOffer: offers.state },
+        startSession: (task, mode) => startSession(sessionId, task, mode),
+        dismiss: () => { offers.dismiss(sessionId) },
+        settle: (title) => { offers.settle(sessionId, title) },
+      }),
+    },
+    ParallelSessionsNotice,
   ))
 }

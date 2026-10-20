@@ -8,4 +8,6 @@ export const pt: Record<string, string> = {
   'row.opening': 'Iniciando…',
   'row.opened': 'Aberta',
   'row.failed': 'Não foi possível iniciar a sessão',
+  'row.pinned': 'Cartão fixado no topo',
+  'notice.close': 'Fechar cartão',
 }

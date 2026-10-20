@@ -13,6 +13,8 @@ export const zh = {
   'row.opening': '正在启动…',
   'row.opened': '已打开',
   'row.failed': '无法启动会话',
+  'row.pinned': '卡片固定在顶部',
+  'notice.close': '关闭卡片',
 } satisfies Record<string, string>
 
 /** The parallelSessions namespace key union. */
@@ -28,4 +30,6 @@ export const en = {
   'row.opening': 'Starting…',
   'row.opened': 'Opened',
   'row.failed': 'Could not start the session',
+  'row.pinned': 'Card pinned above',
+  'notice.close': 'Close card',
 } satisfies Record<ParallelSessionsKey, string>

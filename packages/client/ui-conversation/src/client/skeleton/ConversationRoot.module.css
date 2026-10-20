@@ -357,18 +357,33 @@ button.crumb:hover {
   --dsh-composer-text-max-height: 336px;
 }
 
-/* Selector-elected panel pinned above the transcript: full column width up to
-   the composer card's axis, so it reads as part of the column rather than as a
-   floating card. */
+/* Selector-elected panel pinned above the transcript: it floats over the top of
+   the column, so a question or an offer reaches the user wherever the scroll is
+   without pushing the transcript down. The seat keeps the composer card's width
+   axis and lets pointer events through to the transcript around the card. */
 .noticeSeat {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  left: 50%;
   display: flex;
-  flex: none;
   flex-direction: column;
-  min-height: 0;
+  width: calc(100% - 2 * var(--dsh-composer-side-clearance));
   max-width: var(--dsh-composer-card-max-width);
-  width: 100%;
-  margin: 0 auto;
-  padding: 8px var(--dsh-composer-side-clearance) 0;
+  max-height: 70%;
+  min-height: 0;
+  padding: 8px 0 0;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/* An elected entry that renders nothing leaves the seat empty: no box, no gap. */
+.noticeSeat:empty {
+  display: none;
+}
+
+.noticeSeat > * {
+  pointer-events: auto;
 }
 
 /* Active phase: header is ordinary column chrome above the scrollport (not

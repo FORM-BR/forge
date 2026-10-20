@@ -1,37 +1,24 @@
-import { useState } from 'react'
-import {
-  IconChevronDownOutlineRegular, IconCompareSplitOutlineRegular, IconPlayOutlineRegular,
-  Menu, TextShimmer,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+import { useEffect, useRef } from 'react'
+import { IconCompareSplitOutlineRegular, TextShimmer } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { StartedToolCallViewProps, ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+import type { ParallelOffer, ParallelTask } from './offer-store.ts'
 import css from './ParallelSessionsRow.module.css'
 
-/** One offered session: the card's only call argument. */
-export interface ParallelTask {
-  readonly title: string
-  readonly prompt: string
-}
-
-/** Where the offered session works: this workspace, or a checkout of its own. */
-export type ParallelStartMode = 'local' | 'worktree'
-
-/** What the plugin provides to the card. */
+/** What the plugin provides to the transcript row. */
 export interface ParallelSessionsInjected {
   /**
-   * Create the offered session, send its prompt, and open it in the main region.
-   * @param task - the offered title and prompt.
-   * @param mode - run in the offering workspace, or in a new git worktree beside it.
-   * @returns completion once the session is created, prompted, and opened.
+   * Hand the offered tasks to the card pinned above the transcript. The offer exists only in this
+   * logged call, so the row that renders the call is what publishes it.
+   * @param offer - the call identity and its tasks.
    */
-  startSession: (task: ParallelTask, mode: ParallelStartMode) => Promise<void>
+  publishOffer: (offer: ParallelOffer) => void
+  /** Drop the offer when the row leaves the transcript or stops carrying tasks. */
+  clearOffer: () => void
 }
 
 type ParallelSessionsRowProps =
   ToolCallViewProps & PropsLocale<'parallelSessions'> & InjectFace<ParallelSessionsInjected>
-
-/** Per-task outcome of the card's only gesture. */
-type StartState = 'starting' | 'opened' | 'failed'
 
 /**
  * Read the offered tasks out of the logged call arguments. A truncated streaming prefix reads as no
@@ -39,7 +26,7 @@ type StartState = 'starting' | 'opened' | 'failed'
  * @param argsRaw - the durable raw argument text.
  * @returns the offered tasks, in order.
  */
-function parseTasks(argsRaw: string): ParallelTask[] {
+export function parseTasks(argsRaw: string): ParallelTask[] {
   try {
     const parsed: unknown = JSON.parse(argsRaw)
     if (typeof parsed !== 'object' || parsed === null) return []
@@ -69,7 +56,8 @@ function argsOf(block: StartedToolCallViewProps['block']): string {
 }
 
 /** First physical line of the durable result text, as the failure summary. */
-function firstLine(block: StartedToolCallViewProps['block']): string | null {  if (!('kind' in block)) return null
+function firstLine(block: StartedToolCallViewProps['block']): string | null {
+  if (!('kind' in block)) return null
   const parts: string[] = []
   for (const item of block.content) {
     parts.push(item.type === 'text' ? item.text : JSON.stringify(item, null, 2))
@@ -81,91 +69,44 @@ function firstLine(block: StartedToolCallViewProps['block']): string | null {  i
 }
 
 /**
- * Render one `suggest_parallel_sessions` call as the offer it is: every task with its prompt and the
- * gesture that starts it as its own session.
- * @param props - keyed toolview payload plus the card's locale seat and start action.
- * @returns the offered-sessions card.
+ * Render one `suggest_parallel_sessions` call as the trace it leaves: the count and where the
+ * actionable card sits. The tasks and their start gestures belong to that card, so this row never
+ * repeats them.
+ * @param props - keyed toolview payload plus the card's locale seat and published offer.
+ * @returns the offer's transcript line.
  */
 export function ParallelSessionsRow(props: ParallelSessionsRowProps) {
   if (props.phase === 'preparing') {
     return (
-      <div className={css.card} data-tool="suggest_parallel_sessions" data-state="preparing">
-        <div className={css.header}>
-          <span className={css.leading}><IconCompareSplitOutlineRegular size={14} /></span>
-          <span className={css.visuallyHidden}>{props.t('row.preparing')}</span>
-          <TextShimmer active className={css.headerTitle}>{props.t('row.preparing')}</TextShimmer>
-        </div>
+      <div className={css.row} data-tool="suggest_parallel_sessions" data-state="preparing">
+        <span className={css.leading}><IconCompareSplitOutlineRegular size={14} /></span>
+        <span className={css.visuallyHidden}>{props.t('row.preparing')}</span>
+        <TextShimmer active className={css.title}>{props.t('row.preparing')}</TextShimmer>
       </div>
     )
   }
-  return <OfferedSessions {...props} />
+  return <SettledRow {...props} />
 }
 
-function OfferedSessions({ block, startSession, t }: Exclude<ParallelSessionsRowProps, { phase: 'preparing' }>) {
+function SettledRow({ callId, block, publishOffer, clearOffer, t }: Exclude<ParallelSessionsRowProps, { phase: 'preparing' }>) {
   const tasks = parseTasks(argsOf(block))
-  const [states, setStates] = useState<Record<string, StartState>>({})
-  const [menuTask, setMenuTask] = useState<string | null>(null)
-  const failed = 'kind' in block && block.isError
-  const failure = failed ? firstLine(block) : null
-  const start = (task: ParallelTask, mode: ParallelStartMode): void => {
-    setStates(current => ({ ...current, [task.title]: 'starting' }))
-    void startSession(task, mode).then(
-      () => { setStates(current => ({ ...current, [task.title]: 'opened' })) },
-      () => { setStates(current => ({ ...current, [task.title]: 'failed' })) },
-    )
-  }
+  const failure = 'kind' in block && block.isError ? firstLine(block) : null
+  const titles = tasks.map(task => task.title).join('\n')
+  const tasksRef = useRef(tasks)
+  tasksRef.current = tasks
+  useEffect(() => {
+    if (failure !== null || tasksRef.current.length === 0) return
+    publishOffer({ callId, tasks: tasksRef.current })
+    return () => { clearOffer() }
+    // Republish only when the call identity or its task list changes; the offer store
+    // ignores a call it already holds.
+  }, [callId, titles, failure, publishOffer, clearOffer])
   return (
-    <section className={css.card} data-tool="suggest_parallel_sessions" data-state={failed ? 'error' : 'ok'}>
-      <header className={css.header}>
-        <span className={css.leading}><IconCompareSplitOutlineRegular size={14} /></span>
-        <span className={css.headerTitle}>{t('row.title', { n: tasks.length })}</span>
-      </header>
+    <div className={css.row} data-tool="suggest_parallel_sessions" data-state={failure === null ? 'ok' : 'error'}>
+      <span className={css.leading}><IconCompareSplitOutlineRegular size={14} /></span>
+      <span className={css.title}>{t('row.title', { n: tasks.length })}</span>
+      {failure === null && tasks.length > 0 ? <span className={css.hint}>{t('row.pinned')}</span> : null}
       {failure === null ? null : <p className={css.failure}>{failure}</p>}
-      {failure !== null || tasks.length === 0 ? null : (
-        <ul className={css.tasks}>
-          {tasks.map((task) => {
-            const state = states[task.title]
-            const label = state === 'starting'
-              ? t('row.opening')
-              : state === 'opened' ? t('row.opened') : t('row.open')
-            return (
-              <li key={task.title} className={css.task}>
-                <span className={css.taskText}>
-                  <span className={css.taskTitle}>{task.title}</span>
-                  <span className={css.taskPrompt}>{task.prompt}</span>
-                </span>
-                <Menu
-                  open={menuTask === task.title}
-                  anchor={(
-                    <button
-                      type="button"
-                      className={css.open}
-                      data-state={state ?? 'idle'}
-                      disabled={state === 'starting' || state === 'opened'}
-                      aria-haspopup="menu"
-                      onClick={() => { setMenuTask(current => current === task.title ? null : task.title) }}
-                    >
-                      <IconPlayOutlineRegular size={12} />
-                      {label}
-                      <IconChevronDownOutlineRegular size={12} />
-                    </button>
-                  )}
-                  items={[
-                    { id: 'local', label: t('row.openLocal') },
-                    { id: 'worktree', label: t('row.openWorktree') },
-                  ]}
-                  onSelect={(id) => {
-                    setMenuTask(null)
-                    start(task, id === 'worktree' ? 'worktree' : 'local')
-                  }}
-                  onClose={() => { setMenuTask(null) }}
-                />
-                {state === 'failed' ? <span className={css.taskError}>{t('row.failed')}</span> : null}
-              </li>
-            )
-          })}
-        </ul>
-      )}
-    </section>
+    </div>
   )
 }

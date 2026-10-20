@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ToolResultNode } from '@deepseek-ai/dsh-client-ui-chat/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
@@ -36,12 +36,18 @@ function settled(over: Partial<ToolResultNode> = {}): ToolResultNode {
 }
 
 /**
- * Compose the keyed toolview owner plus the card's locale seat and injected action.
+ * Compose the keyed toolview owner plus the row's locale seat and published offer.
  * @param block - the settled result or the preparing placeholder.
- * @param startSession - the injected start action.
+ * @param injected - the injected offer verbs, defaulting to fresh spies.
  * @returns the component props.
  */
-function props(block: RowProps['block'], startSession: ParallelSessionsInjected['startSession']): RowProps {
+function props(
+  block: RowProps['block'],
+  injected: Pick<ParallelSessionsInjected, 'publishOffer' | 'clearOffer'> = {
+    publishOffer: vi.fn(),
+    clearOffer: vi.fn(),
+  },
+): RowProps {
   return {
     callId: block.callId,
     toolName: 'suggest_parallel_sessions',
@@ -50,7 +56,7 @@ function props(block: RowProps['block'], startSession: ParallelSessionsInjected[
     loadImage: vi.fn(),
     openFile: vi.fn(),
     t,
-    startSession,
+    ...injected,
   } as RowProps
 }
 
@@ -58,54 +64,48 @@ describe('ParallelSessionsRow', () => {
   it('names the offer while the call is still preparing', () => {
     const view = render(<ParallelSessionsRow {...props({
       phase: 'preparing', callId: 'call-parallel', name: 'suggest_parallel_sessions', turn: 1, step: 1, time: 1, subCalls: [],
-    }, vi.fn())} />)
+    })} />)
     expect(view.getAllByText('Suggesting parallel sessions').length).toBeGreaterThan(0)
     expect(view.queryByRole('button')).toBeNull()
   })
 
-  it('lists every offered task with its prompt and starts the chosen one where the user picks', async () => {
-    const startSession = vi.fn<(task: { title: string; prompt: string }, mode: 'local' | 'worktree') => Promise<void>>(
-      () => Promise.resolve(),
-    )
-    const view = render(<ParallelSessionsRow {...props(settled(), startSession)} />)
+  it('publishes the offered tasks and points at the pinned card', () => {
+    const publishOffer = vi.fn()
+    const view = render(<ParallelSessionsRow {...props(settled(), { publishOffer, clearOffer: vi.fn() })} />)
     expect(view.getByText('Suggested 2 parallel sessions')).toBeTruthy()
-    expect(view.getByText('Waitlist copy')).toBeTruthy()
-    expect(view.getByText('Compare the three plans and list the missing rows.')).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: 'Open' })).toHaveLength(2)
-
-    fireEvent.click(screen.getAllByRole('button', { name: 'Open' })[0]!)
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Open in this workspace' }))
-    expect(startSession).toHaveBeenCalledWith(TASKS[0], 'local')
-    await waitFor(() => { expect(screen.getByRole('button', { name: 'Opened' })).toBeTruthy() })
-    expect(screen.getAllByRole('button', { name: 'Open' })).toHaveLength(1)
+    expect(view.getByText('Card pinned above')).toBeTruthy()
+    expect(publishOffer).toHaveBeenCalledWith({ callId: 'call-parallel', tasks: TASKS })
+    // The trace keeps no task bodies and no start gesture: those belong to the pinned card.
+    expect(view.queryByText('Waitlist copy')).toBeNull()
+    expect(view.queryByRole('button')).toBeNull()
   })
 
-  it('offers a worktree checkout as the other place to start the session', async () => {
-    const startSession = vi.fn<(task: { title: string; prompt: string }, mode: 'local' | 'worktree') => Promise<void>>(
-      () => Promise.resolve(),
-    )
-    render(<ParallelSessionsRow {...props(settled(), startSession)} />)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Open' })[1]!)
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Open in a git worktree' }))
-    expect(startSession).toHaveBeenCalledWith(TASKS[1], 'worktree')
+  it('withdraws the offer when the row leaves the transcript', () => {
+    const clearOffer = vi.fn()
+    const view = render(<ParallelSessionsRow {...props(settled(), { publishOffer: vi.fn(), clearOffer })} />)
+    view.unmount()
+    expect(clearOffer).toHaveBeenCalled()
   })
 
-  it('reports a failed start without losing the other tasks', async () => {
-    const startSession = vi.fn(() => Promise.reject(new Error('host refused')))
-    render(<ParallelSessionsRow {...props(settled(), startSession)} />)
-    fireEvent.click(screen.getAllByRole('button', { name: 'Open' })[0]!)
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Open in this workspace' }))
-    await waitFor(() => { expect(screen.getByText('Could not start the session')).toBeTruthy() })
-    expect(screen.getAllByRole('button', { name: 'Open' })).toHaveLength(2)
-  })
-
-  it('shows a rejected call as its message rather than as tasks', () => {
+  it('shows a rejected call as its message and publishes nothing', () => {
+    const publishOffer = vi.fn()
     const view = render(<ParallelSessionsRow {...props(settled({
       content: [{ type: 'text', text: 'invalid tasks: at most 4 tasks may be suggested (got 5)' }],
       isError: true,
-    }), vi.fn())} />)
+    }), { publishOffer, clearOffer: vi.fn() })} />)
     expect(view.getByText('invalid tasks: at most 4 tasks may be suggested (got 5)')).toBeTruthy()
     expect(view.container.querySelector('[data-state="error"]')).not.toBeNull()
+    expect(publishOffer).not.toHaveBeenCalled()
     expect(view.queryByRole('button')).toBeNull()
+  })
+
+  it('publishes nothing while the arguments are still an incomplete stream', () => {
+    const publishOffer = vi.fn()
+    const view = render(<ParallelSessionsRow {...props(settled({
+      call: { name: 'suggest_parallel_sessions', argsRaw: '{"tasks":[{"title":"Wait' },
+    }), { publishOffer, clearOffer: vi.fn() })} />)
+    expect(view.getByText('Suggested 0 parallel sessions')).toBeTruthy()
+    expect(view.queryByText('Card pinned above')).toBeNull()
+    expect(publishOffer).not.toHaveBeenCalled()
   })
 })

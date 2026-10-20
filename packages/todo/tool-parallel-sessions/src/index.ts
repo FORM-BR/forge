@@ -42,9 +42,10 @@ const GUIDANCE =
   'Work here can run in parallel sessions: separate conversations in the same workspace, each started from a '
   + 'prompt of its own and keeping its own transcript. When the remaining work splits into two or more parts '
   + 'that do not depend on each other, offer them with `suggest_parallel_sessions`; the user starts them, so the '
-  + 'offer is the whole action and you start no session yourself. The user may call this parallel sessions, '
-  + 'sessions side by side, a session chip, or splitting the work — treat those requests as this tool, and never '
-  + 'ask the user for a tool name.'
+  + 'offer is the whole action and you start no session yourself. Offer each plan once: the call already puts '
+  + 'the tasks in front of the user, so a repeated call or a restated list adds nothing. The user may call this '
+  + 'parallel sessions, sessions side by side, a session chip, or splitting the work — treat those requests as '
+  + 'this tool, and never ask the user for a tool name.'
 
 /**
  * Validate the bounds the parameter schema cannot express and build the canonical
