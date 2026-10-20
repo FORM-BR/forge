@@ -1,13 +1,58 @@
-/* Pinned offer card: the tasks the model proposed, and where each session can start. The seat
-   above the transcript owns the placement; this file owns how the card itself reads. The card
-   hugs a compact width instead of the column's axis: it is a popup, not a panel. */
+/* Header chip for an offered set of parallel sessions: collapsed it costs the title row one pill,
+   expanded it lists the tasks in a popover below the chip. */
 
-.card {
+.root {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 220px;
+  padding: 2px 8px;
+  border: 0.5px solid var(--dsw-alias-border-l3);
+  border-radius: 999px;
+  corner-shape: round;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+  transition: background 100ms ease, color 100ms ease;
+}
+
+.trigger:hover {
+  background: var(--dsw-alias-interactive-bg-hover-solid);
+  color: var(--dsw-alias-label-primary);
+}
+
+.count {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+/* The popover sits under the chip, over the top of the transcript: only the expanded state covers
+   text, and the transcript stays legible while the offer stays collapsed. */
+.panel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  right: 0;
   display: flex;
   flex-direction: column;
-  width: min(100%, 400px);
-  min-height: 0;
-  margin: 0 auto;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  max-height: 50vh;
   overflow: hidden;
   border: 0.5px solid var(--dsw-alias-border-l1);
   border-radius: var(--dsw-radius-lg);
@@ -15,23 +60,23 @@
   box-shadow: var(--dsw-elevation-prominent);
 }
 
-.header {
+.panelHeader {
   display: flex;
   flex: none;
   align-items: center;
   gap: 6px;
-  padding: 4px 4px 4px 10px;
+  padding: 3px 3px 3px 10px;
   border-bottom: 0.5px solid var(--dsw-alias-border-l1);
 }
 
-.title {
+.panelTitle {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
-  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  color: var(--dsw-alias-label-tertiary);
 }
 
 .close {
@@ -39,8 +84,8 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   padding: 0;
   border: none;
   border-radius: var(--dsw-radius-md, 6px);
@@ -76,7 +121,7 @@
   border-top: 0.5px solid var(--dsw-alias-border-l1);
 }
 
-/* The offer shows only the session title; the prompt rides the `?` tooltip. */
+/* The chip shows only the session title; the prompt rides the `?` tooltip. */
 .taskTitle {
   flex: 1 1 auto;
   min-width: 0;
@@ -110,7 +155,7 @@
 
 .taskError {
   flex-basis: 100%;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--dsw-alias-state-error-primary);
 }
 
@@ -146,6 +191,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .trigger,
   .open {
     transition: none;
   }

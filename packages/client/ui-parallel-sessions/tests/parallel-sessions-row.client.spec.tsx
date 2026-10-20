@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+﻿// @vitest-environment jsdom
 
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -73,7 +73,7 @@ describe('ParallelSessionsRow', () => {
     const publishOffer = vi.fn()
     const view = render(<ParallelSessionsRow {...props(settled(), { publishOffer, clearOffer: vi.fn() })} />)
     expect(view.getByText('Suggested 2 parallel sessions')).toBeTruthy()
-    expect(view.getByText('Card pinned above')).toBeTruthy()
+    expect(view.getByText('In the header')).toBeTruthy()
     expect(publishOffer).toHaveBeenCalledWith({ callId: 'call-parallel', tasks: TASKS })
     // The trace keeps no task bodies and no start gesture: those belong to the pinned card.
     expect(view.queryByText('Waitlist copy')).toBeNull()
@@ -105,7 +105,7 @@ describe('ParallelSessionsRow', () => {
       call: { name: 'suggest_parallel_sessions', argsRaw: '{"tasks":[{"title":"Wait' },
     }), { publishOffer, clearOffer: vi.fn() })} />)
     expect(view.getByText('Suggested 0 parallel sessions')).toBeTruthy()
-    expect(view.queryByText('Card pinned above')).toBeNull()
+    expect(view.queryByText('In the header')).toBeNull()
     expect(publishOffer).not.toHaveBeenCalled()
   })
 })

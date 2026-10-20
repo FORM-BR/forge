@@ -13,9 +13,11 @@ export const zh = {
   'row.opening': '正在启动…',
   'row.opened': '已打开',
   'row.failed': '无法启动会话',
-  'row.pinned': '卡片固定在顶部',
+  'row.pinned': '在标题栏',
   'notice.close': '关闭卡片',
   'notice.details': '查看任务说明',
+  'chip.count': '{n} 个会话',
+  'chip.aria': '{n} 个并行会话建议',
 } satisfies Record<string, string>
 
 /** The parallelSessions namespace key union. */
@@ -31,7 +33,9 @@ export const en = {
   'row.opening': 'Starting…',
   'row.opened': 'Opened',
   'row.failed': 'Could not start the session',
-  'row.pinned': 'Card pinned above',
+  'row.pinned': 'In the header',
   'notice.close': 'Close card',
   'notice.details': 'Task details',
+  'chip.count': '{n} sessions',
+  'chip.aria': '{n} parallel sessions suggested',
 } satisfies Record<ParallelSessionsKey, string>

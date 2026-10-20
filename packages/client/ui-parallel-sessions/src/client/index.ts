@@ -17,8 +17,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { ParallelSessionsRow } from './ParallelSessionsRow.tsx'
 import {
-  ParallelSessionsNotice, type ParallelSessionsNoticeInjected,
-} from './ParallelSessionsNotice.tsx'
+  ParallelSessionsAction, type ParallelSessionsActionInjected,
+} from './ParallelSessionsAction.tsx'
 import {
   createParallelOfferStore, type ParallelOffer, type ParallelStartMode, type ParallelTask,
 } from './offer-store.ts'
@@ -44,13 +44,7 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
 export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'uiWorkspace']
 
 /**
- * The notice chain elects one entry per Session. A pending question takes the seat, so this entry
- * yields to it and renders nothing while the Session carries no offer.
- */
-const NOTICE_PRIORITY = 10
-
-/**
- * Register the dictionaries, the transcript line, and the pinned card.
+ * Register the dictionaries, the transcript line, and the header chip.
  * @param ctx - client root context.
  */
 export function apply(ctx: Context): void {
@@ -99,20 +93,20 @@ export function apply(ctx: Context): void {
     ParallelSessionsRow,
   ))
 
-  ctx.slots.inject('conversation.notice', () => ctx.slots.register(
+  ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register(
     {
-      name: 'conversation.notice',
-      priority: NOTICE_PRIORITY,
-      // The card owns its own visibility: an elected seat with no offer renders nothing.
-      select: (): true => true,
+      name: 'conversation.session.header.actions',
+      id: 'parallel-offer',
+      // The offer follows the background-job chip in the same header band.
+      order: 30,
       locale: NS,
-      inject: (sessionId: SessionId): ParallelSessionsNoticeInjected => ({
+      inject: (): ParallelSessionsActionInjected => ({
         hooks: { parallelOffer: offers.state },
-        startSession: (task, mode) => startSession(sessionId, task, mode),
-        dismiss: () => { offers.dismiss(sessionId) },
-        settle: (title) => { offers.settle(sessionId, title) },
+        startSession,
+        dismiss: (sessionId) => { offers.dismiss(sessionId) },
+        settle: (sessionId, title) => { offers.settle(sessionId, title) },
       }),
     },
-    ParallelSessionsNotice,
+    ParallelSessionsAction,
   ))
 }
