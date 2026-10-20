@@ -73,7 +73,7 @@ it('shows completed paragraph first lines across blank lines with a right-edge f
       await page.emulateMedia({ reducedMotion: 'reduce' })
       await expect.poll(() => hammer.evaluate(element => element.getAnimations().length)).toBe(0)
       await expect.poll(() => hammer.evaluate(element => getComputedStyle(element).transform))
-        .toContain('0.9703')
+        .toContain('0.866025')
       await page.emulateMedia({ reducedMotion: 'no-preference' })
       await expect.poll(() => hammer.evaluate(element => element.getAnimations().length)).toBeGreaterThan(0)
       expect(await reasoning.getAttribute('data-preview')).toBeNull()

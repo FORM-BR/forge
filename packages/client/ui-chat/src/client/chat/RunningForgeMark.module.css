@@ -1,4 +1,5 @@
-/* The strike cycle: wind up, fall, rebound, settle. Sparks follow the impact. */
+/* The strike cycle: hold the upright logo, swing it down, rebound, rise back
+   upright. Sparks follow the impact. */
 .icon {
   display: inline-flex;
   flex: none;
@@ -8,10 +9,18 @@
 
 .hammer {
   transform-box: view-box;
-  /* Pivot at the handle grip, so the logo swings like a hammer and the head
-     travels in an arc instead of spinning around its own striking face. */
+  /* Pivot at the handle grip, so the head travels a wide arc into the anvil
+     instead of spinning in place. */
   transform-origin: 0px 21px;
   animation: forge-strike 1.5s cubic-bezier(0.55, 0.05, 0.45, 1) infinite;
+}
+
+.head {
+  transform-box: view-box;
+  /* The logo's own anchor: this turn, added to the arc, stands the logo
+     upright at the top of the swing. */
+  transform-origin: 12.13px 12.97px;
+  animation: forge-turn 1.5s cubic-bezier(0.55, 0.05, 0.45, 1) infinite;
 }
 
 .anvil {
@@ -24,37 +33,56 @@
   color: var(--dsw-alias-state-warn-primary);
   opacity: 0;
   transform-box: view-box;
-  transform-origin: 13.9px 16.6px;
+  /* The struck point on the anvil face, so the burst grows outward from it. */
+  transform-origin: 14.8px 19.1px;
   animation: forge-sparks 1.5s linear infinite;
 }
 
 @keyframes forge-strike {
-  0% {
-    transform: rotate(-14deg);
-  }
-
+  0%,
   26% {
-    transform: rotate(-14deg);
+    transform: rotate(-30deg);
   }
 
   37% {
-    transform: rotate(14deg);
+    transform: rotate(0deg);
   }
 
   44% {
-    transform: rotate(6deg);
+    transform: rotate(-3deg);
   }
 
   52% {
-    transform: rotate(12deg);
+    transform: rotate(-1deg);
   }
 
-  78% {
-    transform: rotate(-14deg);
-  }
-
+  78%,
   100% {
-    transform: rotate(-14deg);
+    transform: rotate(-30deg);
+  }
+}
+
+@keyframes forge-turn {
+  0%,
+  26% {
+    transform: rotate(-54deg);
+  }
+
+  37% {
+    transform: rotate(0deg);
+  }
+
+  44% {
+    transform: rotate(-5deg);
+  }
+
+  52% {
+    transform: rotate(-1deg);
+  }
+
+  78%,
+  100% {
+    transform: rotate(-54deg);
   }
 }
 
@@ -78,30 +106,35 @@
   0%,
   36% {
     opacity: 0;
-    transform: scale(0.7);
+    transform: scale(0.5);
   }
 
   40% {
     opacity: 1;
-    transform: scale(0.95);
+    transform: scale(0.9);
   }
 
   48% {
     opacity: 0.9;
-    transform: scale(1.04);
+    transform: scale(1.05);
   }
 
   62%,
   100% {
     opacity: 0;
-    transform: scale(1.1);
+    transform: scale(1.15);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .hammer {
     animation: none;
-    transform: rotate(-14deg);
+    transform: rotate(-30deg);
+  }
+
+  .head {
+    animation: none;
+    transform: rotate(-54deg);
   }
 
   .anvil {
