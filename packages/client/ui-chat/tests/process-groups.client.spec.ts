@@ -81,7 +81,10 @@ describe('Definition-owned Chat process groups', () => {
     h.commit()
     expect(source.getSnapshot()?.data).toEqual({
       turn: 1, closed: true,
-      summary: { counts: [{ kind: 'write', count: 1 }], running: undefined, runningDetail: '' },
+      summary: {
+        counts: [{ kind: 'write', count: 1 }], running: undefined, runningDetail: '',
+        steps: [{ kind: 'write', state: 'done', detail: '' }],
+      },
     })
   })
 
@@ -101,10 +104,14 @@ describe('Definition-owned Chat process groups', () => {
     const source = h.store.groupSource(group.key)
     expect(source.getSnapshot()?.data.summary).toEqual({
       counts: [{ kind, count: 1 }], running: kind, preparing: true, runningDetail: kind === 'tools' ? name : '',
+      steps: [{ kind, state: 'running', detail: '' }],
     })
     h.builder.apply({ upserts: [started], timeline })
     h.commit()
-    expect(source.getSnapshot()?.data.summary).toEqual({ counts: [{ kind, count: 1 }], running: kind, runningDetail: 'pwd' })
+    expect(source.getSnapshot()?.data.summary).toEqual({
+      counts: [{ kind, count: 1 }], running: kind, runningDetail: 'pwd',
+      steps: [{ kind, state: 'running', detail: 'pwd' }],
+    })
     const settled: ChatNode<'tool-call'> = {
       ...started,
       data: { root: {
@@ -114,7 +121,10 @@ describe('Definition-owned Chat process groups', () => {
     }
     h.builder.apply({ upserts: [settled], timeline })
     h.commit()
-    expect(source.getSnapshot()?.data.summary).toEqual({ counts: [{ kind, count: 1 }], running: undefined, runningDetail: '' })
+    expect(source.getSnapshot()?.data.summary).toEqual({
+      counts: [{ kind, count: 1 }], running: undefined, runningDetail: '',
+      steps: [{ kind, state: 'done', detail: 'pwd' }],
+    })
   })
 
   it('retains a group through repeated prepends and a later append', () => {

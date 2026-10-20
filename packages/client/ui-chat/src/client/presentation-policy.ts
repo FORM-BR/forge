@@ -17,6 +17,8 @@ export interface ChatPresentationPolicy {
   readonly stepGrouping: 'collapsed' | 'history' | 'none'
   /** Show the running command, path, query, or reasoning detail in group titles. */
   readonly liveProcessDetail: boolean
+  /** List the newest members under a collapsed live group header. */
+  readonly liveWorkTrail: boolean
   /** Whether a settled reasoning row previews its first line beside the Think title. */
   readonly settledReasoningPreview: boolean
 }
@@ -27,6 +29,7 @@ const POLICIES: Readonly<Record<TranscriptViewMode, ChatPresentationPolicy>> = {
     foldCompletedTurns: true,
     stepGrouping: 'collapsed',
     liveProcessDetail: false,
+    liveWorkTrail: false,
     settledReasoningPreview: false,
   },
   standard: {
@@ -34,6 +37,7 @@ const POLICIES: Readonly<Record<TranscriptViewMode, ChatPresentationPolicy>> = {
     foldCompletedTurns: true,
     stepGrouping: 'collapsed',
     liveProcessDetail: true,
+    liveWorkTrail: true,
     settledReasoningPreview: true,
   },
   detailed: {
@@ -41,6 +45,7 @@ const POLICIES: Readonly<Record<TranscriptViewMode, ChatPresentationPolicy>> = {
     foldCompletedTurns: true,
     stepGrouping: 'history',
     liveProcessDetail: true,
+    liveWorkTrail: false,
     settledReasoningPreview: true,
   },
   verbose: {
@@ -48,6 +53,7 @@ const POLICIES: Readonly<Record<TranscriptViewMode, ChatPresentationPolicy>> = {
     foldCompletedTurns: false,
     stepGrouping: 'none',
     liveProcessDetail: false,
+    liveWorkTrail: false,
     settledReasoningPreview: true,
   },
 }

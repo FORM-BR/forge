@@ -32,6 +32,11 @@ function sameSummary(left: ProcessActivitySummary, right: ProcessActivitySummary
     && left.preparing === right.preparing
     && left.counts.length === right.counts.length && left.counts.every((value, index) =>
     value.kind === right.counts[index]?.kind && value.count === right.counts[index].count)
+    && left.steps.length === right.steps.length && left.steps.every((value, index) => {
+    const other = right.steps[index]
+    return other !== undefined && value.kind === other.kind && value.state === other.state
+        && value.detail === other.detail
+  })
 }
 
 function sameMembers(left: readonly NodeReference[], right: readonly NodeReference[]): boolean {
@@ -59,7 +64,7 @@ class ProcessGroup {
   snapshot: GroupSnapshot<ProcessGroupData>
 
   constructor(readonly key: GroupKey, readonly turn: number, readonly members: readonly NodeReference[]) {
-    this.snapshot = { key, members, data: { turn, closed: false, summary: { counts: [], running: undefined, runningDetail: '' } } }
+    this.snapshot = { key, members, data: { turn, closed: false, summary: { counts: [], running: undefined, runningDetail: '', steps: [] } } }
   }
 
   refresh(input: ProcessInput, closed: boolean): void {
@@ -67,7 +72,13 @@ class ProcessGroup {
     const unchanged = nodes.length === this.nodes.length && nodes.every((node, index) => node === this.nodes[index])
     const previous = this.snapshot.data
     const activity = unchanged && previous.closed === closed ? previous.summary : processActivity(nodes)
-    const summary = closed ? { counts: activity.counts, running: undefined, runningDetail: '' } : activity
+    // A closed group keeps its trail for the header count; nothing in it can still be running.
+    const summary = closed ? {
+      counts: activity.counts,
+      running: undefined,
+      runningDetail: '',
+      steps: activity.steps.map(step => step.state === 'running' ? { ...step, state: 'done' as const } : step),
+    } : activity
     this.nodes = nodes
     if (previous.closed !== closed || !sameSummary(previous.summary, summary)) {
       this.snapshot = {
