@@ -1,0 +1,112 @@
+/* The strike cycle: raise, fall, recoil, raise again. Sparks follow the impact. */
+.icon {
+  display: inline-flex;
+  flex: none;
+  width: calc(18px + var(--dsh-content-font-delta, 0px));
+  height: calc(18px + var(--dsh-content-font-delta, 0px));
+}
+
+.hammer {
+  transform-box: view-box;
+  transform-origin: 21px 3.2px;
+  animation: forge-strike 1.6s cubic-bezier(0.5, 0, 0.4, 1) infinite;
+}
+
+.anvil {
+  transform-box: view-box;
+  transform-origin: 8.5px 20px;
+  animation: forge-impact 1.6s linear infinite;
+}
+
+.sparks {
+  opacity: 0;
+  transform-box: view-box;
+  transform-origin: 8.5px 15px;
+  animation: forge-sparks 1.6s linear infinite;
+}
+
+@keyframes forge-strike {
+  0% {
+    transform: rotate(22deg);
+  }
+
+  44% {
+    transform: rotate(22deg);
+  }
+
+  52% {
+    transform: rotate(-8deg);
+  }
+
+  58% {
+    transform: rotate(5deg);
+  }
+
+  68% {
+    transform: rotate(2deg);
+  }
+
+  82% {
+    transform: rotate(22deg);
+  }
+
+  100% {
+    transform: rotate(22deg);
+  }
+}
+
+@keyframes forge-impact {
+  0%,
+  50%,
+  100% {
+    transform: translateY(0);
+  }
+
+  53% {
+    transform: translateY(0.5px);
+  }
+
+  58% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes forge-sparks {
+  0%,
+  50% {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+
+  54% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  70% {
+    opacity: 0.85;
+    transform: scale(1.12);
+  }
+
+  78%,
+  100% {
+    opacity: 0;
+    transform: scale(1.18);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hammer {
+    animation: none;
+    transform: rotate(22deg);
+  }
+
+  .anvil {
+    animation: none;
+  }
+
+  .sparks {
+    animation: none;
+    opacity: 0;
+  }
+}
