@@ -1,10 +1,13 @@
 /* Pinned offer card: the tasks the model proposed, and where each session can start. The seat
-   above the transcript owns the placement; this file owns how the card itself reads. */
+   above the transcript owns the placement; this file owns how the card itself reads. The card
+   hugs a compact width instead of the column's axis: it is a popup, not a panel. */
 
 .card {
   display: flex;
   flex-direction: column;
+  width: min(100%, 400px);
   min-height: 0;
+  margin: 0 auto;
   overflow: hidden;
   border: 0.5px solid var(--dsw-alias-border-l1);
   border-radius: var(--dsw-radius-lg);
@@ -17,16 +20,8 @@
   flex: none;
   align-items: center;
   gap: 6px;
-  padding: 8px 8px 8px 12px;
+  padding: 4px 4px 4px 10px;
   border-bottom: 0.5px solid var(--dsw-alias-border-l1);
-}
-
-.leading {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  color: var(--dsw-alias-label-tertiary);
 }
 
 .title {
@@ -35,8 +30,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--dsh-content-font-size-secondary, 13px);
-  font-weight: 500;
+  font-size: 12px;
   color: var(--dsw-alias-label-secondary);
 }
 
@@ -45,8 +39,8 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   padding: 0;
   border: none;
   border-radius: var(--dsw-radius-md, 6px);
@@ -74,8 +68,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 8px;
-  padding: 5px 12px;
+  gap: 4px 6px;
+  padding: 3px 6px 3px 10px;
 }
 
 .task + .task {
@@ -89,7 +83,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--dsh-content-font-size-secondary, 13px);
+  font-size: 12px;
   color: var(--dsw-alias-label-primary);
 }
 
@@ -98,8 +92,8 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   padding: 0;
   border: none;
   border-radius: var(--dsw-radius-md, 6px);
@@ -124,15 +118,15 @@
   display: inline-flex;
   flex: none;
   align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
+  gap: 3px;
+  padding: 1px 7px;
   border: 0.5px solid var(--dsw-alias-border-l4);
   border-radius: 999px;
   corner-shape: round;
   background: var(--dsw-alias-bg-base);
   color: var(--dsw-alias-label-secondary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 11px;
+  line-height: 16px;
   cursor: pointer;
   transition: background 100ms ease, color 100ms ease;
 }

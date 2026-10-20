@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import {
-  IconChevronDownOutlineRegular, IconCloseOutlineRegular, IconCompareSplitOutlineRegular, IconPlayOutlineRegular,
-  IconQuestionOutlineRegular, Menu, Tooltip,
+  IconChevronDownOutlineRegular, IconCloseOutlineRegular, IconQuestionOutlineRegular, Menu, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ParallelOfferSource, ParallelStartMode, ParallelTask } from './offer-store.ts'
@@ -64,7 +63,6 @@ export function ParallelSessionsNotice(props: ParallelSessionsNoticeProps) {
   return (
     <section className={css.card} data-tool="suggest_parallel_sessions" aria-label={props.t('row.title', { n: offer.tasks.length })}>
       <header className={css.header}>
-        <span className={css.leading}><IconCompareSplitOutlineRegular size={14} /></span>
         <span className={css.title}>{props.t('row.title', { n: offer.tasks.length })}</span>
         <button
           type="button"
@@ -102,9 +100,8 @@ export function ParallelSessionsNotice(props: ParallelSessionsNoticeProps) {
                     aria-haspopup="menu"
                     onClick={() => { setMenuTask(current => current === task.title ? null : task.title) }}
                   >
-                    <IconPlayOutlineRegular size={12} />
                     {label}
-                    <IconChevronDownOutlineRegular size={12} />
+                    <IconChevronDownOutlineRegular size={11} />
                   </button>
                 )}
                 items={[
