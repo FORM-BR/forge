@@ -144,7 +144,7 @@
 
 .runningContent {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   min-width: 0;
   gap: 6px;
 }
@@ -152,27 +152,6 @@
 .runningText {
   min-width: 0;
   font-variant-numeric: tabular-nums;
-}
-
-.runningIcon {
-  display: inline-flex;
-  flex: none;
-  width: calc(14px + var(--dsh-content-font-delta, 0px));
-  height: calc(14px + var(--dsh-content-font-delta, 0px));
-}
-
-.runningWhaleStill {
-  display: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .runningWhaleAnimated {
-    display: none;
-  }
-
-  .runningWhaleStill {
-    display: initial;
-  }
 }
 
 .openError {
