@@ -25,6 +25,8 @@ function isItem(value: unknown): value is PlanItemLike {
 interface RowSummary {
   text: string
   extra: number
+  /** Open (pending) items, so the row can hint at parallel sessions. */
+  pending: number
 }
 
 function summarize(argsRaw: string | null, t: TodoRowProps['t']): RowSummary | null {
@@ -41,12 +43,14 @@ function summarize(argsRaw: string | null, t: TodoRowProps['t']): RowSummary | n
   if (typeof parsed !== 'object' || parsed === null) return null
   const todos = (parsed as { todos?: unknown }).todos
   if (!Array.isArray(todos) || !todos.every(isItem)) return null
-  const { done, total, activeContent, activeExtra } = planSummary(todos)
+  const { done, total, activeContent, activeExtra, pending } = planSummary(todos)
   const head = t('todo.completed', { done, total })
-  return {
-    text: activeContent === null ? head : `${head} · ${activeContent}`,
-    extra: activeExtra,
-  }
+  // Two or more open items are the point where splitting the work into parallel
+  // sessions becomes worth offering; the hint names the count and nothing else.
+  const parallel = pending >= 2 ? t('todo.parallelHint', { n: pending }) : null
+  const text = [activeContent === null ? head : `${head} · ${activeContent}`, parallel]
+    .filter((part): part is string => part !== null).join(' · ')
+  return { text, extra: activeExtra, pending }
 }
 
 /** Summarizes a plan update without presenting a cancelled call as completed. */
@@ -55,7 +59,7 @@ export function TodoRow({ toolName, block, inspect, useDisclosure, useTodoHistor
   const hasMore = useSession(snapshot => snapshot.hasMore)
   const diff = useMemo(() => todoDiffModel(block, baseline, hasMore, t), [block, baseline, hasMore, t])
   const model = toolRowModel(toolName, block)
-  const summary = summarize(model.bodyRaw, t) ?? { text: model.summary, extra: 0 }
+  const summary = summarize(model.bodyRaw, t) ?? { text: model.summary, extra: 0, pending: 0 }
   return (
     <ToolRow
       useDisclosure={useDisclosure}
