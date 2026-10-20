@@ -185,6 +185,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'conversation.view': { kind: 'list'; scope: 'session'; owner: ConvViewOwnerProps }
     /** Selector-routed replacements for the current Session's resident composer. */
     'conversation.composer': { kind: 'chain'; scope: 'session'; owner: ComposerChainProps }
+    /** Selector-routed panel pinned above the transcript, for work the user must settle before the turn continues. */
+    'conversation.notice': { kind: 'chain'; scope: 'session'; owner: ComposerChainProps }
     /** Workspace picker shown by the blank-session Hero. */
     'conversation.hero.workspace': { kind: 'single'; scope: 'root'; owner: EmptyWorkspaceOwnerProps }
     /** Status chip beside the blank-session Workspace chip (for example the git branch of the chosen Workspace). */
@@ -233,6 +235,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       children: {
         'conversation.session': { kind: 'single'; scope: 'session' }
         'conversation.composer': { kind: 'chain'; scope: 'session' }
+        'conversation.notice': { kind: 'chain'; scope: 'session' }
         'conversation.composer.bar': { kind: 'single'; scope: 'session-maybe' }
         'conversation.input.dock': { kind: 'list'; scope: 'session' }
         'conversation.hero.brand.mark': { kind: 'single'; scope: 'root' }

@@ -357,6 +357,20 @@ button.crumb:hover {
   --dsh-composer-text-max-height: 336px;
 }
 
+/* Selector-elected panel pinned above the transcript: full column width up to
+   the composer card's axis, so it reads as part of the column rather than as a
+   floating card. */
+.noticeSeat {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  min-height: 0;
+  max-width: var(--dsh-composer-card-max-width);
+  width: 100%;
+  margin: 0 auto;
+  padding: 8px var(--dsh-composer-side-clearance) 0;
+}
+
 /* Active phase: header is ordinary column chrome above the scrollport (not
    sticky). The scroll body holds the transcript and the sticky composer seat
    so wheel over the footer moves the flow. */

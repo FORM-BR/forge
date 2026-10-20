@@ -25,6 +25,7 @@ import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import { PendingQuestion } from './contract/slots.ts'
 import { createQuestionDraftStore } from './draft-store.ts'
 import { QuestionComposer } from './QuestionComposer.tsx'
+import { QuestionWaiting } from './QuestionWaiting.tsx'
 import { en, zh, type QuestionKey } from './locales.ts'
 
 export type {
@@ -91,9 +92,9 @@ export function apply(ctx: ClientContext): void {
   const registerPendingInteraction = ctx.uiSession.registerPendingInteraction<PendingQuestion>(
     pending => pending.kind === 'plan-review' ? 2 : 1,
   )
-  ctx.slots.inject('conversation.composer', () => ctx.slots.register(
+  ctx.slots.inject('conversation.notice', () => ctx.slots.register(
     {
-      name: 'conversation.composer',
+      name: 'conversation.notice',
       select: ({ pendingInteraction }: ComposerChainProps): PendingQuestion | null =>
         pendingInteraction instanceof PendingQuestion ? pendingInteraction : null,
       locale: NS,
@@ -101,6 +102,17 @@ export function apply(ctx: ClientContext): void {
       children: { 'conversation.plan-review.actions': { kind: 'list', scope: 'session' } },
     },
     QuestionComposer,
+  ))
+  // The composer seat is taken too, so the turn's input cannot be typed while the
+  // answer is outstanding; the strip only says where the question is.
+  ctx.slots.inject('conversation.composer', () => ctx.slots.register(
+    {
+      name: 'conversation.composer',
+      select: ({ pendingInteraction }: ComposerChainProps): PendingQuestion | null =>
+        pendingInteraction instanceof PendingQuestion ? pendingInteraction : null,
+      locale: NS,
+    },
+    QuestionWaiting,
   ))
   ctx.remote.$on('user-questions/request', function (request, next) {
     return answerQuestion(ctx, this, request, next, registerPendingInteraction)
