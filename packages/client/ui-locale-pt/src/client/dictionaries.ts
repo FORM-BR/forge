@@ -15,6 +15,7 @@ import { pt as feedback } from './pt/feedback.ts'
 import { pt as goal } from './pt/goal.ts'
 import { pt as model } from './pt/model.ts'
 import { pt as open_in_app } from './pt/open-in-app.ts'
+import { pt as parallel_sessions } from './pt/parallel-sessions.ts'
 import { pt as permission_access } from './pt/permission-access.ts'
 import { pt as plan } from './pt/plan.ts'
 import { pt as pluginmanager } from './pt/pluginmanager.ts'
@@ -75,6 +76,7 @@ export const dictionaries: Record<string, Record<string, string>> = {
   'model': model,
   'open-in-app': open_in_app,
   'permission.access': permission_access,
+  'parallelSessions': parallel_sessions,
   'plan': plan,
   'pluginManager': pluginmanager,
   'question': question,

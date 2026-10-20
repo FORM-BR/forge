@@ -1,0 +1,9 @@
+/** pt-BR dictionary for the `parallelSessions` namespace. */
+export const pt: Record<string, string> = {
+  'row.title': '{n} sessões em paralelo sugeridas',
+  'row.preparing': 'Sugerindo sessões em paralelo',
+  'row.open': 'Abrir sessão',
+  'row.opening': 'Iniciando…',
+  'row.opened': 'Aberta',
+  'row.failed': 'Não foi possível iniciar a sessão',
+}
