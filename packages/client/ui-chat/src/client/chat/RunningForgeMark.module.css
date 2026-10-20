@@ -10,7 +10,7 @@
   transform-box: view-box;
   /* Pivot at the handle grip, so the logo swings like a hammer and the head
      travels in an arc instead of spinning around its own striking face. */
-  transform-origin: 17px 4px;
+  transform-origin: 0px 21px;
   animation: forge-strike 1.5s cubic-bezier(0.55, 0.05, 0.45, 1) infinite;
 }
 
@@ -24,37 +24,37 @@
   color: var(--dsw-alias-state-warn-primary);
   opacity: 0;
   transform-box: view-box;
-  transform-origin: 14.5px 18.5px;
+  transform-origin: 13.9px 16.6px;
   animation: forge-sparks 1.5s linear infinite;
 }
 
 @keyframes forge-strike {
   0% {
-    transform: rotate(6deg);
+    transform: rotate(-14deg);
   }
 
   26% {
-    transform: rotate(6deg);
+    transform: rotate(-14deg);
   }
 
   37% {
-    transform: rotate(-7deg);
+    transform: rotate(14deg);
   }
 
   44% {
-    transform: rotate(-3deg);
+    transform: rotate(6deg);
   }
 
   52% {
-    transform: rotate(-6deg);
+    transform: rotate(12deg);
   }
 
   78% {
-    transform: rotate(6deg);
+    transform: rotate(-14deg);
   }
 
   100% {
-    transform: rotate(6deg);
+    transform: rotate(-14deg);
   }
 }
 
@@ -101,7 +101,7 @@
 @media (prefers-reduced-motion: reduce) {
   .hammer {
     animation: none;
-    transform: rotate(6deg);
+    transform: rotate(-14deg);
   }
 
   .anvil {
