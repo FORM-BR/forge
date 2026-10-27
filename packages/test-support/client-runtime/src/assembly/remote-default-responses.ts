@@ -32,6 +32,12 @@ export const remoteDefaultResponses: RemoteTable = {
     'dynamicCordisRunner/inventory': ok([]),
     // ui-settings-plugins web-search card `readCredential()` when the settings mirror first publishes.
     'credentials/describe': ok({}),
+    // ui-plugin-manager reads whether this process booted in safe mode when its store first loads.
+    'pluginManager/safeMode': ok({ active: false }),
+    // ui-settings-general phone-access row: the Host's answers while Tailscale is not involved.
+    'remoteAccess/status': ok({ state: 'off' }),
+    'remoteAccess/enable': ok({ state: 'off' }),
+    'remoteAccess/disable': ok({ state: 'off' }),
     // ui-permission-presets `PermissionCatalogDirectory` on its first read for a connection generation.
     'permissionPresets/catalog': ok({ options: [] }),
     // ui-settings-account refreshes details after a stored-grant snapshot.

@@ -345,6 +345,25 @@ describe('connection node half', () => {
     await dispose()
   })
 
+  it('admits an authority while running and withdraws exactly that admission', async () => {
+    const { connection, dispose } = await mounted()
+    const late = fakeRequest({ host: 'pc.tail1234.ts.net' })
+    expect(connection.requestRejection(late)).toBe(403)
+
+    const withdraw = connection.trustHost('pc.tail1234.ts.net')
+    const again = connection.trustHost('pc.tail1234.ts.net')
+    expect(connection.requestRejection(late)).toBe(401)
+
+    withdraw()
+    withdraw()
+    // The second admission of the same authority still stands.
+    expect(connection.requestRejection(late)).toBe(401)
+    again()
+    expect(connection.requestRejection(late)).toBe(403)
+    expect(() => connection.trustHost('pc.tail1234.ts.net/path')).toThrow()
+    await dispose()
+  })
+
   it('provides a disposable dedicated RPC channel', async () => {
     const ctx = new Context()
     const routes: WebRoute[] = []

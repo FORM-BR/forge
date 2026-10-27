@@ -32,3 +32,31 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
 export interface SettingsDocumentOpenValue {
   readonly opened: true
 }
+
+/** The switch's state as a settings page renders it. */
+export type RemoteAccessState =
+  /** Switched off (or never switched on). */
+  | 'off'
+  /** Published on the tailnet and admitted by the fence. */
+  | 'on'
+  /** No `tailscale` command on this computer. */
+  | 'unavailable'
+  /** Tailscale is installed but stopped or signed out. */
+  | 'needs-login'
+  /** Tailscale Serve is not enabled for the tailnet yet; {@link RemoteAccessStatus.link} enables it. */
+  | 'needs-serve'
+  /** Anything else; {@link RemoteAccessStatus.detail} says what. */
+  | 'failed'
+
+/** What the page shows: the state, and the link a phone opens while it is on. */
+export interface RemoteAccessStatus {
+  state: RemoteAccessState
+  /** Tailnet host name of this computer, when Tailscale is connected. */
+  host?: string
+  /** Address to open on the phone, with this process's login token; present only while `on`. */
+  url?: string
+  /** Page that enables Serve; present only with `needs-serve`. */
+  link?: string
+  /** Short diagnostic for `failed`. */
+  detail?: string
+}
