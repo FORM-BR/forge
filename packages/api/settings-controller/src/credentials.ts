@@ -8,9 +8,10 @@
 import { Context } from '@deepseek-ai/cordis'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type { CredentialProvider } from '@deepseek-ai/dsh-credentials'
-import type { CredentialInfo } from '@deepseek-ai/dsh-credentials/types'
+import type { CredentialBalance, CredentialInfo } from '@deepseek-ai/dsh-credentials/types'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { z } from 'zod'
+import { fetchCredentialBalance, supportsBalance } from './credential-balance.ts'
 
 /**
  * Fan-out bound on one remote `describe` batch. A settings page asks about the
@@ -25,6 +26,7 @@ const describeRequestSchema = z.object({
 })
 const setRequestSchema = z.object({ ref: credentialRefSchema, value: z.string().min(1) })
 const unsetRequestSchema = z.object({ ref: credentialRefSchema })
+const balanceRequestSchema = z.object({ ref: credentialRefSchema, provider: z.string().min(1).max(128) })
 
 /** Parse the domain constraints that are more specific than generated TypeScript codecs. */
 function parseRequest<T>(method: string, schema: z.ZodType<T>, value: unknown): T {
@@ -115,6 +117,25 @@ export class CredentialsController extends TypertRemoteService {
     const branded = credentialRef(request.ref)
     const credentials = this.provider()
     await this.write(request.ref, () => credentials.unset(branded))
+  }
+
+  /**
+   * Ask the provider how much credit remains behind one reference. The Host
+   * resolves the key and makes the call; the browser receives only the outcome,
+   * so this is a read half like {@link describe}: no secret rides the wire.
+   * @param ref - reference name whose key is asked about.
+   * @param provider - provider route id, which selects the balance endpoint.
+   * @returns the outcome; routes without a public balance endpoint answer `unsupported`.
+   * @throws RemoteError when the request is invalid or no credential provider is mounted.
+   */
+  @Remote
+  async balance(ref: string, provider: string): Promise<CredentialBalance> {
+    const request = parseRequest('credentials.balance', balanceRequestSchema, { ref, provider })
+    const credentials = this.provider()
+    // An unsupported route answers before the key is read at all.
+    if (!supportsBalance(request.provider)) return { status: 'unsupported' }
+    const resolved = await credentials.resolve(credentialRef(request.ref))
+    return await fetchCredentialBalance(request.provider, resolved?.value)
   }
 
   /** Resolve the optional provider or report how to supply it. */

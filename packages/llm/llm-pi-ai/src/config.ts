@@ -88,10 +88,24 @@ export type {
   PiAiThinkingFormat,
 } from './catalog.ts'
 
+/** One extra API key the configuration page keeps beside the active one. */
+export interface PiAiSavedKey {
+  /** Credential reference (environment-variable name) holding this key's value. */
+  ref: string
+  /** Name the page shows for the key. */
+  label?: string
+}
+
 /** Configuration for one pi-ai provider route; the `providers` dict key IS the route. */
 export interface PiAiProviderProfile {
   /** Credential reference (environment-variable name) resolved per request through `ctx.credentials`. */
   apiKeyEnv?: string
+  /**
+   * Further keys saved for this route. Only configuration surfaces read this:
+   * requests always use {@link apiKeyEnv}, and choosing another key means
+   * pointing `apiKeyEnv` at that entry's reference.
+   */
+  apiKeys?: PiAiSavedKey[]
   /** Name shown by configuration surfaces; defaults to the route key. */
   displayName?: string
   /**
@@ -194,7 +208,7 @@ export interface PiAiProviderProfile {
 
 /** Validated profile with its route stamped and every adapter-owned default resolved. */
 export interface ResolvedPiAiProviderProfile
-  extends Omit<PiAiProviderProfile, 'apiKeyEnv' | 'retryPolicy' | 'models' | 'displayName'> {
+  extends Omit<PiAiProviderProfile, 'apiKeyEnv' | 'apiKeys' | 'retryPolicy' | 'models' | 'displayName'> {
   /** Harness route key and the `Models` collection key (the configuration dict key). */
   provider: string
   /** Resolved display name for selectors and configuration surfaces. */
@@ -333,8 +347,15 @@ const modelProfile: z<PiAiModelProfile> = z.object({
 /** A {@link modelProfile} whose id lives in the `modelOverrides` dict key. */
 const modelOverride: z<PiAiModelOverride> = z.object(modelFields)
 
+/** An {@link PiAiSavedKey} entry: the reference holds the secret, the label only names it. */
+const savedKey: z<PiAiSavedKey> = z.object({
+  ref: z.string().role('credential-ref').required(),
+  label: z.string(),
+})
+
 const profile = z.object({
   apiKeyEnv: z.string().role('credential-ref'),
+  apiKeys: z.array(savedKey),
   displayName: z.string(),
   api: z.union(supportedProtocols()),
   baseURL: z.string(),
@@ -498,7 +519,7 @@ export function resolveProfiles(
       if (validation === 'strict' || !(error instanceof PiAiCatalogError)) throw error
       catalogError ??= error.message
     }
-    const { apiKeyEnv, retryPolicy, models: _models, displayName: _displayName, ...rest } = source
+    const { apiKeyEnv, apiKeys: _apiKeys, retryPolicy, models: _models, displayName: _displayName, ...rest } = source
     resolved.set(provider, {
       ...rest,
       provider,

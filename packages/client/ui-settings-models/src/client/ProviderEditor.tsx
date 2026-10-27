@@ -34,6 +34,8 @@ import {
 import { apiKeyFailure } from './apiKey.ts'
 import { EditorFooter } from './EditorFooter.tsx'
 import { ModelListEditor } from './ModelListEditor.tsx'
+import { SavedKeys } from './SavedKeys.tsx'
+import { entriesOf, listAfterActivating, nextRef, rowsOf } from './saved-keys.ts'
 import { deriveKeyRef, protocolChoices } from './store.ts'
 import { protocolLabel } from './protocol-label.ts'
 import type { ModelsOperations } from './operations.ts'
@@ -167,8 +169,16 @@ function refFor(
 export function ProviderEditor(props: ProviderEditorProps): ReactNode {
   const { namespace, schema, settingsPath, operations, t } = props
   const [draft, setDraft] = useState<Record<string, unknown>>(() => draftAt(schema, namespace, settingsPath))
+  const stringAt = (source: unknown, key: string): string | undefined => {
+    const value = schema.getPath(source, [key])
+    return typeof value === 'string' && value.trim().length > 0 ? value : undefined
+  }
   const [keyDraft, setKeyDraft] = useState('')
   const [keyState, setKeyState] = useState<CredentialInfo | undefined>(undefined)
+  // Keys added or removed on this card wait for Apply, like every other edit: the
+  // secrets live here only until then, and a removed key is unset on commit.
+  const [pendingKeys, setPendingKeys] = useState<Readonly<Record<string, string>>>({})
+  const [removedKeys, setRemovedKeys] = useState<readonly string[]>([])
   const [busy, setBusy] = useState(false)
   const [listBusy, setListBusy] = useState(false)
   const { onBusyChange } = props
@@ -189,6 +199,8 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
   // Account settings use a configurable Cordis entry id.
   const layout = accountProvider ? 'deepseek' : layoutOf(namespace.ns)
   const keyRef = refFor(schema, namespace, settingsPath, props.provider)
+  // The key requests will use once this draft applies; typing a key replaces its value.
+  const activeRef = stringAt(draft, 'apiKeyEnv') ?? keyRef
   // The same schema read the create card makes, so the choices offered here
   // and there cannot drift apart: both come from the adapter's own `Config`.
   // Only the pi-ai layout has a per-route protocol for the read to find, and
@@ -204,17 +216,12 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
     setKeyState(undefined)
     // The key state is a placeholder hint, not a precondition for editing: a
     // refused describe leaves the card without the "already configured" hint.
-    void operations.describeCredential(keyRef).then((described) => {
+    void operations.describeCredential(activeRef).then((described) => {
       if (stale) return
       setKeyState(described)
     })
     return () => { stale = true }
-  }, [operations, keyRef, accountProvider])
-
-  const stringAt = (source: unknown, key: string): string | undefined => {
-    const value = schema.getPath(source, [key])
-    return typeof value === 'string' && value.trim().length > 0 ? value : undefined
-  }
+  }, [operations, activeRef, accountProvider])
   const setField = (key: string, next: string | undefined): void => {
     // A value of nothing but whitespace is cleared, not stored: `stringAt`
     // already reports it as absent, so the field would otherwise render empty
@@ -300,10 +307,20 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
       setDraft(next)
     }
     if (keyValue.length > 0) {
-      const stored = await operations.storeCredential(keyRef, keyValue)
+      const stored = await operations.storeCredential(activeRef, keyValue)
       if (stored !== undefined) return stored
     }
+    for (const [ref, value] of Object.entries(pendingKeys)) {
+      const stored = await operations.storeCredential(ref, value)
+      if (stored !== undefined) return stored
+    }
+    for (const ref of removedKeys) {
+      const removed = await operations.removeCredential(ref)
+      if (removed !== undefined) return removed
+    }
     setKeyDraft('')
+    setPendingKeys({})
+    setRemovedKeys([])
     return undefined
   }
 
@@ -329,6 +346,27 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
   }
 
   const keyLocked = keyState?.writable === false
+
+  const storedKeys = schema.getPath(draft, ['apiKeys'])
+  /** Make `ref` the key requests use, keeping the previous one in the list. */
+  const activateKey = (ref: string): void => {
+    setDraft(current => schema.setPath(
+      schema.setPath(current, ['apiKeys'], listAfterActivating(
+        entriesOf(schema.getPath(current, ['apiKeys'])), stringAt(current, 'apiKeyEnv') ?? keyRef)),
+      ['apiKeyEnv'],
+      ref,
+    ))
+  }
+  const addKey = (label: string, value: string): void => {
+    const ref = nextRef(deriveKeyRef(props.provider), [activeRef, ...entriesOf(storedKeys).map(entry => entry.ref)])
+    setPendingKeys(current => ({ ...current, [ref]: value }))
+    setDraft(current => schema.setPath(current, ['apiKeys'], [...entriesOf(schema.getPath(current, ['apiKeys'])), { ref, label }]))
+  }
+  const removeKey = (ref: string): void => {
+    setDraft(current => schema.setPath(current, ['apiKeys'], entriesOf(schema.getPath(current, ['apiKeys'])).filter(entry => entry.ref !== ref)))
+    if (ref in pendingKeys) setPendingKeys(({ [ref]: _dropped, ...rest }) => rest)
+    else setRemovedKeys(current => [...current, ref])
+  }
 
   /**
    * The catalog beneath the user layer: what the composition entry pinned, or
@@ -396,6 +434,21 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
           />
           {shownKeyFailure === undefined ? null : <p className={styles['error']}>{t(shownKeyFailure)}</p>}
         </div>
+        {family === 'pi-ai' && props.credentialOnly !== true
+          ? (
+            <SavedKeys
+              t={t}
+              provider={props.provider}
+              rows={rowsOf(activeRef, entriesOf(storedKeys))}
+              unsaved={new Set(Object.keys(pendingKeys))}
+              disabled={disabled}
+              onActivate={activateKey}
+              onAdd={addKey}
+              onRemove={removeKey}
+              onBalance={ref => operations.checkBalance(ref, props.provider)}
+            />
+          )
+          : null}
         {props.credentialOnly === true ? null : <details className={styles['customized']}>
           <summary className={styles['customizedSummary']}>{t('customized')}</summary>
           <div className={styles['customizedBody']}>
