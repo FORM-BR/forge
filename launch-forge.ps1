@@ -29,8 +29,12 @@ $stampFile = Join-Path $state 'build-stamp'
 $fallbackLog = Join-Path $serverCwd 'forge-safe-fallback.log'
 $oldStamp = Join-Path $r '.launch-build-stamp'
 # Tailscale e opcional: so liga o acesso pelo celular. Sem ele (nao instalado/parado/sem login) o resto segue normal.
-$tailscale = (Get-Command tailscale.exe -ErrorAction SilentlyContinue).Source
-if (-not $tailscale -and (Test-Path 'C:\Program Files\Tailscale\tailscale.exe')) { $tailscale = 'C:\Program Files\Tailscale\tailscale.exe' }
+$tailscale = if ($env:FORGE_TAILSCALE -and (Test-Path $env:FORGE_TAILSCALE)) { $env:FORGE_TAILSCALE }   # FORGE_TAILSCALE: so para testes
+             else { (Get-Command tailscale.exe -ErrorAction SilentlyContinue).Source }
+if (-not $tailscale) {
+  $tailscale = @("$env:ProgramFiles\Tailscale\tailscale.exe", "${env:ProgramFiles(x86)}\Tailscale\tailscale.exe") |
+    Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+}
 $urlFile = Join-Path $state 'forge-remoto-url.txt'
 New-Item -ItemType Directory -Force $state, $serverCwd | Out-Null
 
