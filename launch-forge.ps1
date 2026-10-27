@@ -4,6 +4,7 @@ param(
   [switch]$NoOpen,          # nao abre o navegador (testes)
   [switch]$Atualizar,       # reconstroi agora (janela visivel) mesmo que o build pareca em dia
   [switch]$Safe,            # modo seguro: so plugins do FORGE, sem terceiros/MCP; nenhum arquivo do profile e alterado
+  [switch]$Reiniciar,       # para o FORGE desta pasta e sobe de novo (usado pelo atalho FORGE (celular) ao ligar/desligar o acesso)
   [switch]$SimularFalha     # teste do fallback: o boot normal recebe um plugin que nao existe (so nesta subida; nada e gravado no profile)
 )
 # Abre o FORGE rapido e sem janela: usa o build compilado (apps\cli\lib\bin.js), sobe o servidor escondido
@@ -36,6 +37,8 @@ if (-not $tailscale) {
     Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 }
 $urlFile = Join-Path $state 'forge-remoto-url.txt'
+# Preferencia do acesso pelo celular, gravada por forge-celular.ps1: 'on', 'off' ou ausente (ausente = liga sozinho se o Tailscale estiver conectado).
+$celularPref = if (Test-Path (Join-Path $state 'celular.txt')) { (Get-Content (Join-Path $state 'celular.txt') -Raw).Trim() } else { '' }
 New-Item -ItemType Directory -Force $state, $serverCwd | Out-Null
 
 function Show-Toast([string]$title, [string]$text) {
@@ -320,6 +323,8 @@ function Start-Server([bool]$safe, [bool]$noOpen, [bool]$simulateFailure, [strin
     -RedirectStandardOutput $log -RedirectStandardError "$log.err"
 }
 
+if ($Reiniciar) { Stop-Forge; Start-Sleep 1 }
+
 # --- 1. Instancia ja no ar? So reaproveita (web) ---------------------------------------------------------------
 if ($Profile -eq 'web' -and -not $Atualizar -and (Test-PortOpen $Port)) {
   $forge = Get-ForgeProcs | Where-Object { $_.CommandLine -match '\bweb\b' }
@@ -356,7 +361,7 @@ if (-not $node) { $node = 'C:\Program Files\nodejs\node.exe' }
 # conectado (ou Serve falha), tudo segue igual: so que sen acceso do celular.
 $hostPublico = ''
 $hostServe = ''
-if ($Profile -eq 'web' -and $Port -eq 3080) {
+if ($Profile -eq 'web' -and $Port -eq 3080 -and $celularPref -ne 'off') {
   $tailHost = Get-TailscaleHost
   if ($tailHost) {
     $tailErr = Ensure-Serve $Port

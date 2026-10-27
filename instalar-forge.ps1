@@ -67,71 +67,13 @@ Ok ("pnpm " + (& pnpm -v))
 $ErrorActionPreference = 'Stop'
 
 # --- 3. Tailscale (opcional) ------------------------------------------------------------------------------------------
-# Vem ANTES do build para o login (que abre o navegador) acontecer enquanto voce esta na frente do computador. O launcher
-# repete a configuracao do Serve a cada subida, entao aqui so preparamos: instalar, entrar na conta, habilitar o Serve.
+# Vem ANTES do build para o login (que abre o navegador) acontecer enquanto voce esta na frente do computador. A logica e
+# do forge-celular.ps1, o mesmo do atalho "FORGE (celular)", que liga e desliga isso depois sem reinstalar.
 Titulo '3/5 Tailscale (opcional: usar o FORGE no celular)'
-function Achar-Tailscale {
-  if ($env:FORGE_TAILSCALE -and (Test-Path $env:FORGE_TAILSCALE)) { return $env:FORGE_TAILSCALE }   # so para testes
-  $c = (Get-Command tailscale.exe -ErrorAction SilentlyContinue).Source
-  if ($c) { return $c }
-  foreach ($p in @("$env:ProgramFiles\Tailscale\tailscale.exe", "${env:ProgramFiles(x86)}\Tailscale\tailscale.exe")) {
-    if ($p -and (Test-Path $p)) { return $p }
-  }
-  $null
-}
-function Ts([string[]]$a) {
-  # Tailscale parado ou sem login escreve no stderr: nunca deixa isso virar erro do instalador.
-  $ErrorActionPreference = 'Continue'
-  try { (& $script:ts @a 2>&1 | Out-String) } catch { '' }
-}
-function Ts-Conectado {
-  $j = try { (Ts @('status', '--json')) | ConvertFrom-Json } catch { $null }
-  [bool]($j -and $j.BackendState -eq 'Running')
-}
-$ts = Achar-Tailscale
-if (-not $ts -and -not $SemPerguntas) {
-  $r = Read-Host '   Quer usar o FORGE tambem no celular? Isso instala o Tailscale (gratis). [s/N]'
-  if ($r -match '^[sSyY]') {
-    if (Get-Command winget -ErrorAction SilentlyContinue) {
-      Aviso 'Instalando o Tailscale pelo winget (pode pedir permissao de administrador)...'
-      $ErrorActionPreference = 'Continue'
-      winget install --id Tailscale.Tailscale -e --silent --accept-package-agreements --accept-source-agreements
-      $ErrorActionPreference = 'Stop'
-      Atualizar-Path
-      $ts = Achar-Tailscale
-    }
-    if (-not $ts) { Start-Process 'https://tailscale.com/download'; Aviso 'Instale o Tailscale pelo site que abriu e rode este instalador de novo.' }
-  }
-}
-$celularPronto = $false
-if (-not $ts) {
-  Aviso 'Sem Tailscale: o FORGE funciona normalmente neste computador (para o celular, rode este instalador de novo).'
-} else {
-  if (-not (Ts-Conectado)) {
-    if ($SemPerguntas) { Aviso 'Tailscale desligado ou sem login; seguindo sem celular.' }
-    else {
-      Aviso 'Abrindo o login do Tailscale no navegador: entre com a MESMA conta que vai usar no celular (ate 3 minutos)...'
-      Ts @('up', '--timeout', '180s') | Out-Null
-    }
-  }
-  if (Ts-Conectado) {
-    if ($Porta -ne 3080) { Aviso 'Porta diferente de 3080: o acesso pelo celular so funciona na porta padrao.' }
-    else {
-      $saida = Ts @('serve', '--bg', '3080')
-      if ($saida -match 'not enabled|enable') {
-        $link = [regex]::Match($saida, 'https://login\.tailscale\.com/\S+').Value
-        if (-not $link) { $link = 'https://login.tailscale.com/f/serve' }
-        Aviso 'O recurso "Serve" precisa ser habilitado uma vez na sua conta Tailscale. Abri a pagina; clique em Enable.'
-        if (-not $SemPerguntas) { Start-Process $link; Read-Host '   Quando terminar, aperte Enter' | Out-Null }
-        $saida = Ts @('serve', '--bg', '3080')
-      }
-      if ($saida -match 'not enabled') { Aviso 'O Serve ainda nao esta habilitado; rode este instalador de novo depois de habilitar.' }
-      else { $celularPronto = $true; Ok 'Tailscale conectado e Serve configurado.' }
-    }
-  } else {
-    Aviso 'O Tailscale nao conectou. Abra o app Tailscale, entre na conta e rode este instalador de novo.'
-  }
-}
+$args3t = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $dir 'forge-celular.ps1'), '-Modo', 'Preparar', '-Porta', $Porta)
+if ($SemPerguntas) { $args3t += '-SemPerguntas' }
+& powershell @args3t
+$celularPronto = ($LASTEXITCODE -eq 0)
 
 # --- 4. Build + primeira subida ---------------------------------------------------------------------------------------
 if ($SoTailscale) {
@@ -161,9 +103,9 @@ if ($comCelular) {
   Write-Host '   1. Instale o app Tailscale no celular e entre na MESMA conta.'
   Write-Host '   2. No PC, abra o atalho "FORGE (link do celular)" e abra o link que aparece no navegador do celular.'
   Write-Host '   O link muda a cada vez que o FORGE inicia (o token renova): pegue o link de novo no mesmo atalho.'
-} elseif ($ts) {
+} else {
   Write-Host ''
-  Aviso 'O celular ainda nao esta ligado. Resolva o que foi dito no passo 3 e rode este instalador de novo (e rapido: nao refaz o que ja esta pronto).'
+  Write-Host '   Acesso pelo celular desligado. Para ligar (ou desligar) depois, sem reinstalar: atalho "FORGE (celular)" na area de trabalho.'
 }
 
 Write-Host ''
