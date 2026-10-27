@@ -61,6 +61,142 @@ interface TokenSurfaceNode {
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
+<a id="ctxcostmeter--costmeter"></a>
+
+### `ctx.costMeter` — `CostMeter`
+
+Host service `ctx.costMeter`: prices every durable assistant settlement with the live OpenRouter table or the installed catalog, folds the current session's cost into the `costUsage` projection, and writes each priced event to the SQLite ledger that backs the history queries below.
+
+```ts cordis-catalog
+/**
+ * Measure one session's catalog-priced API cost through its durable tail.
+ * @param session - session to replay through its current durable log.
+ * @returns a detached per-route and total cost projection.
+ */
+measure(session: Session): CostUsageProjection
+
+/**
+ * Daily cost totals across all sessions from the SQLite ledger.
+ * @returns one aggregate per calendar day with settled events, ascending by day.
+ */
+byDay(): Array<{ day: string } & CostAggregateRow>
+
+/**
+ * Per-route cost totals across all sessions from the SQLite ledger.
+ * @returns one aggregate per provider/model route, most expensive first.
+ */
+byModel(): Array<{ provider: string; model: string } & CostAggregateRow>
+
+/**
+ * Ledger aggregates in one {@link CostReportGroup} bucket, scoped by filter.
+ * @param group - bucket to aggregate by: day, session root (cwd), model route, or session.
+ * @param filter - optional inclusive bounds (days, cwd, provider, model, session); defaults to the whole ledger.
+ * @returns one row per bucket, ascending by day for the `day` group and most expensive first otherwise.
+ */
+report(group: CostReportGroup, filter: CostReportFilter = {}): CostReportRow[]
+
+/**
+ * Session roots with settled events.
+ * @returns the distinct session working directories in the ledger, ascending.
+ */
+workspaces(): string[]
+
+/**
+ * USD→BRL rate of every calendar day in an inclusive range (PTAX selling
+ * rate of the day, or the latest earlier bulletin).
+ * @param fromDay - first day, YYYY-MM-DD.
+ * @param toDay - last day, YYYY-MM-DD.
+ * @returns one row per day with a known rate, ascending.
+ */
+usdBrlRates(fromDay: string, toDay: string): Promise<UsdBrlRate[]>
+
+/**
+ * Routes with settled events.
+ * @returns the distinct provider/model pairs in the ledger, ordered by provider then model.
+ */
+models(): Array<{ provider: string; model: string }>
+
+/**
+ * Replay every stored session under the configured sessions root through
+ * the live price lookup and upsert one settlement per priced event. The
+ * (session id, seq) upsert key makes re-runs idempotent. Absorbs offline
+ * and per-session read failures the same way the CLI backfill does.
+ */
+async warmSync(): Promise<void>
+```
+
+Types: [Session](session.zh.md)
+
+Source: [`packages/llm/cost-meter/src/index.ts`](../../packages/llm/cost-meter/src/index.ts)
+
+<a id="ctxcostreportservice--costreportservice"></a>
+
+### `ctx.costReportService` — `CostReportService`
+
+Host service backing the generated `ctx.remote.costReport` namespace. The namespace stays registered when the meter is absent so calls return the actionable missing-service diagnostic rather than a protocol failure.
+
+```ts cordis-catalog
+/**
+ * Aggregate the cost ledger into one bucket, scoped by an optional inclusive
+ * filter. Ascending by day; otherwise most expensive first.
+ * @param request - bucket group plus optional scoping filter.
+ * @returns one row per bucket that priced a settlement.
+ * @throws RemoteError when no cost meter is mounted.
+ */
+@Remote report(request: CostReportRequest): CostReportRow[]
+
+/**
+ * Session roots (header cwds) that have settled events, ascending.
+ * @returns the workspace roots the panel offers as a filter.
+ * @throws RemoteError when no cost meter is mounted.
+ */
+@Remote workspaces(): string[]
+
+/**
+ * Routes that have settled events, by provider then model.
+ * @returns the routes the panel offers as a filter.
+ * @throws RemoteError when no cost meter is mounted.
+ */
+@Remote models(): CostReportModelRow[]
+
+/**
+ * USD→BRL rate of every calendar day in a range, from the Central Bank of
+ * Brazil's PTAX bulletins (cached on disk by the cost meter).
+ * @param request - inclusive day range.
+ * @returns one row per day with a known rate, ascending; empty offline
+ *   before the first successful fetch.
+ * @throws RemoteError when no cost meter is mounted.
+ */
+@Remote async usdBrlRates(request: UsdBrlRatesRequest): Promise<UsdBrlRate[]>
+```
+
+Source: [`packages/api/cost-report/src/index.ts`](../../packages/api/cost-report/src/index.ts)
+
+<a id="ctxcostscontroller--costscontroller"></a>
+
+### `ctx.costsController` — `CostsController`
+
+Host service backing the generated `ctx.remote.costs` namespace. Both reads are projections of the SQLite ledger the cost meter maintains, so they survive restarts and never measure on demand.
+
+```ts cordis-catalog
+/**
+ * Daily cost totals across all sessions, ascending by day (oldest first).
+ * @returns one row per local calendar day that priced a settlement.
+ * @throws RemoteError when no cost meter is mounted.
+ */
+@Remote byDay(): CostsDayRow[]
+
+/**
+ * Per provider/model route cost totals across all sessions, most expensive
+ * first.
+ * @returns one row per routed model that priced a settlement.
+ * @throws RemoteError when no cost meter is mounted.
+ */
+@Remote byModel(): CostsModelRow[]
+```
+
+Source: [`packages/api/costs-controller/src/index.ts`](../../packages/api/costs-controller/src/index.ts)
+
 <a id="ctxtokenmeter--tokenmeter"></a>
 
 ### `ctx.tokenMeter` — `TokenMeter`

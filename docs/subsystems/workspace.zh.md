@@ -349,6 +349,26 @@ Host service backing the generated `ctx.remote.workspace` namespace.
 @Remote('initializeDefault') async initializeDefault(signal: AbortSignal): Promise<WorkspaceValue | undefined>
 
 /**
+ * Report the git repository containing a directory, for the status bar.
+ * Read-only: runs `git` against the path and never writes. A directory
+ * outside a repository, a missing directory, a missing `git` executable, and
+ * an expired deadline all answer without `git` rather than failing.
+ * @param path - fully qualified Host directory, typically a Session's cwd.
+ * @param signal - caller lifetime; abort terminates the running git child.
+ * @returns the echoed path plus repository name, root, and branch when inside a repository.
+ */
+@Remote('gitInfo') async gitInfo(path: string, signal: AbortSignal): Promise<WorkspaceGitInfoValue>
+
+/**
+ * Create a git worktree of the repository containing the offered work, so a
+ * parallel session writes in a checkout of its own.
+ * @param request - directory inside the repository and the task title naming the worktree.
+ * @param signal - caller lifetime; abort terminates the running git child.
+ * @returns the created worktree path and its branch.
+ */
+@Remote('createWorktree') async createWorktree(request: WorkspaceWorktreeRequest, signal: AbortSignal): Promise<WorkspaceWorktreeValue>
+
+/**
  * Rename one Workspace to a unique non-blank title.
  * @param request - Workspace identity and proposed title.
  * @returns the updated Workspace projection.

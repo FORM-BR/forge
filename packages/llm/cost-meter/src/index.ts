@@ -100,6 +100,12 @@ export type { CostAggregateRow }
 // re-exported so the API seam and CLI consumers share the same shapes.
 export type { CostReportFilter, CostReportGroup, CostReportRow } from './ledger.ts'
 
+/**
+ * Host service `ctx.costMeter`: prices every durable assistant settlement with
+ * the live OpenRouter table or the installed catalog, folds the current
+ * session's cost into the `costUsage` projection, and writes each priced event
+ * to the SQLite ledger that backs the history queries below.
+ */
 export class CostMeter extends Service {
   // Schemastery has no `.optional()`; a defaulted `''` means "use the home
   // path", letting the loader accept an absent ledgerPath. Unknown loader keys
@@ -182,22 +188,36 @@ export class CostMeter extends Service {
     return viewOf(entry.state)
   }
 
-  /** Daily cost totals across all sessions from the SQLite ledger. */
+  /**
+   * Daily cost totals across all sessions from the SQLite ledger.
+   * @returns one aggregate per calendar day with settled events, ascending by day.
+   */
   byDay(): Array<{ day: string } & CostAggregateRow> {
     return this.ledger.byDay()
   }
 
-  /** Per-route cost totals across all sessions from the SQLite ledger. */
+  /**
+   * Per-route cost totals across all sessions from the SQLite ledger.
+   * @returns one aggregate per provider/model route, most expensive first.
+   */
   byModel(): Array<{ provider: string; model: string } & CostAggregateRow> {
     return this.ledger.byModel()
   }
 
-  /** Ledger aggregates in one {@link CostReportGroup} bucket, scoped by filter. */
+  /**
+   * Ledger aggregates in one {@link CostReportGroup} bucket, scoped by filter.
+   * @param group - bucket to aggregate by: day, session root (cwd), model route, or session.
+   * @param filter - optional inclusive bounds (days, cwd, provider, model, session); defaults to the whole ledger.
+   * @returns one row per bucket, ascending by day for the `day` group and most expensive first otherwise.
+   */
   report(group: CostReportGroup, filter: CostReportFilter = {}): CostReportRow[] {
     return this.ledger.report(group, filter)
   }
 
-  /** Session roots with settled events, ascending. */
+  /**
+   * Session roots with settled events.
+   * @returns the distinct session working directories in the ledger, ascending.
+   */
   workspaces(): string[] {
     return this.ledger.workspaces()
   }
@@ -213,7 +233,10 @@ export class CostMeter extends Service {
     return this.usdBrl.rates(fromDay, toDay)
   }
 
-  /** Routes with settled events, by provider then model. */
+  /**
+   * Routes with settled events.
+   * @returns the distinct provider/model pairs in the ledger, ordered by provider then model.
+   */
   models(): Array<{ provider: string; model: string }> {
     return this.ledger.models()
   }

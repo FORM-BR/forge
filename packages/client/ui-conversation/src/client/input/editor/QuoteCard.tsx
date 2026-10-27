@@ -4,8 +4,15 @@
  * QuoteCardNode; this component renders the node's cached excerpt and reply
  * and raises the editor's dismissal event for its X button.
  */
+import { createContext, useContext } from 'react'
 import type { MouseEvent, ReactNode } from 'react'
 import css from './QuoteCard.module.css'
+
+/**
+ * Localized accessible name of the dismiss button. The Lexical node renders
+ * outside React context, so the portal loop that mounts the card provides it.
+ */
+export const QuoteCardDismissLabel = createContext<string | undefined>(undefined)
 
 /** Display inputs of one quote card. */
 export interface QuoteCardProps {
@@ -25,6 +32,7 @@ export interface QuoteCardProps {
  * @returns the card body.
  */
 export function QuoteCard({ quote, answer, dismissKey, dismissEvent }: QuoteCardProps): ReactNode {
+  const dismissLabel = useContext(QuoteCardDismissLabel)
   const onDismiss = (event: MouseEvent<HTMLButtonElement>): void => {
     // Keep the press away from the composer (selection/caret side effects).
     event.preventDefault()
@@ -38,7 +46,7 @@ export function QuoteCard({ quote, answer, dismissKey, dismissEvent }: QuoteCard
       <button
         type="button"
         className={css.dismiss}
-        aria-label="Remove quote"
+        aria-label={dismissLabel}
         data-composer-quote-card-dismiss
         onMouseDown={(event) => { event.preventDefault() }}
         onClick={onDismiss}

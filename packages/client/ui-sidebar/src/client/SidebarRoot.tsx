@@ -225,7 +225,7 @@ export function SidebarRoot({
                 {renderSlot('sidebar.brand.mark', { size: 24 }, { fallback: <ForgeLogo size={24} /> })}
               </span>
               <span className={css.brandName}>
-                {renderSlot('sidebar.brand.name', {}, {
+                {renderSlot('sidebar.brand.name', { label: t('brand.localBuild') }, {
                   fallback: buildVersion === undefined
                     ? <span className={css.fallbackBrandName}>{t('brand.localBuild')}</span>
                     : (
