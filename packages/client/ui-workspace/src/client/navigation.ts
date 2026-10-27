@@ -76,6 +76,13 @@ export interface UiWorkspace {
    */
   archiveSession(sessionId: SessionId, options?: { readonly stopActivity?: boolean }): Promise<void>
   /**
+   * Permanently delete a Session, clear it when it is the current selection,
+   * and refresh the Session list so its row disappears.
+   * @param sessionId - Session to delete.
+   * @param options - `stopActivity` asks the Host to stop the Session's running work instead of refusing.
+   */
+  deleteSession(sessionId: SessionId, options?: { readonly stopActivity?: boolean }): Promise<void>
+  /**
    * Unarchive a Session, restoring it to its recorded Workspace position.
    * @param sessionId - Session to unarchive.
    */
@@ -274,6 +281,12 @@ class UiWorkspaceService extends Service implements UiWorkspace {
   async archiveSession(sessionId: SessionId, options: { readonly stopActivity?: boolean } = {}): Promise<void> {
     await this.workspaces.archiveSession(sessionId, options)
     if (this.mainReference?.sessionId === sessionId) this.clearMain()
+  }
+
+  async deleteSession(sessionId: SessionId, options: { readonly stopActivity?: boolean } = {}): Promise<void> {
+    await this.workspaces.deleteSession(sessionId, options)
+    if (this.mainReference?.sessionId === sessionId) this.clearMain()
+    await this.sessions.refresh()
   }
 
   async unarchiveSession(sessionId: SessionId): Promise<void> {

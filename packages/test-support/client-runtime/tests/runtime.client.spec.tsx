@@ -854,9 +854,14 @@ describe('workspaces action face', () => {
     // Default unarchive mirrors it: the id leaves the same set.
     await ws.unarchiveSession('s0' as SessionId)
     expect(ws.list.getSnapshot().archivedSessionIds).toEqual(['s1'])
+    // Default delete mirrors it too: the id leaves the archive and pin sets.
+    await ws.update((draft) => { draft.pinnedSessionIds = ['sp' as SessionId] })
+    await ws.deleteSession('sp' as SessionId)
+    expect(ws.list.getSnapshot().pinnedSessionIds).toEqual([])
+    expect(ws.list.getSnapshot().archivedSessionIds).toEqual(['s1'])
     expect(ws.calls.map(c => c.method)).toEqual(
       ['create', 'create', 'rename', 'delete', 'insertBefore', 'insertSessionBefore',
-        'archiveSession', 'archiveSession', 'unarchiveSession'])
+        'archiveSession', 'archiveSession', 'unarchiveSession', 'deleteSession'])
 
     ws.stub('create', () => Promise.resolve({ workspaceId: 'ws-x', title: 'X', path: '/x', sessionIds: [] } as never))
     ws.stub('rename', () => Promise.resolve({ workspaceId: 'w1', title: 'S', path: '/s', sessionIds: [] } as never))
@@ -866,6 +871,8 @@ describe('workspaces action face', () => {
     ws.stub('insertSessionBefore', () => Promise.resolve({ workspaceId: 'w1', title: '', path: '', sessionIds: [] } as never))
     ws.stub('archiveSession', () => Promise.resolve())
     ws.stub('unarchiveSession', () => Promise.resolve())
+    const deleteStub = vi.fn(() => Promise.resolve())
+    ws.stub('deleteSession', deleteStub)
     expect((await ws.create({ path: '/y' })).title).toBe('X')
     expect((await ws.rename('w1' as WorkspaceId, 'z')).title).toBe('S')
     await ws.delete('w1' as WorkspaceId)
@@ -876,6 +883,9 @@ describe('workspaces action face', () => {
     await ws.archiveSession('s2' as SessionId)
     expect(ws.list.getSnapshot().archivedSessionIds).toEqual(['s1'])
     await ws.unarchiveSession('s1' as SessionId)
+    expect(ws.list.getSnapshot().archivedSessionIds).toEqual(['s1'])
+    await ws.deleteSession('s1' as SessionId, { stopActivity: true })
+    expect(deleteStub).toHaveBeenCalledWith('s1', { stopActivity: true })
     expect(ws.list.getSnapshot().archivedSessionIds).toEqual(['s1'])
     await runtime.dispose()
   })

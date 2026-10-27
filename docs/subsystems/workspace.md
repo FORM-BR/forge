@@ -127,7 +127,7 @@ The controller's `initializeDefault` takes no request: it owns the fixed `defaul
 
 ## Session pinning
 
-The controller's [transport types](../../packages/api/workspace-controller/src/types.ts) define `WorkspacePinSessionRequest` and `WorkspaceUnpinSessionRequest`, each carrying one `sessionId`. Both operations return `WorkspacePinValue`: the complete `pinnedSessionIds` array of Session ids, most recently pinned first. Pinning requires a known, unarchived Session; unpinning an id that is not pinned succeeds without changing the set. Archiving removes the Session's pin in the same durable write, and unarchiving does not restore it.
+The controller's [transport types](../../packages/api/workspace-controller/src/types.ts) define `WorkspacePinSessionRequest` and `WorkspaceUnpinSessionRequest`, each carrying one `sessionId`. Both operations return `WorkspacePinValue`: the complete `pinnedSessionIds` array of Session ids, most recently pinned first. Pinning requires a known, unarchived Session; unpinning an id that is not pinned succeeds without changing the set. Archiving removes the Session's pin in the same durable write, and unarchiving does not restore it. `deleteSession` permanently removes a Session (`WorkspaceDeleteSessionRequest`, `{ deleted: true }`): running work refuses it as `workspace/session-active` unless `stopActivity` is set, a Session another process still owns refuses it as `workspace/session-in-use`, and a successful call also drops the Session's archive and pin entries.
 
 ## Archive admission
 

@@ -18,16 +18,20 @@ export class WorkspaceCreateError extends Error {
 }
 
 /**
- * Archive failed on the Host. `rpcError.code` distinguishes the active-session
- * refusal (`workspace/session-active`, whose details name what still runs)
- * from a missing session or a carrier fault.
+ * Archive or delete of a Session failed on the Host. `rpcError.code`
+ * distinguishes the active-session refusal (`workspace/session-active`, whose
+ * details name what still runs) from a Session another writer owns
+ * (`workspace/session-in-use`), a missing session, or a carrier fault.
  */
 export class WorkspaceArchiveError extends Error {
   override readonly name = 'WorkspaceArchiveError'
 
-  /** @param rpcError - Host business or folded carrier failure. */
-  constructor(readonly rpcError: RemoteFailure) {
-    super(`workspace session archive failed: ${rpcError.code}: ${rpcError.message}`)
+  /**
+   * @param rpcError - Host business or folded carrier failure.
+   * @param verb - The failed operation; archive unless stated.
+   */
+  constructor(readonly rpcError: RemoteFailure, verb: 'archive' | 'delete' = 'archive') {
+    super(`workspace session ${verb} failed: ${rpcError.code}: ${rpcError.message}`)
   }
 }
 
@@ -102,6 +106,14 @@ export interface IWorkspaces {
    *   running work fails as `workspace/session-active`, its details naming what runs.
    */
   archiveSession(sessionId: SessionId, options?: { readonly stopActivity?: boolean }): Promise<void>
+  /**
+   * Permanently delete a Session and all of its stored data.
+   * @param sessionId - Session to delete.
+   * @param options - `stopActivity` asks the Host to stop the Session's running work instead of refusing.
+   * @throws {WorkspaceArchiveError} when the Host refuses: running work fails as
+   *   `workspace/session-active`, a Session another writer owns as `workspace/session-in-use`.
+   */
+  deleteSession(sessionId: SessionId, options?: { readonly stopActivity?: boolean }): Promise<void>
   /**
    * Unarchive a Session from the archived Session list.
    * @param sessionId - Session to unarchive.
@@ -187,6 +199,11 @@ export class WorkspaceController extends Service implements IWorkspaces {
   async archiveSession(sessionId: SessionId, options: { readonly stopActivity?: boolean } = {}): Promise<void> {
     const result = await this.model.archiveSession(sessionId, options)
     if (!result.ok) throw new WorkspaceArchiveError(result.error)
+  }
+
+  async deleteSession(sessionId: SessionId, options: { readonly stopActivity?: boolean } = {}): Promise<void> {
+    const result = await this.model.deleteSession(sessionId, options)
+    if (!result.ok) throw new WorkspaceArchiveError(result.error, 'delete')
   }
 
   async unarchiveSession(sessionId: SessionId): Promise<void> {

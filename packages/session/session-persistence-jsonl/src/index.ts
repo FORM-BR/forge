@@ -22,12 +22,12 @@ import { createHash, randomBytes } from 'node:crypto'
 import {
   SessionPersistence, SessionPersistenceRevision, SessionFormatUnsupportedError,
   SessionPersistenceCorruptionError,
-  SessionAlreadyExistsError, SessionPersistenceNotFoundError,
+  SessionAlreadyExistsError, SessionAlreadyOwnedError, SessionPersistenceNotFoundError,
   assertStoredId, materializeCreateHeader, sessionFormatVersionRefusal, validateStoredEvents,
   type SessionAccess, type SessionHandle,
   type SessionHandleReadResult,
   type SessionLocation, type SessionPersistenceCreateOptions,
-  type SessionPersistenceListOptions, type SessionPersistenceOpenOptions,
+  type SessionPersistenceListOptions, type SessionPersistenceOpenOptions, type SessionPersistenceRemoveOptions,
   type SessionPersistenceSnapshot, type SessionPersistenceStatOptions,
   type SessionPersistenceRevision as PersistenceRevision,
 } from '@deepseek-ai/dsh-session-persistence'
@@ -289,6 +289,35 @@ class JsonlSessionPersistence extends SessionPersistence {
     }
     this.assertUsableRoot()
     this.tracker.install(ctx)
+  }
+
+  /**
+   * Permanently remove one session by deleting its artifact directory (every
+   * format generation plus the lock file). The kernel write lock is taken
+   * first, so a session with a live writer in this or another process is
+   * refused instead of torn; the Windows lock is a named semaphore, not a file
+   * handle, so the directory removal proceeds while it is held.
+   * @param id - the stored session to remove.
+   * @param options - optional cancellation, honored before the lock is taken.
+   * @returns whether a stored session existed and was removed.
+   */
+  override async remove(id: SessionId, options?: SessionPersistenceRemoveOptions): Promise<boolean> {
+    options?.signal?.throwIfAborted()
+    await this.ensureRootEncoding()
+    if (this.tracker.hasPending(id)) throw new SessionAlreadyOwnedError(id)
+    const found = await this.findLog(id, options?.signal)
+    if (found === undefined) return false
+    options?.signal?.throwIfAborted()
+    const dir = dirname(found.sourcePath)
+    const lease = await this.acquireLease(id, undefined, dir)
+    try {
+      await rm(dir, { recursive: true, force: true })
+    } finally {
+      await lease.release()
+    }
+    this.coldLogMemo.delete(id)
+    this.migrationPreparations.delete(id)
+    return true
   }
 
   /**

@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, stat } from 'node:fs/promises'
 import { Context, Service } from '@deepseek-ai/cordis'
 import type { SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
-import type {} from '@deepseek-ai/dsh-session-persistence'
+import { SessionAlreadyOwnedError } from '@deepseek-ai/dsh-session-persistence'
 import type { DomainGlobal, KvTable } from '@deepseek-ai/dsh-storage-domain'
 import { WorkspaceEntity } from './entity.ts'
 import type { WorkspaceEntityHost } from './entity.ts'
@@ -49,7 +49,7 @@ export class WorkspaceUnknownSessionError extends Error {
    * @param sessionId - The unknown session id.
    * @param verb - The registry operation that named the session.
    */
-  constructor(readonly sessionId: SessionId, verb: 'archive' | 'pin') {
+  constructor(readonly sessionId: SessionId, verb: 'archive' | 'pin' | 'delete') {
     super(`cannot ${verb} session '${sessionId}': live sessions and session persistence hold no such session`)
     this.name = 'WorkspaceUnknownSessionError'
   }
@@ -65,9 +65,25 @@ export class WorkspaceActiveSessionError extends Error {
    * @param sessionId - The active session id.
    * @param activity - The reported activity, in listener order.
    */
-  constructor(readonly sessionId: SessionId, readonly activity: readonly SessionActivity[]) {
-    super(`cannot archive session '${sessionId}': the session is active (${activity.map(entry => entry.kind).join(', ')})`)
+  constructor(
+    readonly sessionId: SessionId,
+    readonly activity: readonly SessionActivity[],
+    verb: 'archive' | 'delete' = 'archive',
+  ) {
+    super(`cannot ${verb} session '${sessionId}': the session is active (${activity.map(entry => entry.kind).join(', ')})`)
     this.name = 'WorkspaceActiveSessionError'
+  }
+}
+
+/**
+ * A deleteSession request found the session's write ownership held by a writer
+ * the registry could not release, for example another process. Nothing was removed.
+ */
+export class WorkspaceSessionInUseError extends Error {
+  /** @param sessionId - The session whose write ownership is held. */
+  constructor(readonly sessionId: SessionId) {
+    super(`cannot delete session '${sessionId}': another writer owns it`)
+    this.name = 'WorkspaceSessionInUseError'
   }
 }
 
@@ -110,6 +126,15 @@ export interface ArchiveSessionOptions {
   readonly stopActivity?: boolean
 }
 
+/** Caller choices for {@link WorkspaceRegistry.deleteSession}. */
+export interface DeleteSessionOptions {
+  /**
+   * Ask the composed providers to stop the session's running work instead of
+   * refusing the deletion because of it.
+   */
+  readonly stopActivity?: boolean
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     workspaceRegistry: WorkspaceRegistry
@@ -145,6 +170,16 @@ declare module '@deepseek-ai/cordis' {
      * @mode parallel
      */
     'workspace/session-stop'(request: SessionActivityRequest): Promise<void> | void
+    /**
+     * Release the live runtime of a session that is about to be deleted: the
+     * owner of its Agent stops the loop, waits for it to exit, and drops the
+     * Agent so the session's write ownership is released. Dispatched after
+     * the activity check (or the stop) and before the stored session is
+     * removed. A rejection aborts the deletion before anything is removed.
+     * @param request - the session being deleted.
+     * @mode parallel
+     */
+    'workspace/session-release'(request: SessionActivityRequest): Promise<void> | void
   }
 }
 
@@ -381,6 +416,55 @@ export class WorkspaceRegistry extends Service {
         pinnedSessionIds: state.pinnedSessionIds.filter(id => id !== sessionId),
       })
       if (options.stopActivity === true) await this.stopSessionActivity(sessionId)
+    })
+  }
+
+  /**
+   * Permanently delete one session: its stored log and artifacts, its
+   * archive and pin entries, and its workspace membership. Irreversible. The
+   * session must exist. Without `stopActivity` the session must be inactive
+   * (the `workspace/session-activity` waterfall is asked once); with it, the
+   * `workspace/session-stop` providers are asked first. The
+   * `workspace/session-release` providers then release the live runtime, and
+   * the stored session is removed from session persistence; a session another
+   * writer still owns is refused with {@link WorkspaceSessionInUseError}
+   * before anything is removed.
+   * @param sessionId - The session to delete.
+   * @param options - Whether running work is stopped instead of refusing.
+   * @returns resolution after the stored session and every registry reference are gone.
+   */
+  deleteSession(sessionId: SessionId, options: DeleteSessionOptions = {}): Promise<void> {
+    return this.enqueueOperation(async () => {
+      if (!(await this.sessionKnown(sessionId))) {
+        throw new WorkspaceUnknownSessionError(sessionId, 'delete')
+      }
+      if (options.stopActivity === true) {
+        await this.stopSessionActivity(sessionId)
+      } else {
+        const activity = await this.ctx.waterfall(
+          'workspace/session-activity', { sessionId }, () => Promise.resolve([]),
+        )
+        if (activity.length > 0) throw new WorkspaceActiveSessionError(sessionId, activity, 'delete')
+      }
+      await this.ctx.parallel('workspace/session-release', { sessionId })
+      try {
+        await this.ctx.sessionPersistence.remove(sessionId)
+      } catch (error: unknown) {
+        if (error instanceof SessionAlreadyOwnedError) throw new WorkspaceSessionInUseError(sessionId)
+        throw error
+      }
+      this.headers.delete(sessionId)
+      this.sessionPaths.delete(sessionId)
+      this.invalidSessionPaths.delete(sessionId)
+      for (const entity of this.entities.values()) await entity.detachSession(sessionId)
+      const state = this.requireState()
+      if (state.archivedSessionIds.includes(sessionId) || state.pinnedSessionIds.includes(sessionId)) {
+        await this.setState({
+          ...state,
+          archivedSessionIds: state.archivedSessionIds.filter(id => id !== sessionId),
+          pinnedSessionIds: state.pinnedSessionIds.filter(id => id !== sessionId),
+        })
+      }
     })
   }
 

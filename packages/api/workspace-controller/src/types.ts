@@ -64,6 +64,11 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
       readonly sessionId: SessionId
       readonly activity: readonly SessionActivity[]
     }
+    /**
+     * Another writer, for example another running FORGE process, still owns
+     * the Session, so deleting it was refused and nothing was removed.
+     */
+    'workspace/session-in-use': { readonly sessionId: SessionId }
     /** The Session or its anchor is not in the Workspace's manual order. */
     'workspace/move-invalid': {
       readonly workspaceId: WorkspaceId
@@ -162,6 +167,22 @@ export interface WorkspaceArchiveSessionRequest {
    * set is durable.
    */
   readonly stopActivity?: boolean
+}
+
+/** Session requested for permanent deletion from Workspace grouping surfaces. */
+export interface WorkspaceDeleteSessionRequest {
+  readonly sessionId: SessionId
+  /**
+   * Stop the Session's running work instead of refusing the deletion as
+   * `workspace/session-active`. The stops are requested before the Agent is
+   * released and the stored Session is removed.
+   */
+  readonly stopActivity?: boolean
+}
+
+/** Receipt after one Session was permanently deleted. */
+export interface WorkspaceDeleteSessionValue {
+  readonly deleted: true
 }
 
 /** Session requested for restoration from the archived Session list. */

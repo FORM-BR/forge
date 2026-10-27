@@ -39,8 +39,10 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 // Type-only: pulls the Session root standard-hook merge.
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import {
-  type ArchiveSessionInjected, type ForkSessionInjected, type RetitleSessionInjected, menuOpenStateFactory, type PinSessionInjected,
+  type ArchiveSessionInjected, type DeleteSessionInjected, type ForkSessionInjected, type RetitleSessionInjected,
+  menuOpenStateFactory, type PinSessionInjected,
   type SessionArchiveConfirmInjected, type SessionArchiveConfirmRequest,
+  type SessionDeleteDialogInjected, type SessionDeleteOutcome, type SessionDeleteRequest,
   type RenameSessionInjected, type RowToast, type RowToastInjected, type RowToastState, type SessionRenameDialogInjected,
   type WorkspaceBrowserInjected, type WorkspacePickerInjected, type WorkspaceStatusInjected,
   workspaceMenuOpenStateFactory,
@@ -50,6 +52,7 @@ import { UiWorkspaceService } from './navigation.ts'
 import { createWorkspaceViewStore } from './stores.ts'
 import { WorkspaceBrowser } from './rows/WorkspaceBrowser.tsx'
 import { ArchiveSessionMenuItem, ArchiveSessionRowButton, SessionArchiveConfirmDialog } from './session-actions/ArchiveSession.tsx'
+import { DeleteSessionMenuItem, SessionDeleteDialog } from './session-actions/DeleteSession.tsx'
 import { derive } from './session-actions/derived.ts'
 import { ForkSessionMenuItem } from './session-actions/ForkSession.tsx'
 import { PinSessionMenuItem, PinSessionRowButton } from './session-actions/PinSession.tsx'
@@ -214,6 +217,26 @@ export function apply(ctx: Context): void {
       notify({ kind: 'stoppedAndArchived', sessionId })
     },
   })
+  const deleteRequest = createSnapshotStore<SessionDeleteRequest | null>(null)
+  const deleteInjected = (): DeleteSessionInjected => ({
+    requestSessionDelete: (sessionId, displayTitle) => { deleteRequest.set({ sessionId, displayTitle }) },
+  })
+  const deleteDialogInjected = (): SessionDeleteDialogInjected => ({
+    hooks: { deleteRequest },
+    settleSessionDelete: () => { deleteRequest.set(null) },
+    deleteSession: async (sessionId, options): Promise<SessionDeleteOutcome> => {
+      try {
+        await uiWorkspace.deleteSession(sessionId, options)
+        return { status: 'deleted' }
+      } catch (reason: unknown) {
+        const activity = activeSessionRefusal(reason)
+        if (activity !== undefined) return { status: 'active', activity }
+        if (sessionInUseRefusal(reason)) return { status: 'in-use' }
+        console.warn('session delete rejected:', reason)
+        return { status: 'failed', message: reason instanceof Error ? reason.message : String(reason) }
+      }
+    },
+  })
   const forkInjected = (): ForkSessionInjected => ({
     forkSession: (sessionId) => {
       uiWorkspace.forkSession(sessionId, (childId) => {
@@ -359,6 +382,7 @@ export function apply(ctx: Context): void {
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'retitle', order: 250, locale: NS, inject: retitleInjected }, RetitleSessionMenuItem)
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'fork', order: 300, locale: NS, inject: forkInjected }, ForkSessionMenuItem)
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'archive', order: 400, locale: NS, inject: archiveInjected }, ArchiveSessionMenuItem)
+    yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'delete', order: 1000, locale: NS, inject: deleteInjected }, DeleteSessionMenuItem)
   })
   ctx.slots.inject('sidebar.workspaces.session.row.action', function* () {
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.row.action', id: 'archive', order: 100, locale: NS, inject: archiveInjected }, ArchiveSessionRowButton)
@@ -373,6 +397,9 @@ export function apply(ctx: Context): void {
     yield ctx.slots.register({
       name: 'shell.overlay', id: 'workspace.session-archive', locale: NS, inject: archiveConfirmInjected,
     }, SessionArchiveConfirmDialog)
+    yield ctx.slots.register({
+      name: 'shell.overlay', id: 'workspace.session-delete', locale: NS, inject: deleteDialogInjected,
+    }, SessionDeleteDialog)
     // The toast shares the browser's viewing store: it reads the archived
     // filter to drop the archived notice's filter action once rows are visible.
     yield ctx.slots.register({
@@ -400,6 +427,15 @@ export function apply(ctx: Context): void {
     },
     WorkspacePicker,
   ))
+}
+
+/**
+ * Whether a Host `workspace/session-in-use` refusal ended the failure: another
+ * writer owns the Session. Matched by name like {@link activeSessionRefusal}.
+ */
+function sessionInUseRefusal(reason: unknown): boolean {
+  return reason instanceof Error && reason.name === 'WorkspaceArchiveError'
+    && (reason as WorkspaceArchiveError).rpcError.code === 'workspace/session-in-use'
 }
 
 /**

@@ -157,7 +157,7 @@ class FakeSessions implements ISessions {
   declare readonly using: ISessions['using']
   declare readonly retainInfo: ISessions['retainInfo']
   declare readonly searchResultLimit: ISessions['searchResultLimit']
-  declare readonly refresh: ISessions['refresh']
+  readonly refresh = vi.fn<ISessions['refresh']>(() => Promise.resolve())
   declare readonly search: ISessions['search']
   declare readonly scope: ISessions['scope']
   declare readonly scopeOf: ISessions['scopeOf']
@@ -176,6 +176,8 @@ class FakeWorkspaces implements IWorkspaces {
   readonly list: MutableSource<WorkspaceSnapshot>
   readonly archiveCalls: SessionId[] = []
   readonly unarchiveCalls: SessionId[] = []
+  readonly deleteCalls: { sessionId: SessionId; options: { readonly stopActivity?: boolean } | undefined }[] = []
+  onDelete: IWorkspaces['deleteSession'] = async () => {}
   onArchive: IWorkspaces['archiveSession'] = async (sessionId) => {
     this.list.update(state => ({
       ...state,
@@ -213,6 +215,11 @@ class FakeWorkspaces implements IWorkspaces {
   archiveSession(sessionId: SessionId): Promise<void> {
     this.archiveCalls.push(sessionId)
     return this.onArchive(sessionId)
+  }
+
+  deleteSession(sessionId: SessionId, options?: { readonly stopActivity?: boolean }): Promise<void> {
+    this.deleteCalls.push({ sessionId, options })
+    return this.onDelete(sessionId, options)
   }
 
   unarchiveSession(sessionId: SessionId): Promise<void> {
@@ -1098,6 +1105,33 @@ describe('UiWorkspaceService', () => {
     b.workspaces.onArchive = () => Promise.reject(new Error('archive rejected'))
     await expect(b.uiWorkspace.archiveSession(idle)).rejects.toThrow('archive rejected')
     expect(b.workspaces.archiveCalls).toEqual([idle, idle])
+  })
+
+  it('deletes a Session, clears it when selected, and refreshes the Session list', async () => {
+    const b = bench()
+    b.uiWorkspace.openSession(sid('current'))
+
+    await b.uiWorkspace.deleteSession(sid('current'), { stopActivity: true })
+
+    expect(b.workspaces.deleteCalls).toEqual([{ sessionId: sid('current'), options: { stopActivity: true } }])
+    expect(b.sessions.retained[0]!.release).toHaveBeenCalledOnce()
+    expect(b.selectPanel).toHaveBeenCalledTimes(2)
+    expect(b.sessions.refresh).toHaveBeenCalledOnce()
+  })
+
+  it('keeps an unrelated selection when another Session is deleted, and preserves failures without refreshing', async () => {
+    const b = bench()
+    b.uiWorkspace.openSession(sid('current'))
+
+    await b.uiWorkspace.deleteSession(sid('other'))
+    expect(b.workspaces.deleteCalls).toEqual([{ sessionId: sid('other'), options: {} }])
+    expect(b.sessions.retained[0]!.release).not.toHaveBeenCalled()
+    expect(b.sessions.refresh).toHaveBeenCalledOnce()
+
+    b.workspaces.onDelete = () => Promise.reject(new Error('delete rejected'))
+    await expect(b.uiWorkspace.deleteSession(sid('current'))).rejects.toThrow('delete rejected')
+    expect(b.sessions.refresh).toHaveBeenCalledOnce()
+    expect(b.sessions.retained[0]!.release).not.toHaveBeenCalled()
   })
 
   it('forwards unarchive commands and preserves failures', async () => {

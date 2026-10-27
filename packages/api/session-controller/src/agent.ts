@@ -2,7 +2,8 @@
 
 import { mkdir } from 'node:fs/promises'
 import type { Context } from '@deepseek-ai/cordis'
-import { installModelSelection } from '@deepseek-ai/dsh-agent'
+import { installModelSelection, type AgentHandle } from '@deepseek-ai/dsh-agent'
+import type {} from '@deepseek-ai/dsh-workspace'
 import type {
   Agent, AgentOptions, AgentSetup, ModelSelection as AgentModelSelection, ModelSelectionRef,
 } from '@deepseek-ai/dsh-agent'
@@ -140,11 +141,15 @@ export async function inspectApiSession(
 export class ApiSessionAgentController {
   private readonly resumes = new Map<SessionId, Promise<Agent>>()
   private readonly creations = new Map<SessionId, Promise<Agent>>()
+  /** Disposal capabilities of the Agents this controller published, keyed by Session. */
+  private readonly handles = new Map<SessionId, AgentHandle>()
   private readonly selections = new WeakMap<Agent, InstalledSelection>()
   private readonly imageAdmissionChains = new WeakMap<Agent, Promise<void>>()
 
   /** @param ctx - Host context carrying Agent, model, persistence, and Typert services. */
   constructor(private readonly ctx: Context) {
+    ctx.on('workspace/session-release', ({ sessionId }) => this.release(sessionId))
+    ctx.on('agent/disposed', ({ agent }) => { this.handles.delete(agent.id) })
     ctx.typert.lookups.configure('agent', async (sessionId: SessionId) => {
       const found = await this.resolveAgent(sessionId)
       if ('error' in found) throw found.error
@@ -434,11 +439,11 @@ export class ApiSessionAgentController {
     if (published !== undefined && hasApiSessionSubagentOwner(this.ctx, published, live)) {
       throw new ApiSessionSubagentOwnership(sessionId)
     }
-    return (await this.ctx.agents.resume({
+    return this.track(await this.ctx.agents.resume({
       resumeSessionId: sessionId,
       agentOptions: this.agentOptions(),
       setup: composition.setup,
-    })).agent
+    }))
   }
 
   private async createOrAdopt(
@@ -466,11 +471,11 @@ export class ApiSessionAgentController {
         const storedPreset = this.presetForObservation(observation)
         this.assertPresetUnchanged(sessionId, presetId, storedPreset)
         const composition = await this.composeAgent(storedPreset)
-        return (await this.ctx.agents.resume({
+        return this.track(await this.ctx.agents.resume({
           resumeSessionId: sessionId,
           agentOptions: this.agentOptions(),
           setup: composition.setup,
-        })).agent
+        }))
       } catch (error: unknown) {
         if (!(error instanceof SessionQueryError)
           || error.code !== 'SESSION_QUERY_SESSION_NOT_FOUND') throw error
@@ -483,7 +488,7 @@ export class ApiSessionAgentController {
       throw new Error(`failed to ensure project directory "${cwd}": ${String(error)}`, { cause: error })
     }
     const composition = await this.composeAgent(presetId)
-    return (await this.ctx.agents.create({
+    return this.track(await this.ctx.agents.create({
       sessionId,
       agentOptions: this.agentOptions(),
       meta: {
@@ -491,7 +496,31 @@ export class ApiSessionAgentController {
         ...(composition.agentPreset === undefined ? {} : { agentPreset: composition.agentPreset }),
       },
       setup: composition.setup,
-    })).agent
+    }))
+  }
+
+  /**
+   * Remember an Agent's disposal capability so the Session can be released later.
+   * @param handle - the handle returned by `agents.create` or `agents.resume`.
+   * @returns the live Agent.
+   */
+  track(handle: AgentHandle): Agent {
+    this.handles.set(handle.agent.id, handle)
+    return handle.agent
+  }
+
+  /**
+   * Stop and unpublish the live Agent this controller published for a Session,
+   * so its write ownership is released before the Session is deleted. A Session
+   * without a tracked Agent (cold, or owned by subagent routing) is a no-op.
+   * @param sessionId - the Session being released.
+   * @returns resolution once the Agent's loop exited and its scope unwound.
+   */
+  async release(sessionId: SessionId): Promise<void> {
+    const handle = this.handles.get(sessionId)
+    if (handle === undefined) return
+    this.handles.delete(sessionId)
+    await handle.dispose()
   }
 
   private agentOptions(): AgentOptions {
