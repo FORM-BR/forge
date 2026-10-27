@@ -7,7 +7,7 @@
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {
-  CredentialInfo, LlmDiscoveredModel, LlmModelDiscoveryRequest,
+  CredentialBalance, CredentialInfo, LlmDiscoveredModel, LlmModelDiscoveryRequest,
   SettingsNamespaceView, SettingsPathOpView,
 } from '@deepseek-ai/dsh-api-remotes/client'
 
@@ -52,6 +52,13 @@ export interface ModelsOperations {
    */
   removeCredential(ref: string): Promise<string | undefined>
   /**
+   * Ask the Host for the balance behind one stored credential reference.
+   * @param ref - credential reference name.
+   * @param provider - provider route id, which selects the balance endpoint.
+   * @returns the outcome, or undefined when the question itself was refused.
+   */
+  checkBalance(ref: string, provider: string): Promise<CredentialBalance | undefined>
+  /**
    * Apply path operations to one settings namespace.
    * @param ns - settings namespace identity.
    * @param ops - ordered path operations against the stored section, as the
@@ -92,6 +99,10 @@ export function createModelsOperations(ctx: ClientContext): ModelsOperations {
     removeCredential: async (ref) => {
       const response = await ctx.remote.credentials.unset(ref)
       return response.ok ? undefined : response.error.message
+    },
+    checkBalance: async (ref, provider) => {
+      const response = await ctx.remote.credentials.balance(ref, provider)
+      return response.ok ? response.value : undefined
     },
     writeSettings: async (ns, ops, expectedRevision) => {
       const response = await ctx.remote.settings.mutate(ns, ops, expectedRevision)

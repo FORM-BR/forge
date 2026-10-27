@@ -73,6 +73,26 @@ export interface CredentialInfo {
   writable: boolean
 }
 
+/**
+ * What a provider answered when asked for the remaining balance behind one
+ * reference. Like {@link CredentialInfo} it has no slot a secret could ride in:
+ * the Host reads the key and the browser only ever sees the outcome.
+ */
+export interface CredentialBalance {
+  /**
+   * `ok` — the provider answered with an amount; `unsupported` — the provider
+   * publishes no balance endpoint for an ordinary key; `unconfigured` — the
+   * reference resolves to no key; `failed` — the provider refused or did not answer.
+   */
+  status: 'ok' | 'unsupported' | 'unconfigured' | 'failed'
+  /** Remaining balance as the provider spelled it, present only with `ok`. */
+  amount?: string
+  /** ISO currency code of {@link amount} when the provider names one. */
+  currency?: string
+  /** Short diagnostic for `failed` (never the key). */
+  detail?: string
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Events {
     /**
