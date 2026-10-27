@@ -2302,6 +2302,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'options', description: 'optional cancellation.' }],
         returns: 'one snapshot per stored session.',
       },
+      {
+        signature: 'remove(id: SessionId, options?: SessionPersistenceRemoveOptions): Promise<boolean>',
+        description: 'Permanently remove one stored session and everything the backend keeps for it. This is the only operation that deletes session data; it is irreversible and requires that nobody — this process or another — holds write ownership of the session. A backend that cannot remove sessions keeps this default, which rejects.',
+        parameters: [{ name: 'id', description: 'the stored session to remove.' }, { name: 'options', description: 'optional cancellation.' }],
+        returns: '`true` when a stored session was removed, `false` when none existed.',
+        throws: ['{SessionAlreadyOwnedError} while a write handle owns the session.'],
+      },
     ],
   },
   {
@@ -3799,6 +3806,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the complete resulting archive set.',
       },
       {
+        signature: '@Remote(\'deleteSession\') deleteSession(request: WorkspaceDeleteSessionRequest): Promise<WorkspaceDeleteSessionValue>',
+        description: 'Permanently delete one Session and all of its stored data.',
+        parameters: [{ name: 'request', description: 'Session identity to delete and whether to stop its work.' }],
+        returns: 'the deletion receipt.',
+      },
+      {
         signature: '@Remote(\'unarchiveSession\') unarchiveSession(request: WorkspaceUnarchiveSessionRequest): Promise<WorkspaceArchiveValue>',
         description: 'Restore one archived Session to Workspace grouping surfaces.',
         parameters: [{ name: 'request', description: 'Session identity to unarchive.' }],
@@ -3908,6 +3921,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Archive one session durably. The session must exist (live or in session persistence); its workspace accounting — or lack of one — is irrelevant. Without `stopActivity` the session must also be inactive: the `workspace/session-activity` waterfall is asked once, and any reported activity rejects with WorkspaceActiveSessionError before anything is written. With `stopActivity` the archive is written without an activity check, and the `workspace/session-stop` providers are then asked to stop the session\'s work: the durable archive set is what a provider\'s `agent/pre-step` gate reads, so every wake the stops induce is already blocked. Archiving drops the session\'s pin in the same durable write (pinning and archival are mutually exclusive). An already archived id resolves without writing, asking, or stopping.',
         parameters: [{ name: 'sessionId', description: 'The session to archive.' }, { name: 'options', description: 'Whether running work is stopped instead of refusing.' }],
         returns: 'resolution after durability and, with `stopActivity`, after every stop request was issued.',
+      },
+      {
+        signature: 'deleteSession(sessionId: SessionId, options: DeleteSessionOptions = {}): Promise<void>',
+        description: 'Permanently delete one session: its stored log and artifacts, its archive and pin entries, and its workspace membership. Irreversible. The session must exist. Without `stopActivity` the session must be inactive (the `workspace/session-activity` waterfall is asked once); with it, the `workspace/session-stop` providers are asked first. The `workspace/session-release` providers then release the live runtime, and the stored session is removed from session persistence; a session another writer still owns is refused with WorkspaceSessionInUseError before anything is removed.',
+        parameters: [{ name: 'sessionId', description: 'The session to delete.' }, { name: 'options', description: 'Whether running work is stopped instead of refusing.' }],
+        returns: 'resolution after the stored session and every registry reference are gone.',
       },
       {
         signature: 'unarchiveSession(sessionId: SessionId): Promise<void>',
@@ -4580,6 +4599,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'request', description: 'the session about to be archived.' }, { name: 'next', description: 'delegate to the remaining providers.' }],
   },
   {
+    name: 'workspace/session-release',
+    mode: 'parallel',
+    signature: '\'workspace/session-release\'(request: SessionActivityRequest): Promise<void> | void',
+    summary: 'Release the live runtime of a session that is about to be deleted: the owner of its Agent stops the loop, waits for it to exit, and drops the Agent so the session\'s write ownership is released.',
+    description: 'Release the live runtime of a session that is about to be deleted: the owner of its Agent stops the loop, waits for it to exit, and drops the Agent so the session\'s write ownership is released. Dispatched after the activity check (or the stop) and before the stored session is removed. A rejection aborts the deletion before anything is removed.',
+    parameters: [{ name: 'request', description: 'the session being deleted.' }],
+  },
+  {
     name: 'workspace/session-stop',
     mode: 'parallel',
     signature: '\'workspace/session-stop\'(request: SessionActivityRequest): Promise<void> | void',
@@ -5238,6 +5265,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'DeepSeekLlmApiJson',
     declaration: 'export type DeepSeekLlmApiJson = null | boolean | number | string | DeepSeekLlmApiJson[] | {\n    [key: string]: DeepSeekLlmApiJson;\n};',
+  },
+  {
+    name: 'DeleteSessionOptions',
+    declaration: 'export interface DeleteSessionOptions {\n    readonly stopActivity?: boolean;\n}',
   },
   {
     name: 'DeliveryRetentionBounds',
@@ -6841,7 +6872,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SessionForkRequest',
-    declaration: 'export interface SessionForkRequest {\n    readonly sessionId: SessionId;\n    readonly atSeq?: number;\n}',
+    declaration: 'export interface SessionForkRequest {\n    readonly sessionId: SessionId;\n    readonly atSeq?: number;\n    readonly workspaceId?: WorkspaceId;\n}',
   },
   {
     name: 'SessionForkSource',
@@ -6966,6 +6997,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SessionPersistenceOpenOptions',
     declaration: 'export interface SessionPersistenceOpenOptions {\n    readonly signal?: AbortSignal;\n}',
+  },
+  {
+    name: 'SessionPersistenceRemoveOptions',
+    declaration: 'export interface SessionPersistenceRemoveOptions {\n    readonly signal?: AbortSignal;\n}',
   },
   {
     name: 'SessionPersistenceRevision',
@@ -8318,6 +8353,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WorkspaceDeleteRequest',
     declaration: 'export interface WorkspaceDeleteRequest {\n    readonly workspaceId: WorkspaceId;\n}',
+  },
+  {
+    name: 'WorkspaceDeleteSessionRequest',
+    declaration: 'export interface WorkspaceDeleteSessionRequest {\n    readonly sessionId: SessionId;\n    readonly stopActivity?: boolean;\n}',
+  },
+  {
+    name: 'WorkspaceDeleteSessionValue',
+    declaration: 'export interface WorkspaceDeleteSessionValue {\n    readonly deleted: true;\n}',
   },
   {
     name: 'WorkspaceDeleteValue',

@@ -404,6 +404,13 @@ Host service backing the generated `ctx.remote.workspace` namespace.
 @Remote('archiveSession') archiveSession(request: WorkspaceArchiveSessionRequest): Promise<WorkspaceArchiveValue>
 
 /**
+ * Permanently delete one Session and all of its stored data.
+ * @param request - Session identity to delete and whether to stop its work.
+ * @returns the deletion receipt.
+ */
+@Remote('deleteSession') deleteSession(request: WorkspaceDeleteSessionRequest): Promise<WorkspaceDeleteSessionValue>
+
+/**
  * Restore one archived Session to Workspace grouping surfaces.
  * @param request - Session identity to unarchive.
  * @returns the complete resulting archive set.
@@ -581,6 +588,22 @@ insertBefore(id: WorkspaceId, beforeId?: WorkspaceId): Promise<readonly Workspac
 archiveSession(sessionId: SessionId, options: ArchiveSessionOptions = {}): Promise<void>
 
 /**
+ * Permanently delete one session: its stored log and artifacts, its
+ * archive and pin entries, and its workspace membership. Irreversible. The
+ * session must exist. Without `stopActivity` the session must be inactive
+ * (the `workspace/session-activity` waterfall is asked once); with it, the
+ * `workspace/session-stop` providers are asked first. The
+ * `workspace/session-release` providers then release the live runtime, and
+ * the stored session is removed from session persistence; a session another
+ * writer still owns is refused with {@link WorkspaceSessionInUseError}
+ * before anything is removed.
+ * @param sessionId - The session to delete.
+ * @param options - Whether running work is stopped instead of refusing.
+ * @returns resolution after the stored session and every registry reference are gone.
+ */
+deleteSession(sessionId: SessionId, options: DeleteSessionOptions = {}): Promise<void>
+
+/**
  * Unarchive one session durably by dropping it from the registry-global
  * archive set; the accounting slot was never touched, so the session
  * returns to its recorded position. Unarchiving runs no session-existence
@@ -647,6 +670,27 @@ Ask the composed providers what still runs for a session before it is archived. 
  * @mode waterfall
  */
 'workspace/session-activity'( request: SessionActivityRequest, next: () => Promise<readonly SessionActivity[]>, ): Promise<readonly SessionActivity[]>
+```
+
+Source: [`packages/workspace/workspace/src/index.ts`](../../packages/workspace/workspace/src/index.ts)
+
+<a id="workspacesession-release--parallel"></a>
+
+#### `workspace/session-release` — parallel
+
+Release the live runtime of a session that is about to be deleted: the owner of its Agent stops the loop, waits for it to exit, and drops the Agent so the session's write ownership is released. Dispatched after the activity check (or the stop) and before the stored session is removed. A rejection aborts the deletion before anything is removed.
+
+```ts cordis-catalog
+/**
+ * Release the live runtime of a session that is about to be deleted: the
+ * owner of its Agent stops the loop, waits for it to exit, and drops the
+ * Agent so the session's write ownership is released. Dispatched after
+ * the activity check (or the stop) and before the stored session is
+ * removed. A rejection aborts the deletion before anything is removed.
+ * @param request - the session being deleted.
+ * @mode parallel
+ */
+'workspace/session-release'(request: SessionActivityRequest): Promise<void> | void
 ```
 
 Source: [`packages/workspace/workspace/src/index.ts`](../../packages/workspace/workspace/src/index.ts)

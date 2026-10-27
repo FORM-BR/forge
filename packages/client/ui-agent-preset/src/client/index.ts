@@ -61,7 +61,10 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
  * flow exists (it lives and dies with that scope).
  */
 export interface AgentPresetLauncher {
-  /** Whether a session on a shipped preset can start now: it needs Developer tools. */
+  /**
+   * Whether a session on a shipped preset can start now: it needs Developer tools.
+   * @returns `true` when {@link AgentPresetLauncher.start} can launch a preset.
+   */
   available(): boolean
   /**
    * Stage the preset and open a new session on it.
