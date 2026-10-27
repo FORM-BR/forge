@@ -206,6 +206,16 @@ export interface HostConnectionHandle {
   createSharedFetchHandler(channel: '/api'): ConnectionFetchHandler
 
   /**
+   * Admit one more deployment authority to the Host/Origin fence while the
+   * process runs, as `--trusted-host` does at boot (a reverse proxy such as
+   * Tailscale Serve is the usual case).
+   * @param authority - exact `host:port`, or a port-less host matching any port.
+   * @returns a disposer that withdraws exactly this admission; a second call does nothing.
+   * @throws Error when the authority is malformed.
+   */
+  trustHost(authority: string): () => void
+
+  /**
    * Apply Connection's Host/Origin checks and browser authentication to
    * another Web route.
    * @param request - request headers from the HTTP or upgrade request.

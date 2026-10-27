@@ -60,10 +60,10 @@ export interface SidebarBrandMarkOwnerProps {
   size: number
 }
 
-/** Empty owner share for the sidebar brand-name occupant. */
+/** Owner share for the sidebar brand-name occupant, which owns its own content and width. */
 export interface SidebarBrandNameOwnerProps {
-  /** Marker field: the occupant owns its own content and width. */
-  children?: never
+  /** Locale-owned product name, for occupants that draw it as text. */
+  label: string
 }
 
 /** Icon presentation supplied by the global panel row. */

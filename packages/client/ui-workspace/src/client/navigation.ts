@@ -50,6 +50,19 @@ export interface UiWorkspace {
    */
   forkSession(sessionId: SessionId, onCreated?: (childId: SessionId) => void): Promise<SessionId>
   /**
+   * Move a Session to another Workspace without the user seeing a copy: the
+   * Host forks it into the target Workspace's directory keeping its title,
+   * the original is deleted, and the current view follows the replacement
+   * when the original was on screen. Running work in the original refuses the
+   * switch; a failure after the fork removes the replacement again, so either
+   * the Session is in the target Workspace or nothing changed.
+   * @param sessionId - Session to move.
+   * @param workspaceId - target Workspace.
+   * @throws {WorkspaceArchiveError} when the Host refuses the removal of the original
+   *   (`workspace/session-active`, `workspace/session-in-use`).
+   */
+  switchWorkspace(sessionId: SessionId, workspaceId: WorkspaceId): Promise<void>
+  /**
    * Resolve the reusable or newly created blank Session for a Workspace.
    * @param workspaceId - target Workspace.
    * @returns a Session already addressable through the Session Controller.
@@ -75,6 +88,13 @@ export interface UiWorkspace {
    * @param options - `stopActivity` asks the Host to stop the Session's running work instead of refusing.
    */
   archiveSession(sessionId: SessionId, options?: { readonly stopActivity?: boolean }): Promise<void>
+  /**
+   * Permanently delete a Session, clear it when it is the current selection,
+   * and refresh the Session list so its row disappears.
+   * @param sessionId - Session to delete.
+   * @param options - `stopActivity` asks the Host to stop the Session's running work instead of refusing.
+   */
+  deleteSession(sessionId: SessionId, options?: { readonly stopActivity?: boolean }): Promise<void>
   /**
    * Unarchive a Session, restoring it to its recorded Workspace position.
    * @param sessionId - Session to unarchive.
@@ -228,6 +248,23 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     return this.sessions.fork({ sessionId, increaseTitle: true, ...onCreated === undefined ? {} : { onCreated } })
   }
 
+  async switchWorkspace(sessionId: SessionId, workspaceId: WorkspaceId): Promise<void> {
+    const replacementId = await this.sessions.fork({ sessionId, workspaceId })
+    const onScreen = this.mainReference?.sessionId === sessionId
+    if (onScreen) this.openSession(replacementId)
+    try {
+      await this.workspaces.deleteSession(sessionId)
+    } catch (error: unknown) {
+      // The original stays authoritative: drop the replacement before reporting.
+      await this.workspaces.deleteSession(replacementId, { stopActivity: true }).catch((rollback: unknown) => {
+        console.warn('workspace switch rollback failed:', rollback)
+      })
+      if (onScreen) this.openSession(sessionId)
+      throw error
+    }
+    await this.sessions.refresh()
+  }
+
   startSession(workspaceId?: WorkspaceId): void {
     const workspace = this.workspaces.list.getSnapshot()
     const sessions = this.sessions.list.getSnapshot()
@@ -274,6 +311,12 @@ class UiWorkspaceService extends Service implements UiWorkspace {
   async archiveSession(sessionId: SessionId, options: { readonly stopActivity?: boolean } = {}): Promise<void> {
     await this.workspaces.archiveSession(sessionId, options)
     if (this.mainReference?.sessionId === sessionId) this.clearMain()
+  }
+
+  async deleteSession(sessionId: SessionId, options: { readonly stopActivity?: boolean } = {}): Promise<void> {
+    await this.workspaces.deleteSession(sessionId, options)
+    if (this.mainReference?.sessionId === sessionId) this.clearMain()
+    await this.sessions.refresh()
   }
 
   async unarchiveSession(sessionId: SessionId): Promise<void> {

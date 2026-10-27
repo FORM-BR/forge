@@ -34,6 +34,7 @@ import { CloseLabel, HeaderContent, TriggerContent } from './chrome.tsx'
 import { GeneralSection } from './GeneralSection.tsx'
 import { CurrentVersionRow } from './CurrentVersionRow.tsx'
 import { DeveloperToolsRow, type DeveloperToolsRowInjected } from './DeveloperToolsRow.tsx'
+import { RemoteAccessRow, type RemoteAccessRowInjected, type RemoteAccessView } from './RemoteAccessRow.tsx'
 import { SettingsDocumentAction } from './SettingsDocumentAction.tsx'
 import type { SettingsDocumentActionInjected } from './SettingsDocumentAction.tsx'
 import { SettingsDocumentStore } from './settings-document-store.ts'
@@ -65,7 +66,7 @@ const NS = 'settings'
  * ui-settings' apply, whose activation order relative to this one is NOT
  * constrained; registrations depend on their slots through `slots.inject()`.
  */
-export const inject = ['slots', 'locale', 'connection', 'remote', 'remote.settings', 'configForms', 'shortcuts']
+export const inject = ['slots', 'locale', 'connection', 'remote', 'remote.settings', 'remote.remoteAccess', 'configForms', 'shortcuts']
 
 /**
  * Register the `settings` dictionaries, the chrome content, and the General
@@ -80,6 +81,20 @@ export function apply(ctx: ClientContext): void {
       setEnabled: enabled => ctx.configForms.developerTools.setEnabled(enabled),
     }),
   }, DeveloperToolsRow))
+  // Phone access sits beside the other core switches; the Host owns every Tailscale detail.
+  const remoteAccess = (call: () => ReturnType<typeof ctx.remote.remoteAccess.status>) =>
+    async (): Promise<RemoteAccessView> => {
+      const response = await call()
+      return response.ok ? response.value : { state: 'failed', detail: response.error.message }
+    }
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item', id: 'remote-access', order: 16, locale: NS,
+    inject: (): RemoteAccessRowInjected => ({
+      status: remoteAccess(() => ctx.remote.remoteAccess.status()),
+      enable: remoteAccess(() => ctx.remote.remoteAccess.enable()),
+      disable: remoteAccess(() => ctx.remote.remoteAccess.disable()),
+    }),
+  }, RemoteAccessRow))
   // Version information follows the core preferences.
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item', id: 'current-version', order: 100, locale: NS,

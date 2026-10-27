@@ -25,6 +25,7 @@ The todo group gives agents a session-level task list to plan with: add tasks, m
 | Package | Role | ctx key |
 |---|---|---|
 | [`tool-todo`](tool-todo/README.md) | Lets the agent maintain a session task list: plan tasks, update status, and track progress | registers on `ctx.tools` |
+| [`tool-parallel-sessions`](tool-parallel-sessions/README.md) | Lets the agent offer independent work as parallel sessions with a self-contained prompt per session | registers on `ctx.tools` |
 
 -----
 

@@ -5,6 +5,7 @@ import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { QuestionComposer } from '../src/client/QuestionComposer.tsx'
+import { QuestionWaiting } from '../src/client/QuestionWaiting.tsx'
 import { PendingQuestion } from '../src/client/contract/slots.ts'
 import { createQuestionDraftStore } from '../src/client/draft-store.ts'
 import { apply, inject } from '../src/client/index.ts'
@@ -39,7 +40,13 @@ async function bench(declare = true) {
   const slots = ctx.get('slots') as SlotRegistry
   if (declare) {
     slots.register(
-      { name: 'root', children: { 'conversation.composer': { kind: 'chain', scope: 'session' } } } as never,
+      {
+        name: 'root',
+        children: {
+          'conversation.composer': { kind: 'chain', scope: 'session' },
+          'conversation.notice': { kind: 'chain', scope: 'session' },
+        },
+      } as never,
       () => null,
     )
   }
@@ -113,13 +120,13 @@ describe('apply', () => {
     expect(b.pending.getSnapshot()).toEqual([])
   })
 
-  it('projects a scoped request through one stable composer and returns its answer', async () => {
+  it('projects a scoped request into the pinned notice and returns its answer', async () => {
     const b = await bench()
     const next = vi.fn(async () => ANSWER)
     const result = b.invoke(b.agent, { questions: QUESTIONS }, next)
     await Promise.resolve()
 
-    const entry = b.slots.entries('conversation.composer')[0]!
+    const entry = b.slots.entries('conversation.notice')[0]!
     expect(entry.component).toBe(QuestionComposer)
     expect(entry.inject).toBeUndefined()
     expect(entry.locale).toBe('question')
@@ -134,12 +141,15 @@ describe('apply', () => {
     expect(select({ pendingInteraction: undefined })).toBeNull()
     expect(select({ pendingInteraction: pending })).toBe(pending)
     expect(pending).toMatchObject({ kind: 'question', sessionId: SESSION_ID, questions: QUESTIONS })
+    // The composer seat is held by the pointer strip, not by a second copy of the question.
+    const composer = b.slots.entries('conversation.composer')[0]!
+    expect(composer.component).toBe(QuestionWaiting)
 
     await pending.answer(ANSWER)
     await expect(result).resolves.toBe(ANSWER)
     expect(next).not.toHaveBeenCalled()
     expect(b.pending.getSnapshot()).toEqual([])
-    expect(b.slots.entries('conversation.composer')).toHaveLength(1)
+    expect(b.slots.entries('conversation.notice')).toHaveLength(1)
   })
 
   it('preserves ASK_CANCELLED as a rejected waterfall result', async () => {
@@ -199,13 +209,15 @@ describe('apply', () => {
     expect(b.pending.getSnapshot()).toEqual([])
   })
 
-  it('removes the stable composer with the plugin lifetime', async () => {
+  it('removes the stable notice and composer seats with the plugin lifetime', async () => {
     const b = await bench()
     expect(b.slots.entries('conversation.composer')).toHaveLength(1)
+    expect(b.slots.entries('conversation.notice')).toHaveLength(1)
 
     await b.fiber.dispose()
 
     expect(b.slots.entries('conversation.composer')).toHaveLength(0)
+    expect(b.slots.entries('conversation.notice')).toHaveLength(0)
   })
 })
 

@@ -49,6 +49,19 @@ configuration(): Array<{ entry: Entry; inherited: Record<string, unknown>; overr
  * @returns Fulfillment after Loader reconciliation completes.
  */
 async edit( entry: Entry, change: (current: Record<string, unknown>, inherited: Record<string, unknown>) => Record<string, unknown>, ): Promise<void>
+
+/**
+ * Rewrite the whole profile patch text and apply it through the normal Loader path,
+ * for edits that add, remove, or toggle rows rather than change one entry's config.
+ * The write is rolled back when the reload rejects it. A reload that outlives `settleMs`
+ * keeps the edit lock and finishes in the background; its failure rolls the file back and is logged.
+ * @param change Derive the next patch text from the current one; throwing aborts before any write.
+ * @param options.requiredIds Entry ids whose activation failure must reject the reload.
+ * @param options.settleMs How long to wait for the reload before answering `pending`.
+ * @returns `applied` after reconciliation, `pending` while it still runs, or `restart-required`
+ * when the host cannot reload the profile in place (the file is written either way).
+ */
+async editDocument( change: (before: string) => string, options: { readonly requiredIds?: readonly string[]; readonly settleMs?: number } = {}, ): Promise<DocumentEditOutcome>
 ```
 
 Source: [`packages/boot/config-editor/src/index.ts`](../../packages/boot/config-editor/src/index.ts)

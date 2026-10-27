@@ -24,6 +24,7 @@ function controllerAgents(overrides: object = {}): ApiSessionAgentController {
     composeAgent: () => Promise.resolve({ setup: () => {} }),
     presetForSession: () => undefined,
     presetForObservation: () => undefined,
+    track: (handle: { agent: unknown }) => handle.agent,
     ...overrides,
   } as unknown as ApiSessionAgentController
 }
@@ -269,6 +270,57 @@ describe('Session fork failures', () => {
     if (options === undefined) throw new Error('Agent creation was not attempted')
     expect(options.meta).not.toHaveProperty('cwd')
     expect(options.meta).not.toHaveProperty('agentPreset')
+    await ctx.fiber.dispose()
+  })
+
+  it('continues in the chosen Workspace: its directory becomes the child cwd and the child attaches there', async () => {
+    const ctx = await baseContext()
+    const source = completedSession(ctx, 'move-source', '/old')
+    const attachSession = vi.fn(() => Promise.resolve())
+    const target = { id: 'target' as WorkspaceId, path: '/new', sessionIds: [], attachSession } as unknown as Workspace
+    ctx.provide('workspaceRegistry', { get: (id: WorkspaceId) => id === target.id ? target : undefined, list: () => [] } as never)
+    const create = vi.spyOn(ctx.agents, 'create').mockImplementation(
+      (options: CreateAgentOptions) => Promise.resolve(resolvedHandle(ctx, options.sessionId)),
+    )
+    const controller = new SessionCommandController(ctx, controllerAgents(), '/default')
+
+    const forked = await controller.fork({ sessionId: source.id, workspaceId: target.id })
+
+    const options = create.mock.calls[0]?.[0]
+    if (options === undefined) throw new Error('Agent creation was not attempted')
+    expect(options.meta?.cwd).toBe('/new')
+    expect(options.meta?.parentSession).toBe(source.id)
+    expect(attachSession).toHaveBeenCalledExactlyOnceWith(forked.sessionId)
+    await ctx.fiber.dispose()
+  })
+
+  it('rejects an unknown target Workspace before creating anything', async () => {
+    const ctx = await baseContext()
+    ctx.provide('workspaceRegistry', { get: () => undefined, list: () => [] } as never)
+    const source = completedSession(ctx, 'lost-target', '/old')
+    const create = vi.spyOn(ctx.agents, 'create')
+    const controller = new SessionCommandController(ctx, controllerAgents(), '/default')
+
+    await expect(controller.fork({ sessionId: source.id, workspaceId: 'missing' as WorkspaceId })).rejects.toMatchObject({
+      code: 'workspace/not-found',
+      details: { workspaceId: 'missing' },
+    })
+    expect(create).not.toHaveBeenCalled()
+    await ctx.fiber.dispose()
+  })
+
+  it('keeps a source without a directory directoryless when no Workspace is chosen', async () => {
+    const ctx = await baseContext()
+    ctx.provide('workspaceRegistry', { list: () => [] } as never)
+    const source = completedSession(ctx, 'no-cwd-source')
+    const create = vi.spyOn(ctx.agents, 'create').mockImplementation(
+      (options: CreateAgentOptions) => Promise.resolve(resolvedHandle(ctx, options.sessionId)),
+    )
+    const controller = new SessionCommandController(ctx, controllerAgents(), '/default')
+
+    await controller.fork({ sessionId: source.id })
+
+    expect(create.mock.calls[0]?.[0].meta).not.toHaveProperty('cwd')
     await ctx.fiber.dispose()
   })
 

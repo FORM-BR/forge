@@ -22,6 +22,34 @@ A form namespace is the local id of a uniquely addressed entry in the active pro
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
+<a id="ctxremoteaccesscontroller--remoteaccesscontroller"></a>
+
+### `ctx.remoteAccessController` — `RemoteAccessController`
+
+Host service backing the generated `ctx.remote.remoteAccess` namespace. The link it returns carries the process login token, so it is as sensitive as the address bar of the Forge tab it is opened from: it only ever answers the authenticated operator, who already holds that token.
+
+```ts cordis-catalog
+/**
+ * Read the current state of the switch without changing it.
+ * @returns `on` with the phone link, `off`, or why Tailscale cannot be used.
+ */
+@Remote async status(): Promise<RemoteAccessStatus>
+
+/**
+ * Publish this server on the tailnet and admit its host name.
+ * @returns `on` with the phone link, or why it could not be switched on.
+ */
+@Remote async enable(): Promise<RemoteAccessStatus>
+
+/**
+ * Stop publishing and withdraw the host name from the fence.
+ * @returns the state after switching off.
+ */
+@Remote async disable(): Promise<RemoteAccessStatus>
+```
+
+Source: [`packages/api/settings-controller/src/remote-access.ts`](../../packages/api/settings-controller/src/remote-access.ts)
+
 <a id="ctxsettings--settingsforms"></a>
 
 ### `ctx.settings` — `SettingsForms`
@@ -29,6 +57,15 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 Project Config schemas into forms and own optional instance-level UI policy.
 
 ```ts cordis-catalog
+/** Compatibility for 0.1.x plugins: register a namespace outside the entry-config model.
+ * Prefer volatile Config fields in new plugins. The section is stored under `<profile>/legacy-settings`.
+ * @param ns Lowercase hyphenated namespace.
+ * @param schema Schemastery schema resolving the namespace.
+ * @param options Composition `base` layer and optional validation.
+ * @returns Scope for reads, observation and updates; unregistered with the calling plugin's fiber.
+ */
+register<T>(ns: string, schema: z<T>, options?: SettingsRegisterOptions<T>): SettingsScope<T>
+
 /** Register the calling plugin instance's page policy without changing its Config.
  * @param presentation Automatic-page policy for this instance; `auto` defaults to true.
  * @param owner Plugin instance the policy belongs to; defaults to the calling fiber.

@@ -144,7 +144,7 @@ describe('ForgeLogo', () => {
 
 describe('ForgeWordmark', () => {
   it('spells the product name in the brand font inside its 3:1 box', () => {
-    const { container } = render(<primitives.ForgeWordmark />)
+    const { container } = render(<primitives.ForgeWordmark label="FORGE" />)
     const svg = container.querySelector('svg')!
     expect(svg.getAttribute('width')).toBe('72')
     expect(svg.getAttribute('height')).toBe('24')

@@ -1,5 +1,5 @@
 /** Tool-category and live-detail interpretation owned by Chat grouping. */
-import type { ProcessActivity, ProcessActivitySummary } from '../contract/process-groups.ts'
+import type { ProcessActivity, ProcessActivitySummary, ProcessStep } from '../contract/process-groups.ts'
 import type { ChatNode } from '../contract/chat-nodes.ts'
 import { isRunningTool } from '../contract/chat-nodes.ts'
 import type { ToolCallBlock } from '../contract/snapshot.ts'
@@ -50,19 +50,25 @@ function questionDetail(value: unknown): string {
   return ''
 }
 
+function reasoningDetail(blocks: readonly { readonly kind: string; readonly text?: string }[]): string {
+  for (let blockIndex = blocks.length - 1; blockIndex >= 0; blockIndex--) {
+    const block = blocks[blockIndex]
+    if (block?.kind !== 'reasoning') continue
+    const paragraphs = (block.text ?? '').split(/\r?\n[\t ]*\r?\n/)
+    for (let paragraphIndex = paragraphs.length - 1; paragraphIndex >= 0; paragraphIndex--) {
+      const detail = normalizeLiveToolDetail(paragraphs[paragraphIndex]?.replaceAll('**', ''))
+      if (detail !== '') return detail
+    }
+  }
+  return ''
+}
+
 function liveReasoningDetail(nodes: readonly ChatNode[]): string {
   for (let nodeIndex = nodes.length - 1; nodeIndex >= 0; nodeIndex--) {
     const node = nodes[nodeIndex]
     if (node?.kind !== 'assistant-step' || node.data.status !== 'running') continue
-    for (let blockIndex = node.data.blocks.length - 1; blockIndex >= 0; blockIndex--) {
-      const block = node.data.blocks[blockIndex]
-      if (block?.kind !== 'reasoning') continue
-      const paragraphs = block.text.split(/\r?\n[\t ]*\r?\n/)
-      for (let paragraphIndex = paragraphs.length - 1; paragraphIndex >= 0; paragraphIndex--) {
-        const detail = normalizeLiveToolDetail(paragraphs[paragraphIndex]?.replaceAll('**', ''))
-        if (detail !== '') return detail
-      }
-    }
+    const detail = reasoningDetail(node.data.blocks)
+    if (detail !== '') return detail
   }
   return ''
 }
@@ -94,6 +100,7 @@ function liveToolDetail(name: string, argsRaw: string): string {
 export function processActivity(nodes: readonly ChatNode[]): ProcessActivitySummary {
   const counts = new Map<ProcessActivity, number>()
   const seen = new Set<string>()
+  const steps: ProcessStep[] = []
   let running: ProcessActivity | undefined
   let runningDetail = ''
   let runningTime = -Infinity
@@ -113,10 +120,26 @@ export function processActivity(nodes: readonly ChatNode[]): ProcessActivitySumm
         runningTime = tool.time
       }
       counts.set(kind, (counts.get(kind) ?? 0) + 1)
+      steps.push({
+        kind,
+        state: isRunningTool(tool) ? 'running' : tool.isError ? 'error' : 'done',
+        detail: 'argsRaw' in call ? liveToolDetail(call.name, call.argsRaw) : '',
+      })
     }
     for (const child of tool.subCalls) visit(child)
   }
   for (const node of nodes) {
+    if (node.kind === 'assistant-step') {
+      const detail = reasoningDetail(node.data.blocks)
+      if (detail !== '') {
+        steps.push({
+          kind: 'thinking',
+          state: node.data.status === 'running' ? 'running' : 'done',
+          detail,
+        })
+      }
+      continue
+    }
     if (node.kind === 'tool-call') visit(node.data.root)
   }
   if (running === undefined) runningDetail = liveReasoningDetail(nodes)
@@ -125,5 +148,6 @@ export function processActivity(nodes: readonly ChatNode[]): ProcessActivitySumm
     running,
     runningDetail,
     ...preparing ? { preparing: true } : {},
+    steps,
   }
 }

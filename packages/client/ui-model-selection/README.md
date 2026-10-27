@@ -41,6 +41,8 @@ Models stay grouped by provider. The composer menu shows model and effort names 
 
 The composer replaces the model and effort text with the Models icon when the expanded controls cannot share one line, and restores the text when space permits. The full selection remains available in the trigger's accessible name, tooltip, and menu.
 
+With more than one provider, the model list shows a small fold-all button above the groups: it folds every provider at once and, when all are folded, unfolds them again (a single provider can still be folded from its own heading). Dragging any corner of the model list resizes it: the corner opposite the one grabbed stays put, and the size is clamped to 240×160 px at least, 720×720 px at most, and the window. The size is saved in the browser (`dsh.model-menu` in local storage) and applies to every composer the next time the list opens; the two-row root menu and the effort list keep their compact fit.
+
 ### Unroutable sessions
 
 Catalog availability does not block sending with a saved selection; request execution reports missing credentials or unavailable models. Refreshes and refresh failures retain the last displayed selection and groups. A Host reset clears that display. Sign-out hides the account provider from the picker while preserving the saved provider/model ID and reasoning effort. Signing in restores the catalog name when that model is available again. Existing session logs remain unchanged.

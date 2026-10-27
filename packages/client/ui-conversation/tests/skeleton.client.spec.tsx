@@ -128,6 +128,8 @@ function mount(
     sessionId?: SessionId | undefined
     /** When true, mimic overlay:true chain siblings (hidden fallback + takeover). */
     overlayTakeover?: boolean
+    /** When true, the notice chain elects a panel above the transcript. */
+    noticeTakeover?: boolean
     /** The session list summary's `blank` flag — independent of the snapshot's. */
     summaryBlank?: boolean
     /** Drop the session's summary row entirely (a session the list has not caught up with). */
@@ -309,9 +311,9 @@ function mount(
     }
     return <div data-testid={`view-${opts?.only ?? key}`} />
   }) as ConversationContentProps['renderSlot']
-  const renderSlotChain = ((_key, _owner, opts) => (
-    options.overlayTakeover === true
-      ? (
+  const renderSlotChain = ((key, _owner, opts) => {
+    if (options.overlayTakeover === true && key === 'conversation.composer') {
+      return (
         <>
           <div data-chain-overlay-fallback="conversation.composer" style={{ display: 'none' }}>
             {opts?.fallback ?? null}
@@ -319,8 +321,12 @@ function mount(
           <div data-testid="composer-takeover">TAKEOVER</div>
         </>
       )
-      : (opts?.fallback ?? null)
-  )) as ConversationContentProps['renderSlotChain']
+    }
+    if (options.noticeTakeover === true && key === 'conversation.notice') {
+      return <div data-testid="conversation-notice">NOTICE</div>
+    }
+    return opts?.fallback ?? null
+  }) as ConversationContentProps['renderSlotChain']
   const SessionProvider: ConversationContentProps['SessionProvider'] = ({ children }) => children
   const renderFactorySlot = ((_name: string, input: ConversationContentInputProps, factoryOptions?: {
     slots?: Record<string, (props: never) => ReactNode>
@@ -531,6 +537,16 @@ describe('ConversationRoot resident composer', () => {
     const fallback = b.view.container.querySelector('[data-chain-overlay-fallback="conversation.composer"]')
     expect(seat?.contains(takeover)).toBe(true)
     expect(seat?.contains(fallback)).toBe(true)
+  })
+
+  it('pins an elected notice chain above the scrollport, outside the composer seat', () => {
+    const b = mount(sessionSnapshotOf(), undefined, undefined, { noticeTakeover: true })
+    const notice = b.view.getByTestId('conversation-notice')
+    const host = b.view.container.querySelector('[data-conversation-scroll]')
+    const seat = b.view.container.querySelector('[data-composer-seat]')
+    expect(host?.contains(notice)).toBe(false)
+    expect(seat?.contains(notice)).toBe(false)
+    expect(b.view.container.querySelector('[data-conversation-region="notice"]')?.contains(notice)).toBe(true)
   })
 
   it('hero phase: keeps sidebar controls accessible while hiding conversation chrome', () => {

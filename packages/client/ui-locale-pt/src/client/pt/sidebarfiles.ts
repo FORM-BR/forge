@@ -1,0 +1,20 @@
+/** pt-BR dictionary for the `sidebarFiles` namespace. */
+export const pt: Record<string, string> = {
+  'shortcut.noSession': 'Selecione uma sessão primeiro',
+  'type.label': 'Arquivos',
+  'guide.title': 'Arquivos do workspace',
+  'guide.description': 'Navegue pelos arquivos do workspace desta sessão',
+  'loading': 'Lendo…',
+  'empty': 'Diretório vazio',
+  'truncated': 'Muitas entradas; mostrando apenas algumas delas.',
+  'noWorkspace': 'Esta sessão não tem um diretório de workspace.',
+  'reload': 'Recarregar',
+  'autoRefresh': 'Atualização automática',
+  'autoRefresh.enable': 'Ativar atualização automática',
+  'autoRefresh.disable': 'Desativar atualização automática',
+  'entry.other': 'Não é um arquivo nem um diretório, portanto não pode ser aberto.',
+  'error.notFound': 'Esse diretório não existe mais. Ele pode ter sido movido ou excluído.',
+  'error.outsideWorkspace': 'Esse diretório está fora do workspace, então a barra lateral não o lerá.',
+  'error.notDirectory': 'Isso não é um diretório.',
+  'error.unavailable': 'Falha na leitura: {message}',
+}

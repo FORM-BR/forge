@@ -163,6 +163,7 @@ root
 │     ├─ conversation.composer
 │     │  ├─ conversation.approval.detail
 │     │  └─ conversation.plan-review.actions
+│     ├─ conversation.notice
 │     ├─ conversation.composer.bar
 │     │  ├─ conversation.input.attachments
 │     │  ├─ conversation.input.permission

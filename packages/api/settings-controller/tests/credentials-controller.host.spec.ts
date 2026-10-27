@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { CredentialInfo } from '@deepseek-ai/dsh-credentials/types'
 import { remoteErrorOf, remoteMethods } from '@deepseek-ai/dsh-typert-protocol'
@@ -38,6 +38,8 @@ async function boot(
   return ctx.credentialsController
 }
 
+afterEach(() => { vi.unstubAllGlobals() })
+
 describe('the credentials Remote namespace a configuration surface calls', () => {
   it('publishes the credentials namespace from its own service key', async () => {
     const controller = await boot()
@@ -48,6 +50,7 @@ describe('the credentials Remote namespace a configuration surface calls', () =>
       { method: 'describe', invocation: { kind: 'direct' } },
       { method: 'set', invocation: { kind: 'direct' } },
       { method: 'unset', invocation: { kind: 'direct' } },
+      { method: 'balance', invocation: { kind: 'direct' } },
     ])
   })
 
@@ -58,6 +61,7 @@ describe('the credentials Remote namespace a configuration surface calls', () =>
       () => ctx.credentialsController.describe(['DEEPSEEK_API_KEY']),
       () => ctx.credentialsController.set('DEEPSEEK_API_KEY', 'sk-live'),
       () => ctx.credentialsController.unset('DEEPSEEK_API_KEY'),
+      () => ctx.credentialsController.balance('OPENROUTER_API_KEY', 'openrouter'),
     ]) {
       const failure = await call().catch((error: unknown) => error)
       expect(remoteErrorOf(failure)).toMatchObject({
@@ -134,5 +138,39 @@ describe('the credentials Remote namespace a configuration surface calls', () =>
     const controller = await boot({}, LiteralRejectingCredentials)
     const failure = await controller.set('DEEPSEEK_API_KEY', 'sk-live').catch((error: unknown) => error)
     expect(remoteErrorOf(failure)?.message).toBe('the store refused')
+  })
+
+  it('asks the provider for the balance of the stored key and never returns the key', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve(Response.json({ data: { total_credits: 10, total_usage: 2.5 } })))
+    vi.stubGlobal('fetch', fetchMock)
+    const controller = await boot({ OPENROUTER_API_KEY_2: 'sk-or-secret' })
+    const balance = await controller.balance('OPENROUTER_API_KEY_2', 'openrouter')
+    expect(balance).toEqual({ status: 'ok', amount: '7.50', currency: 'USD' })
+    expect(JSON.stringify(balance)).not.toContain('sk-or-secret')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('answers unsupported without reading the key for a provider with no balance endpoint', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const controller = await boot({ ANTHROPIC_API_KEY: 'sk-ant-secret' })
+    expect(await controller.balance('ANTHROPIC_API_KEY', 'anthropic')).toEqual({ status: 'unsupported' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('answers unconfigured when the reference holds no key', async () => {
+    const controller = await boot()
+    expect(await controller.balance('OPENROUTER_API_KEY', 'openrouter')).toEqual({ status: 'unconfigured' })
+  })
+
+  it('reports a malformed balance request as bad-request', async () => {
+    const controller = await boot()
+    for (const call of [
+      () => controller.balance('not a var', 'openrouter'),
+      () => controller.balance('OPENROUTER_API_KEY', ''),
+    ]) {
+      const failure = await call().catch((error: unknown) => error)
+      expect(remoteErrorOf(failure)).toMatchObject({ code: 'gateway/bad-request' })
+    }
   })
 })

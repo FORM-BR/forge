@@ -19,9 +19,9 @@ param(
 #  - o servidor roda com cwd num diretorio neutro, NUNCA na raiz do repo (o sandbox do Forge marca o cwd
 #    com integridade Low e isso quebrou os hooks do git; ver Vault-IA/geral/Forge - sandbox Windows ...).
 $ErrorActionPreference = 'Stop'
-$r = if ($env:FORGE_REPO_ROOT) { $env:FORGE_REPO_ROOT } else { 'C:\Users\Felipe\Dev\deepseek-harness' }   # FORGE_REPO_ROOT: so para testar outra worktree
-$serverCwd = 'C:\Users\Felipe\Dev\forge-tasks\server-cwd'
+$r = if ($env:FORGE_REPO_ROOT) { $env:FORGE_REPO_ROOT } else { $PSScriptRoot }   # a pasta deste script (instalacao portatil); FORGE_REPO_ROOT: so para testar outra worktree
 $state = Join-Path $env:LOCALAPPDATA 'forge-launch'
+$serverCwd = if ($env:FORGE_SERVER_CWD) { $env:FORGE_SERVER_CWD } else { Join-Path $state 'server-cwd' }   # fora do repo e do OneDrive
 # Um log por porta: uma subida de teste/corrida nao pode apagar o log (com o token) da instancia que esta no ar.
 $log = Join-Path $env:LOCALAPPDATA $(if ($Port -eq 3080) { "forge-launch-$Profile.log" } else { "forge-launch-$Profile-$Port.log" })
 $bin = Join-Path $r 'apps\cli\lib\bin.js'
@@ -52,9 +52,17 @@ function Test-PortOpen([int]$p) {
   catch { return $false } finally { $c.Close() }
 }
 
+function Get-CodeStamp {
+  # Identifica a versao do codigo: HEAD do git (checkout) ou o hash do pnpm-lock.yaml (instalacao por zip, sem .git).
+  if (Test-Path (Join-Path $r '.git')) { try { return (git -C $r rev-parse HEAD).Trim() } catch { } }
+  $lock = Join-Path $r 'pnpm-lock.yaml'
+  if (Test-Path $lock) { return (Get-FileHash $lock -Algorithm SHA256).Hash }
+  ''
+}
+
 function Get-ForgeProcs {
   Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
-    Where-Object { $_.CommandLine -match 'apps\\cli\\lib\\bin\.js' }
+    Where-Object { $_.CommandLine -and $_.CommandLine.Contains($bin) }   # so o FORGE desta pasta (outra copia/instalacao nao e tocada)
 }
 
 function Stop-Forge { Get-ForgeProcs | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } }
@@ -73,16 +81,101 @@ function Open-Existing([int]$p) {
   return $true
 }
 
+# Script das fases do build, materializado em %LOCALAPPDATA%\forge-launch (fora do repo) por Build-Forge.
+# Literal de proposito: o que esta escrito aqui roda no processo filho sem interpolacao do launcher.
+$buildFases = @'
+param([Parameter(Mandatory)][string]$Raiz)
+
+# Build do FORGE em fases, com o tempo de cada uma (gerado por launch-forge.ps1 - nao editar aqui:
+# a proxima atualizacao sobrescreve este arquivo).
+$ErrorActionPreference = 'Stop'
+$state = Join-Path $env:LOCALAPPDATA 'forge-launch'
+New-Item -ItemType Directory -Force $state | Out-Null
+$tempoLog = Join-Path $state 'build-forge-tempos.log'
+$lockHashFile = Join-Path $state 'pnpm-lock.sha256'
+
+$Host.UI.RawUI.WindowTitle = 'Atualizando FORGE - aguarde'
+Set-Location $Raiz
+
+# Sem .git (instalacao por zip) o build do desktop nao consegue ler o commit: usa o hash gravado no zip (forge-commit.txt).
+if (-not (Test-Path (Join-Path $Raiz '.git')) -and -not $env:DSH_CLIENT_COMMIT_HASH) {
+  $arqHash = Join-Path $Raiz 'forge-commit.txt'
+  $h = if (Test-Path $arqHash) { (Get-Content $arqHash -Raw).Trim() } else { '' }
+  $env:DSH_CLIENT_COMMIT_HASH = if ($h -match '^[0-9a-fA-F]{7,40}$') { $h } else { '0000000' }
+}
+
+$tempos =New-Object System.Collections.Generic.List[object]
+
+function Registrar([string]$fase, [double]$segundos, [bool]$falhou, [string]$nota) {
+  $tempos.Add([pscustomobject]@{ Fase = $fase; Segundos = $segundos; Falhou = $falhou; Nota = $nota })
+}
+
+function Encerrar([int]$codigo) {
+  $total = ($tempos | Measure-Object -Property Segundos -Sum).Sum
+  if (-not $total) { $total = 0 }
+  Write-Host ''
+  if ($codigo -eq 0) { Write-Host ('Build concluido em {0}s' -f [math]::Round($total, 1)) -ForegroundColor Green }
+  else { Write-Host ('Build interrompido depois de {0}s' -f [math]::Round($total, 1)) -ForegroundColor Red }
+  $head = ''
+  try { if (Test-Path (Join-Path $Raiz '.git')) { $head = (git rev-parse --short HEAD).Trim() } } catch { }
+  $linhas = $tempos | ForEach-Object {
+    $estado = if ($_.Falhou) { '  FALHOU' } else { '' }
+    $nota = if ($_.Nota) { '  ' + $_.Nota } else { '' }
+    '{0,-12} {1,7}s{2}{3}' -f $_.Fase, $_.Segundos, $estado, $nota
+  }
+  Add-Content -Path $tempoLog -Encoding UTF8 -Value (@(
+    ('=== {0}  (HEAD {1}) ===' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $head)
+    $linhas
+    ''
+  ) -join "`r`n")
+  exit $codigo
+}
+
+function Passo([string]$nome, [scriptblock]$acao) {
+  Write-Host ''
+  Write-Host ('== ' + $nome) -ForegroundColor Cyan
+  $sw = [Diagnostics.Stopwatch]::StartNew()
+  & $acao
+  $codigo = $LASTEXITCODE
+  $sw.Stop()
+  $s = [math]::Round($sw.Elapsed.TotalSeconds, 1)
+  if ($codigo) { Write-Host ('   FALHOU depois de {0}s' -f $s) -ForegroundColor Red }
+  else { Write-Host ('   ok em {0}s' -f $s) -ForegroundColor DarkGray }
+  Registrar $nome $s ([bool]$codigo) ''
+  if ($codigo) { Encerrar 1 }
+}
+
+# install: so quando o lockfile mudou. Sem mudanca o pnpm responde "Already up to date" em ~1s, mas
+# pulando a atualizacao nao toca no store nem na rede. Com dependencia nova, roda normal.
+$lock = Join-Path $Raiz 'pnpm-lock.yaml'
+$hash = (Get-FileHash $lock -Algorithm SHA256).Hash
+$anterior = if (Test-Path $lockHashFile) { (Get-Content $lockHashFile -Raw).Trim() } else { '' }
+if ((Test-Path (Join-Path $Raiz 'node_modules\.pnpm')) -and $hash -eq $anterior) {
+  Write-Host ''
+  Write-Host '== install: pulado (lockfile igual ao do ultimo build)' -ForegroundColor DarkGray
+  Registrar 'install' 0 $false '(pulado)'
+} else {
+  Passo 'install' { pnpm install --frozen-lockfile }
+  Set-Content -Path $lockHashFile -Value $hash -Encoding UTF8
+}
+
+# As tres fases seguem os scripts do repo (sem reimplementar os internos deles aqui).
+Passo 'host' { pnpm run build:lib:host }
+Passo 'client' { pnpm run build:lib:client }
+Passo 'web' { pnpm run build:web }
+
+Encerrar 0
+'@
+
 function Build-Forge {
   # Janela visivel de proposito: e o caminho lento (so primeira vez, `-Atualizar` ou lib ausente).
+  # O processo filho roda o script das fases acima e grava o tempo de cada uma em
+  # build-forge-tempos.log (ao lado de build-stamp), para saber onde a atualizacao pesa.
   Set-Location $r
-  $head = (git rev-parse HEAD).Trim()
-  $cmd = '$Host.UI.RawUI.WindowTitle="Atualizando FORGE - aguarde"; cd "' + $r + '"; ' +
-    'pnpm install --frozen-lockfile; if($LASTEXITCODE){exit 1}; ' +
-    'pnpm run build:lib:host; if($LASTEXITCODE){exit 1}; ' +
-    'pnpm run build:lib:client; if($LASTEXITCODE){exit 1}; ' +
-    'pnpm run build:web; exit $LASTEXITCODE'
-  $p = Start-Process powershell -ArgumentList '-NoProfile', '-Command', $cmd -Wait -PassThru
+  $head = Get-CodeStamp
+  $fases = Join-Path $state 'build-forge.ps1'
+  Set-Content -Path $fases -Encoding UTF8 -Value $buildFases
+  $p = Start-Process powershell -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$fases`"", '-Raiz', "`"$r`"" -Wait -PassThru
   if ($p.ExitCode -eq 0) { Set-Content $stampFile $head }
   else { Show-Toast 'FORGE' 'Falha ao reconstruir; abrindo a versao anterior.' }
 }
@@ -185,7 +278,7 @@ if ($Profile -eq 'web' -and -not $Atualizar -and (Test-PortOpen $Port)) {
 }
 
 # --- 2. Build: so bloqueia se nao existe ou foi pedido ---------------------------------------------------------
-$head = (git -C $r rev-parse HEAD).Trim()
+$head = Get-CodeStamp
 $stamp = if (Test-Path $stampFile) { (Get-Content $stampFile -Raw).Trim() }
          elseif (Test-Path $oldStamp) { (Get-Content $oldStamp -Raw).Trim() } else { '' }
 if ($Atualizar) { Stop-Forge }
@@ -199,6 +292,7 @@ if (-not (Test-Path $bin)) { Show-Toast 'FORGE nao abriu' 'Build ausente e a rec
 if ($Profile -eq 'plain') { Stop-Forge }
 $node = (Get-Command node -ErrorAction SilentlyContinue).Source
 if (-not $node) { $node = 'C:\Program Files\nodejs\node.exe' }
+
 # Fallback automatico so no web em modo normal. Nele o launcher abre o navegador (so apos o veredito do boot), entao o
 # servidor sobe com --no-open; no resto o `dsh web` abre sozinho, como sempre.
 $autoFallback = ($Profile -eq 'web' -and -not $Safe)
@@ -253,5 +347,5 @@ if ($fellBack) {
 }
 
 if ($head -ne $stamp) {
-  Show-Toast 'FORGE aberto - ha versao nova' 'O codigo do FORGE mudou desde o ultimo build. Para aplicar: feche o FORGE e rode atualizar-forge.bat (pasta do repo).'
+  Show-Toast 'FORGE aberto - ha versao nova' 'O codigo do FORGE mudou desde o ultimo build. Para aplicar: feche o FORGE e use o atalho "Atualizar FORGE" (ou atualizar-forge.bat, na pasta do FORGE).'
 }

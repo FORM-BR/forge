@@ -88,10 +88,24 @@ export type {
   PiAiThinkingFormat,
 } from './catalog.ts'
 
+/** One extra API key the configuration page keeps beside the active one. */
+export interface PiAiSavedKey {
+  /** Credential reference (environment-variable name) holding this key's value. */
+  ref: string
+  /** Name the page shows for the key. */
+  label?: string
+}
+
 /** Configuration for one pi-ai provider route; the `providers` dict key IS the route. */
 export interface PiAiProviderProfile {
   /** Credential reference (environment-variable name) resolved per request through `ctx.credentials`. */
   apiKeyEnv?: string
+  /**
+   * Further keys saved for this route. Only configuration surfaces read this:
+   * requests always use {@link apiKeyEnv}, and choosing another key means
+   * pointing `apiKeyEnv` at that entry's reference.
+   */
+  apiKeys?: PiAiSavedKey[]
   /** Name shown by configuration surfaces; defaults to the route key. */
   displayName?: string
   /**
@@ -165,6 +179,16 @@ export interface PiAiProviderProfile {
   /** Maximum provider idle time while one stream read is outstanding. */
   streamIdleTimeoutMs?: number
   /**
+   * Request-shape shims a third-party OpenAI-compatible gateway demands before
+   * it accepts a request as coming from its own client. `opencode-gateway`
+   * covers the OpenCode free tier, which answers `400` for a tool whose
+   * `parameters` is not an object schema and `403 FreeTierError` for a request
+   * that declares no function at all — including harness calls that carry no
+   * tool surface, such as session-title and compaction requests. Absent means
+   * the route is sent exactly as the harness builds it.
+   */
+  gatewayCompat?: 'opencode-gateway'
+  /**
    * Maximum base64-encoded image payload per request. When a request's
    * accumulated images exceed it, the oldest images are replaced by text
    * placeholders until the request fits, so a long session keeps completing
@@ -184,7 +208,7 @@ export interface PiAiProviderProfile {
 
 /** Validated profile with its route stamped and every adapter-owned default resolved. */
 export interface ResolvedPiAiProviderProfile
-  extends Omit<PiAiProviderProfile, 'apiKeyEnv' | 'retryPolicy' | 'models' | 'displayName'> {
+  extends Omit<PiAiProviderProfile, 'apiKeyEnv' | 'apiKeys' | 'retryPolicy' | 'models' | 'displayName'> {
   /** Harness route key and the `Models` collection key (the configuration dict key). */
   provider: string
   /** Resolved display name for selectors and configuration surfaces. */
@@ -323,8 +347,15 @@ const modelProfile: z<PiAiModelProfile> = z.object({
 /** A {@link modelProfile} whose id lives in the `modelOverrides` dict key. */
 const modelOverride: z<PiAiModelOverride> = z.object(modelFields)
 
+/** An {@link PiAiSavedKey} entry: the reference holds the secret, the label only names it. */
+const savedKey: z<PiAiSavedKey> = z.object({
+  ref: z.string().role('credential-ref').required(),
+  label: z.string(),
+})
+
 const profile = z.object({
   apiKeyEnv: z.string().role('credential-ref'),
+  apiKeys: z.array(savedKey),
   displayName: z.string(),
   api: z.union(supportedProtocols()),
   baseURL: z.string(),
@@ -342,6 +373,7 @@ const profile = z.object({
   timeoutMs: z.natural(),
   websocketConnectTimeoutMs: z.natural(),
   streamIdleTimeoutMs: z.number().min(Number.MIN_VALUE).max(MAX_TIMER_DELAY_MS).default(DEFAULT_STREAM_IDLE_TIMEOUT_MS),
+  gatewayCompat: z.union(['opencode-gateway']),
   maxRequestImageBytes: z.number().step(1).min(1).default(DEFAULT_MAX_REQUEST_IMAGE_BYTES),
   requestImagePixelBudget: z.number().step(1).min(1).default(DEFAULT_REQUEST_IMAGE_PIXEL_BUDGET),
   requestImageMaxBytes: z.number().step(1).min(1).default(DEFAULT_REQUEST_IMAGE_MAX_BYTES),
@@ -487,7 +519,7 @@ export function resolveProfiles(
       if (validation === 'strict' || !(error instanceof PiAiCatalogError)) throw error
       catalogError ??= error.message
     }
-    const { apiKeyEnv, retryPolicy, models: _models, displayName: _displayName, ...rest } = source
+    const { apiKeyEnv, apiKeys: _apiKeys, retryPolicy, models: _models, displayName: _displayName, ...rest } = source
     resolved.set(provider, {
       ...rest,
       provider,

@@ -64,6 +64,11 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
       readonly sessionId: SessionId
       readonly activity: readonly SessionActivity[]
     }
+    /**
+     * Another writer, for example another running FORGE process, still owns
+     * the Session, so deleting it was refused and nothing was removed.
+     */
+    'workspace/session-in-use': { readonly sessionId: SessionId }
     /** The Session or its anchor is not in the Workspace's manual order. */
     'workspace/move-invalid': {
       readonly workspaceId: WorkspaceId
@@ -78,6 +83,10 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'directory-picker/exists': { readonly path: string }
     /** The parent is not fully qualified, the name is not one segment, or creation failed. */
     'directory-picker/create-failed': { readonly path: string }
+    /** The requested directory is not inside a git repository. */
+    'workspace/not-a-repository': { readonly path: string }
+    /** git refused to create the worktree, or its parent directory is unwritable. */
+    'workspace/worktree-failed': { readonly path: string }
   }
 }
 
@@ -90,6 +99,22 @@ export interface WorkspaceCreateRequest {
 export interface WorkspaceCreateValue {
   readonly workspace: WorkspaceView
   readonly created: boolean
+}
+
+/** New worktree requested beside the repository containing `cwd`. */
+export interface WorkspaceWorktreeRequest {
+  /** Directory inside the repository; git resolves the repository root from it. */
+  readonly cwd: string
+  /** Task title that names the directory and branch. */
+  readonly title: string
+}
+
+/** Created worktree checkout. */
+export interface WorkspaceWorktreeValue {
+  /** Fully qualified worktree directory. */
+  readonly path: string
+  /** New branch checked out in the worktree. */
+  readonly branch: string
 }
 
 /** Workspace title mutation. */
@@ -142,6 +167,22 @@ export interface WorkspaceArchiveSessionRequest {
    * set is durable.
    */
   readonly stopActivity?: boolean
+}
+
+/** Session requested for permanent deletion from Workspace grouping surfaces. */
+export interface WorkspaceDeleteSessionRequest {
+  readonly sessionId: SessionId
+  /**
+   * Stop the Session's running work instead of refusing the deletion as
+   * `workspace/session-active`. The stops are requested before the Agent is
+   * released and the stored Session is removed.
+   */
+  readonly stopActivity?: boolean
+}
+
+/** Receipt after one Session was permanently deleted. */
+export interface WorkspaceDeleteSessionValue {
+  readonly deleted: true
 }
 
 /** Session requested for restoration from the archived Session list. */

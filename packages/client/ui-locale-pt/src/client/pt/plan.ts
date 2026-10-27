@@ -1,0 +1,20 @@
+/** pt-BR dictionary for the `plan` namespace. */
+export const pt: Record<string, string> = {
+  'chip.label': 'Plano',
+  'preview.title': 'Plano',
+  'preview.document': 'Plano · Markdown',
+  'preview.action': 'Abrir',
+  'preview.open': 'Abrir plano na barra lateral',
+  'preview.full': 'Ver plano completo',
+  'preview.openNamed': 'Abrir plano: {title}',
+  'preview.loading': 'Carregando plano…',
+  'preview.failed': 'Não foi possível carregar o plano',
+  'preview.invalidAddress': 'Endereço do plano inválido',
+  'preview.historyUnavailable': 'O histórico da sessão não está disponível',
+  'preview.notFound': 'Este plano não foi encontrado',
+  'preview.unavailable': 'A prévia do plano não está disponível',
+  'preview.expired': 'Esta prévia temporária do plano expirou. Reabra-a pelo cartão de revisão pendente.',
+  'chip.on.aria': 'Modo de plano ativado, pressione para desativar',
+  'chip.on.title': 'Modo de plano ativado — clique para desativar (/plan off)',
+  'chip.exitFailed': 'Falha ao sair do modo de plano',
+}

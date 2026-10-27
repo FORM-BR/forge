@@ -136,4 +136,21 @@ register(server: string, provider: McpResourceProvider): () => void
 ```
 
 Source: [`packages/mcp/mcp-resources/src/index.ts`](../../packages/mcp/mcp-resources/src/index.ts)
+
+<a id="ctxmcpserverstatus--mcpserverstatusregistry"></a>
+
+### `ctx.mcpServerStatus` — `McpServerStatusRegistry`
+
+Collects the status of every live MCP server plugin in its scope.
+
+```ts cordis-catalog
+/**
+ * Add one server's status owner for the lifetime of the calling plugin.
+ * @param source - the connection's status owner.
+ * @returns the disposer that removes exactly this registration.
+ */
+register(source: McpServerStatusSource): () => void
+```
+
+Source: [`packages/mcp/mcp-client/src/status.ts`](../../packages/mcp/mcp-client/src/status.ts)
 <!-- END GENERATED cordis-surface -->

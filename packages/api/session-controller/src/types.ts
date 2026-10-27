@@ -335,6 +335,12 @@ export interface SessionForkRequest {
   readonly sessionId: SessionId
   /** Exact inclusive source event seq; omission selects the latest completed-turn prefix. */
   readonly atSeq?: number
+  /**
+   * Continue the conversation in this Workspace: the child starts in the
+   * Workspace's directory and is attached to it. Omission keeps the source's
+   * directory and Workspace.
+   */
+  readonly workspaceId?: WorkspaceId
 }
 
 /** Identity of a newly forked Session. */

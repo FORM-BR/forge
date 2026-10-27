@@ -92,6 +92,22 @@ export class TestWorkspaces implements IWorkspaces {
   }
 
   /**
+   * Create a worktree for one offered task (recorded).
+   * @param input - directory inside the repository and the task title.
+   * @param signal - caller lifetime.
+   * @returns the stubbed worktree, or a sibling path under `-worktrees`.
+   */
+  async createWorktree(
+    input: { cwd: string; title: string },
+    signal?: AbortSignal,
+  ): Promise<{ path: string; branch: string }> {
+    this.calls.push({ method: 'createWorktree', args: [input, signal] })
+    const stub = this.stubs.get('createWorktree')
+    if (stub !== undefined) return await (stub(input, signal) as Promise<{ path: string; branch: string }>)
+    return { path: `${input.cwd}-worktrees/work`, branch: 'forge/work' }
+  }
+
+  /**
    * Look up git facts for a directory (recorded). The default answers outside any repository.
    * @param path - Host directory.
    * @param signal - caller lifetime.
@@ -164,6 +180,25 @@ export class TestWorkspaces implements IWorkspaces {
     }
     await this.update((draft) => {
       draft.archivedSessionIds = [...draft.archivedSessionIds, sessionId]
+    })
+  }
+
+  /**
+   * Delete a session permanently (recorded). The default mirrors the
+   * production face's observable effect: the id leaves the archive and pin sets.
+   * @param sessionId - session to delete.
+   * @param options - whether the Host stops the session's running work.
+   */
+  async deleteSession(sessionId: SessionId, options?: { readonly stopActivity?: boolean }): Promise<void> {
+    this.calls.push({ method: 'deleteSession', args: [sessionId, options] })
+    const stub = this.stubs.get('deleteSession')
+    if (stub !== undefined) {
+      await (stub(sessionId, options) as Promise<void>)
+      return
+    }
+    await this.update((draft) => {
+      draft.archivedSessionIds = draft.archivedSessionIds.filter(id => id !== sessionId)
+      draft.pinnedSessionIds = draft.pinnedSessionIds.filter(id => id !== sessionId)
     })
   }
 

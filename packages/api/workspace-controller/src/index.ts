@@ -8,6 +8,7 @@ import { DirectoryPickerController } from './directory-picker.ts'
 import { WorkspaceFeed, workspaceView } from './feed.ts'
 import { defaultWorkspaceDirectory, validateDocumentsDirectory } from './default-directory.ts'
 import { isGitInfoPath, resolveGitInfo } from './git-info.ts'
+import { createWorktree } from './worktree.ts'
 import type {
   WorkspaceArchiveSessionRequest,
   WorkspaceArchiveValue,
@@ -23,9 +24,13 @@ import type {
   WorkspacePinSessionRequest,
   WorkspacePinValue,
   WorkspaceRenameRequest,
+  WorkspaceDeleteSessionRequest,
+  WorkspaceDeleteSessionValue,
   WorkspaceUnarchiveSessionRequest,
   WorkspaceUnpinSessionRequest,
   WorkspaceValue,
+  WorkspaceWorktreeRequest,
+  WorkspaceWorktreeValue,
 } from './types.ts'
 
 export type * from './types.ts'
@@ -134,6 +139,26 @@ export class WorkspaceController extends TypertRemoteService {
   }
 
   /**
+   * Create a git worktree of the repository containing the offered work, so a
+   * parallel session writes in a checkout of its own.
+   * @param request - directory inside the repository and the task title naming the worktree.
+   * @param signal - caller lifetime; abort terminates the running git child.
+   * @returns the created worktree path and its branch.
+   */
+  @Remote('createWorktree')
+  async createWorktree(request: WorkspaceWorktreeRequest, signal: AbortSignal): Promise<WorkspaceWorktreeValue> {
+    if (!isGitInfoPath(request.cwd)) {
+      throw new RemoteError('gateway/bad-request', 'workspace.createWorktree requires a fully qualified path', {})
+    }
+    try {
+      return await createWorktree(request, signal, this.config.gitLookupTimeoutMs)
+    } catch (error: unknown) {
+      if (signal.aborted) throw new RemoteError('gateway/cancelled', 'worktree creation was aborted', {}, { cause: error })
+      throw error
+    }
+  }
+
+  /**
    * Rename one Workspace to a unique non-blank title.
    * @param request - Workspace identity and proposed title.
    * @returns the updated Workspace projection.
@@ -181,6 +206,16 @@ export class WorkspaceController extends TypertRemoteService {
   @Remote('archiveSession')
   archiveSession(request: WorkspaceArchiveSessionRequest): Promise<WorkspaceArchiveValue> {
     return this.commands.archiveSession(request)
+  }
+
+  /**
+   * Permanently delete one Session and all of its stored data.
+   * @param request - Session identity to delete and whether to stop its work.
+   * @returns the deletion receipt.
+   */
+  @Remote('deleteSession')
+  deleteSession(request: WorkspaceDeleteSessionRequest): Promise<WorkspaceDeleteSessionValue> {
+    return this.commands.deleteSession(request)
   }
 
   /**

@@ -27,6 +27,8 @@ export interface PlanItemLike {
 export interface PlanSummary {
   done: number
   total: number
+  /** Items still `pending`: the count a parallel-session hint reads. */
+  pending: number
   /** First `in_progress` content, or null when that first item is unusable. */
   activeContent: string | null
   /** Active items beyond the first; 0 whenever there is no `activeContent` to sit beside. */
@@ -54,6 +56,7 @@ export function planSummary(todos: readonly PlanItemLike[]): PlanSummary {
   return {
     done: todos.filter(t => t.status === 'completed').length,
     total: todos.length,
+    pending: todos.filter(t => t.status === 'pending').length,
     activeContent: named ? first : null,
     activeExtra: named ? active.length - 1 : 0,
   }

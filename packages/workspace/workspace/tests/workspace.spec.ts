@@ -10,7 +10,7 @@ import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
 import type { DomainChanged } from '@deepseek-ai/dsh-storage-domain'
 import SessionStore, { SESSION_FORMAT_VERSION, SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionHeader } from '@deepseek-ai/dsh-session'
-import { SessionPersistenceRevision } from '@deepseek-ai/dsh-session-persistence'
+import { SessionAlreadyOwnedError, SessionPersistenceRevision } from '@deepseek-ai/dsh-session-persistence'
 import type { SessionPersistenceSnapshot } from '@deepseek-ai/dsh-session-persistence'
 import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 import WorkspaceRegistry, {
@@ -18,6 +18,8 @@ import WorkspaceRegistry, {
   type workspaceDomainState,
   WorkspaceMoveInvalidError,
   WorkspaceOrderInvalidError,
+  WorkspaceActiveSessionError,
+  WorkspaceSessionInUseError,
 } from '../src/index.ts'
 import type { WorkspaceDomainState, WorkspaceRecord } from '../src/index.ts'
 import { defaultWorkspaceTitle, fullyQualifiedWorkspacePath } from '../src/paths.ts'
@@ -55,7 +57,12 @@ async function harness(options: HarnessOptions = {}) {
     listed.map(header => ({ header, revision: SessionPersistenceRevision(`rev-${header.id}`) })))
   const open = vi.fn(() => { throw new Error('event bodies must not be opened') })
   const stat = vi.fn(() => { throw new Error('per-session stat must not be needed') })
-  ctx.provide('sessionPersistence', { list, open, stat } as never)
+  const remove = vi.fn(async (id: SessionId): Promise<boolean> => {
+    const before = listed.length
+    listed = listed.filter(meta => meta.id !== id)
+    return listed.length < before
+  })
+  ctx.provide('sessionPersistence', { list, open, stat, remove } as never)
 
   if (options.sessionStore === true) {
     await ctx.plugin(SessionStore)
@@ -82,6 +89,7 @@ async function harness(options: HarnessOptions = {}) {
     list,
     open,
     stat,
+    remove,
     setSessions: (headers: SessionHeader[]) => { listed = headers },
   }
 }
@@ -1399,3 +1407,76 @@ declare module '@deepseek-ai/dsh-workspace/types' {
     'probe-items': true
   }
 }
+
+describe('registry session deletion', () => {
+  it('removes the stored session, its archive and pin entries, and its workspace membership', async () => {
+    const dir = await makeDir('delete-home')
+    const result = await harness({ sessions: [header('gone', dir, 200), header('kept', dir, 100)] })
+    const workspace = result.registry.list()[0]!
+    await result.registry.pinSession(SessionId('kept'))
+    await result.registry.archiveSession(SessionId('gone'))
+    expect(workspace.sessionIds).toContain('gone')
+
+    await result.registry.deleteSession(SessionId('gone'))
+
+    expect(result.remove).toHaveBeenCalledWith(SessionId('gone'))
+    expect(workspace.sessionIds).toEqual(['kept'])
+    expect(result.registry.archivedSessionIds).toEqual([])
+    expect(result.registry.pinnedSessionIds).toEqual(['kept'])
+    expect(storedState(result.pool).archivedSessionIds).toEqual([])
+    // The forgotten id is unknown again.
+    await expect(result.registry.archiveSession(SessionId('gone'))).rejects.toThrow(/cannot archive session 'gone'/)
+  })
+
+  it('drops the pin of a deleted session', async () => {
+    const dir = await makeDir('delete-pin')
+    const result = await harness({ sessions: [header('pinned', dir, 100)] })
+    await result.registry.pinSession(SessionId('pinned'))
+    await result.registry.deleteSession(SessionId('pinned'))
+    expect(result.registry.pinnedSessionIds).toEqual([])
+  })
+
+  it('rejects an unknown session without removing anything', async () => {
+    const result = await harness({ sessions: [] })
+    await expect(result.registry.deleteSession(SessionId('ghost'))).rejects.toThrow(/cannot delete session 'ghost'/)
+    expect(result.remove).not.toHaveBeenCalled()
+  })
+
+  it('refuses a session the activity waterfall reports active, and removes nothing', async () => {
+    const dir = await makeDir('delete-busy')
+    const result = await harness({ sessions: [header('busy', dir, 100)] })
+    result.ctx.on('workspace/session-activity', async (_request, next) => [{ kind: 'turn' as const }, ...await next()])
+    const failure = await result.registry.deleteSession(SessionId('busy')).catch((error: unknown) => error)
+    expect(failure).toBeInstanceOf(WorkspaceActiveSessionError)
+    expect((failure as Error).message).toMatch(/cannot delete session 'busy'/)
+    expect(result.remove).not.toHaveBeenCalled()
+  })
+
+  it('with stopActivity, stops the work and releases the runtime before removing the session', async () => {
+    const dir = await makeDir('delete-stop')
+    const result = await harness({ sessions: [header('busy', dir, 100)] })
+    const order: string[] = []
+    result.ctx.on('workspace/session-activity', async (_request, next) => [{ kind: 'turn' as const }, ...await next()])
+    result.ctx.on('workspace/session-stop', ({ sessionId }) => { order.push(`stop:${sessionId}`) })
+    result.ctx.on('workspace/session-release', ({ sessionId }) => { order.push(`release:${sessionId}`) })
+    result.remove.mockImplementationOnce(async (id) => { order.push(`remove:${id}`); return true })
+    await result.registry.deleteSession(SessionId('busy'), { stopActivity: true })
+    expect(order).toEqual(['stop:busy', 'release:busy', 'remove:busy'])
+  })
+
+  it('reports a session another writer owns as in use and keeps its references', async () => {
+    const dir = await makeDir('delete-owned')
+    const result = await harness({ sessions: [header('owned', dir, 100)] })
+    const workspace = result.registry.list()[0]!
+    result.remove.mockRejectedValueOnce(new SessionAlreadyOwnedError(SessionId('owned')))
+    await expect(result.registry.deleteSession(SessionId('owned'))).rejects.toBeInstanceOf(WorkspaceSessionInUseError)
+    expect(workspace.sessionIds).toEqual(['owned'])
+  })
+
+  it('propagates any other persistence failure unchanged', async () => {
+    const dir = await makeDir('delete-fault')
+    const result = await harness({ sessions: [header('fault', dir, 100)] })
+    result.remove.mockRejectedValueOnce(new Error('disk on fire'))
+    await expect(result.registry.deleteSession(SessionId('fault'))).rejects.toThrow('disk on fire')
+  })
+})

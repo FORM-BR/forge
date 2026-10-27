@@ -1,0 +1,52 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/client/ui-settings-mcp/README.md
+/:
+  en: f4f078b8e865b18c
+  zh: cd0d847e51768ebe
+/deepseek-ai-dsh-client-ui-settings-mcp:
+  en: 6ba6f9819727d227
+  zh: 8e2801429e74acc3
+/deepseek-ai-dsh-client-ui-settings-mcp/summary:
+  en: b7009474977daefa
+  zh: 2e59b4b61e0a6fbf
+/deepseek-ai-dsh-client-ui-settings-mcp/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 09388d293f9be9cb
+/deepseek-ai-dsh-client-ui-settings-mcp/use-this-package:
+  en: bf84ab03bc95c65f
+  zh: 27637f30b4c67e21
+/deepseek-ai-dsh-client-ui-settings-mcp/use-this-package/reading-a-row:
+  en: e495042a1690b409
+  zh: 2c61667f6868d46c
+/deepseek-ai-dsh-client-ui-settings-mcp/use-this-package/refreshing:
+  en: e45110b9402dae14
+  zh: e1f12b9faed00d50
+/deepseek-ai-dsh-client-ui-settings-mcp/use-this-package/adding-and-editing-a-server:
+  en: 5884742d69347fbb
+  zh: 8d215560cf74b488
+/deepseek-ai-dsh-client-ui-settings-mcp/use-this-package/servers-defined-elsewhere:
+  en: df77c57ab426ca82
+  zh: 40cf9e0f3afa7aab
+/deepseek-ai-dsh-client-ui-settings-mcp/use-this-package/asking-the-agent:
+  en: 770e0dfcbca50183
+  zh: 749374c0865318dc
+/deepseek-ai-dsh-client-ui-settings-mcp/understand-the-implementation:
+  en: 4eab75650f3c3c4b
+  zh: 6992b65e3281295d
+/deepseek-ai-dsh-client-ui-settings-mcp/further-exploration:
+  en: 73b9ec378546a02b
+  zh: 939486274954821d
+/deepseek-ai-dsh-client-ui-settings-mcp/model-experience:
+  en: ecf7b1163d5e50ff
+  zh: 379b12bc8903495c
+/deepseek-ai-dsh-client-ui-settings-mcp/model-experience/kv-cache-effect:
+  en: ca75c51c89c2c9b0
+  zh: f57cc48a1b5cbfa9
+/deepseek-ai-dsh-client-ui-settings-mcp/known-limitations-and-deferred-work:
+  en: 114e750f9f9c5d46
+  zh: 4b74b5c8aac6f55b
+/deepseek-ai-dsh-client-ui-settings-mcp/known-limitations-and-deferred-work/dev-note:
+  en: 9dd5f21ff4d17982
+  zh: be68b88cd3a48510

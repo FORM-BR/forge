@@ -14,6 +14,7 @@ import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_SETTINGS_NAMESPACE, LocaleSettingsSchema } from '@deepseek-ai/dsh-client-locale/src/locale-settings.ts'
 import { inject } from '../src/client/index.ts'
 import type { DeveloperToolsRowInjected } from '../src/client/DeveloperToolsRow.tsx'
+import type { RemoteAccessRowInjected } from '../src/client/RemoteAccessRow.tsx'
 import { CloseLabel, HeaderContent, TriggerContent } from '../src/client/chrome.tsx'
 import { GeneralSection } from '../src/client/GeneralSection.tsx'
 import { SettingsDocumentAction } from '../src/client/SettingsDocumentAction.tsx'
@@ -89,7 +90,7 @@ function setPageUrl(url: string): void {
 
 describe('ui-settings-general apply', () => {
   it('declares the services it uses', () => {
-    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'remote.settings', 'configForms', 'shortcuts'])
+    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'remote.settings', 'remote.remoteAccess', 'configForms', 'shortcuts'])
   })
 
   it('fills the five seats of the shell it declares, with the locale-following General label', async ({ mock, start }) => {
@@ -102,7 +103,7 @@ describe('ui-settings-general apply', () => {
     expect(generalLabel(c)).toBe('通用设置')
     expect(c.ctx.slots.spec('settings.general.item')).toEqual({ kind: 'list', scope: 'root' })
     // The shared developer-tool control belongs to General; onboarding remains feature-owned.
-    expect(c.ctx.slots.entries('settings.general.item').filter(row => row.locale === NS).map(row => row.options.id)).toEqual(['developer-tools', 'current-version'])
+    expect(c.ctx.slots.entries('settings.general.item').filter(row => row.locale === NS).map(row => row.options.id)).toEqual(['developer-tools', 'remote-access', 'current-version'])
     expect(c.ctx.slots.entries('settings.onboarding').filter(row => row.locale === NS)).toEqual([])
     const developerRow = c.ctx.slots.entries('settings.general.item').find(row => row.options.id === 'developer-tools')!
     const developer = (developerRow.inject as unknown as () => DeveloperToolsRowInjected)()
@@ -118,6 +119,19 @@ describe('ui-settings-general apply', () => {
     for (const [name, component] of SEATS) {
       expect(c.ctx.slots.entries(name).find(row => row.component === component)!.locale).toBe(NS)
     }
+  }, COLD_BOOT_TIMEOUT_MS)
+
+  it('feeds the phone-access row from the Host and reports a refused call as a failure', async ({ mock, start }) => {
+    const { c } = await client(mock, start)
+    const row = c.ctx.slots.entries('settings.general.item').find(entry => entry.options.id === 'remote-access')!
+    const injected = (row.inject as unknown as () => RemoteAccessRowInjected)()
+    const remote = mock.remote.remoteAccess
+    remote.status.mockResolvedValue(ok({ state: 'off', host: 'pc.tail1.ts.net' }))
+    remote.enable.mockResolvedValue(ok({ state: 'on', url: 'https://pc.tail1.ts.net/?token=t' }))
+    remote.disable.mockResolvedValue({ ok: false, error: { code: 'gateway/internal', message: 'tailscale is down' } } as never)
+    expect(await injected.status()).toEqual({ state: 'off', host: 'pc.tail1.ts.net' })
+    expect(await injected.enable()).toEqual({ state: 'on', url: 'https://pc.tail1.ts.net/?token=t' })
+    expect(await injected.disable()).toEqual({ state: 'failed', detail: 'tailscale is down' })
   }, COLD_BOOT_TIMEOUT_MS)
 
   it('registers the zh/en settings dictionaries and frees the seats when its row unloads', async ({ mock, start }) => {
@@ -213,7 +227,7 @@ describe('ui-settings-general apply', () => {
       expect(ownEntries(c, name)[0]).not.toBe(before[index])
     })
     expect(c.ctx.slots.spec('settings.general.item')).toEqual({ kind: 'list', scope: 'root' })
-    expect(c.ctx.slots.entries('settings.general.item').filter(row => row.locale === NS).map(row => row.options.id)).toEqual(['developer-tools', 'current-version'])
+    expect(c.ctx.slots.entries('settings.general.item').filter(row => row.locale === NS).map(row => row.options.id)).toEqual(['developer-tools', 'remote-access', 'current-version'])
     // The recovered registrations still ride the locale path.
     const english = localeView('en', 1)
     const chinese = localeView('zh', 2)

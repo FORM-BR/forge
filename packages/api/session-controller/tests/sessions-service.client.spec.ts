@@ -2,6 +2,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, vi } from 'vitest'
 import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
+import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import type { SessionReference } from '../src/client/contract/sessions.ts'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { LlmAttemptId } from '@deepseek-ai/dsh-llm'
@@ -950,6 +951,17 @@ describe('fork', () => {
       displayTitle: childTitle,
       parentId: 'source',
     })
+  })
+
+  it('sends the target Workspace and leaves the placeholder without the source directory', async ({ bench }) => {
+    const b = bench()
+    await feedList(b, [{ id: 'source', cwd: '/work' }])
+    b.mock.remote.session.fork.mockResolvedValue(ok({ sessionId: sid('child') }))
+
+    await expect(b.svc.fork({ sessionId: sid('source'), workspaceId: 'other' as WorkspaceId })).resolves.toBe('child')
+
+    expect(b.mock.remote.session.fork).toHaveBeenCalledExactlyOnceWith({ sessionId: 'source', workspaceId: 'other' })
+    expect(b.svc.list.getSnapshot().byId[sid('child')]?.cwd).toBeUndefined()
   })
 
   it('sends the exact boundary seq verbatim: callers pass real event seqs', async ({ bench }) => {

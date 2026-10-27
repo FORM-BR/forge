@@ -159,6 +159,12 @@
     - id: cost-report
       name: '@deepseek-ai/dsh-api-cost-report'
 
+    # Connection status of configured MCP servers over Typert Remote, and the
+    # registry the mcp-client plugins report into; MCP servers run unchanged
+    # without it.
+    - id: mcp-status
+      name: '@deepseek-ai/dsh-api-mcp-status'
+
     # Workspace commands and reconnect-safe projection over Typert Remote.
     - id: workspace-controller
       name: '@deepseek-ai/dsh-api-workspace-controller'
@@ -255,6 +261,9 @@
     - id: locale
       name: '@deepseek-ai/dsh-client-locale'
 
+    - id: ui-locale-pt
+      name: '@deepseek-ai/dsh-client-ui-locale-pt'
+
     - id: shortcuts
       name: '@deepseek-ai/dsh-client-shortcuts'
 
@@ -330,6 +339,11 @@
     - id: ui-settings-plugin-inventory
       name: '@deepseek-ai/dsh-client-ui-settings-plugin-inventory'
 
+    # MCP servers tab in the Settings Plugins section: connection state,
+    # transport, and tool count per configured server.
+    - id: ui-settings-mcp
+      name: '@deepseek-ai/dsh-client-ui-settings-mcp'
+
     - id: ui-conversation
       name: '@deepseek-ai/dsh-client-ui-conversation'
 
@@ -367,6 +381,8 @@
 
     - id: ui-workspace
       name: '@deepseek-ai/dsh-client-ui-workspace'
+    - id: ui-parallel-sessions
+      name: '@deepseek-ai/dsh-client-ui-parallel-sessions'
 
     # Durable workflow lifecycle as an independent Chat node after the
     # existing generic workflow tool row.
@@ -575,6 +591,9 @@
   disabled: true
 
 - id: tool-todo
+  disabled: true
+
+- id: tool-parallel-sessions
   disabled: true
 
 - id: tool-web

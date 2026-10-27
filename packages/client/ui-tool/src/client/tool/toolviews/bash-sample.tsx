@@ -11,10 +11,13 @@ import {
   isSettledPersistentShellCall,
   isSpilledShellCall,
   localizeTerminalCardModel,
+  shellCommand,
   terminalBlockLabels,
   terminalCardModel,
   terminalFailed,
 } from '../models/terminal-card-model.ts'
+import { gitCommand } from '../models/git-command.ts'
+import { GitActionIcon } from '../components/GitActionIcon.tsx'
 import { formatToolBody, toolRowModel, toolTitleKey, type ToolRowState } from '../models/tool-call-model.ts'
 import { PreparingToolRow } from '../components/PreparingToolRow.tsx'
 import { CONVERSATION_NS as NS } from '../../locale.ts'
@@ -53,6 +56,12 @@ const StartedBashRow = memo(function StartedBashRow({ toolName, block, sessionId
   const terminalModel = useMemo(() => terminalCardModel(block, cwd), [block, cwd])
   const terminal = useMemo(() => terminalModel === null ? null : localizeTerminalCardModel(terminalModel, t), [terminalModel, t])
   const labels = useMemo(() => terminalBlockLabels(t), [t])
+  // A Git or GitHub call earns its subcommand glyph; every other shell call keeps the API icon.
+  const git = useMemo(() => {
+    const command = shellCommand(block)
+    return command === undefined ? null : gitCommand(command)
+  }, [block])
+  const icon = git === null ? BASH_ICON : <GitActionIcon action={git.action} />
   // A failing exit status is the terminal card's own error signal (the call
   // itself settles isError:false), surfaced through the row's error summary.
   const state = model.state === 'ok' && terminalModel !== null && terminalFailed(terminalModel)
@@ -88,11 +97,11 @@ const StartedBashRow = memo(function StartedBashRow({ toolName, block, sessionId
     : expandable
       ? (
         <>
-          <span className={css.iconIdle}>{BASH_ICON}</span>
+          <span className={css.iconIdle}>{icon}</span>
           <IconChevronDownOutlineRegular className={clsx(css.chevron, css.chevronHover)} />
         </>
       )
-      : BASH_ICON
+      : icon
   return (
     <div className={css.card}>
       <div

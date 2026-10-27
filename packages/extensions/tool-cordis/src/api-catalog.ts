@@ -704,6 +704,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'entry', description: 'Current Loader entry, also used to detect replacement during the write.' }, { name: 'change', description: 'Derive a raw config from the current entry and its inherited layer.' }],
         returns: 'Fulfillment after Loader reconciliation completes.',
       },
+      {
+        signature: 'async editDocument( change: (before: string) => string, options: { readonly requiredIds?: readonly string[]; readonly settleMs?: number } = {}, ): Promise<DocumentEditOutcome>',
+        description: 'Rewrite the whole profile patch text and apply it through the normal Loader path, for edits that add, remove, or toggle rows rather than change one entry\'s config. The write is rolled back when the reload rejects it. A reload that outlives `settleMs` keeps the edit lock and finishes in the background; its failure rolls the file back and is logged.',
+        parameters: [{ name: 'change', description: 'Derive the next patch text from the current one; throwing aborts before any write.' }, { name: 'options', description: '.settleMs How long to wait for the reload before answering `pending`.' }],
+        returns: '`applied` after reconciliation, `pending` while it still runs, or `restart-required` when the host cannot reload the profile in place (the file is written either way).',
+      },
     ],
   },
   {
@@ -733,6 +739,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'Fetch handler for trusted, authenticated requests.',
       },
       {
+        signature: 'trustHost(authority: string): () => void',
+        description: 'Admit one more deployment authority to the Host/Origin fence while the process runs, as `--trusted-host` does at boot (a reverse proxy such as Tailscale Serve is the usual case).',
+        parameters: [{ name: 'authority', description: 'exact `host:port`, or a port-less host matching any port.' }],
+        returns: 'a disposer that withdraws exactly this admission; a second call does nothing.',
+        throws: ['Error when the authority is malformed.'],
+      },
+      {
         signature: 'requestRejection(request: ConnectionTrustRequest): ConnectionRequestRejection',
         description: 'Apply Connection\'s Host/Origin checks and browser authentication to another Web route.',
         parameters: [{ name: 'request', description: 'request headers from the HTTP or upgrade request.' }],
@@ -755,6 +768,116 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Add the fresh process token to an ordinary Web application URL.',
         parameters: [{ name: 'baseUrl', description: 'clean application URL whose authority and mount are preserved.' }],
         returns: 'tokenized URL for initial login; a mount proxy strips its prefix before {@link authorizeIndex}.',
+      },
+    ],
+  },
+  {
+    key: 'costMeter',
+    summary: 'Host service `ctx.costMeter`: prices every durable assistant settlement with the live OpenRouter table or the installed catalog, folds the current session\'s cost into the `costUsage` projection, and writes each priced event to the SQLite ledger that backs the history queries below.',
+    description: 'Host service `ctx.costMeter`: prices every durable assistant settlement with the live OpenRouter table or the installed catalog, folds the current session\'s cost into the `costUsage` projection, and writes each priced event to the SQLite ledger that backs the history queries below.',
+    methods: [
+      {
+        signature: 'measure(session: Session): CostUsageProjection',
+        description: 'Measure one session\'s catalog-priced API cost through its durable tail.',
+        parameters: [{ name: 'session', description: 'session to replay through its current durable log.' }],
+        returns: 'a detached per-route and total cost projection.',
+      },
+      {
+        signature: 'byDay(): Array<{ day: string } & CostAggregateRow>',
+        description: 'Daily cost totals across all sessions from the SQLite ledger.',
+        parameters: [],
+        returns: 'one aggregate per calendar day with settled events, ascending by day.',
+      },
+      {
+        signature: 'byModel(): Array<{ provider: string; model: string } & CostAggregateRow>',
+        description: 'Per-route cost totals across all sessions from the SQLite ledger.',
+        parameters: [],
+        returns: 'one aggregate per provider/model route, most expensive first.',
+      },
+      {
+        signature: 'report(group: CostReportGroup, filter: CostReportFilter = {}): CostReportRow[]',
+        description: 'Ledger aggregates in one CostReportGroup bucket, scoped by filter.',
+        parameters: [{ name: 'group', description: 'bucket to aggregate by: day, session root (cwd), model route, or session.' }, { name: 'filter', description: 'optional inclusive bounds (days, cwd, provider, model, session); defaults to the whole ledger.' }],
+        returns: 'one row per bucket, ascending by day for the `day` group and most expensive first otherwise.',
+      },
+      {
+        signature: 'workspaces(): string[]',
+        description: 'Session roots with settled events.',
+        parameters: [],
+        returns: 'the distinct session working directories in the ledger, ascending.',
+      },
+      {
+        signature: 'usdBrlRates(fromDay: string, toDay: string): Promise<UsdBrlRate[]>',
+        description: 'USD→BRL rate of every calendar day in an inclusive range (PTAX selling rate of the day, or the latest earlier bulletin).',
+        parameters: [{ name: 'fromDay', description: 'first day, YYYY-MM-DD.' }, { name: 'toDay', description: 'last day, YYYY-MM-DD.' }],
+        returns: 'one row per day with a known rate, ascending.',
+      },
+      {
+        signature: 'models(): Array<{ provider: string; model: string }>',
+        description: 'Routes with settled events.',
+        parameters: [],
+        returns: 'the distinct provider/model pairs in the ledger, ordered by provider then model.',
+      },
+      {
+        signature: 'async warmSync(): Promise<void>',
+        description: 'Replay every stored session under the configured sessions root through the live price lookup and upsert one settlement per priced event. The (session id, seq) upsert key makes re-runs idempotent. Absorbs offline and per-session read failures the same way the CLI backfill does.',
+        parameters: [],
+      },
+    ],
+  },
+  {
+    key: 'costReportService',
+    summary: 'Host service backing the generated `ctx.remote.costReport` namespace.',
+    description: 'Host service backing the generated `ctx.remote.costReport` namespace. The namespace stays registered when the meter is absent so calls return the actionable missing-service diagnostic rather than a protocol failure.',
+    methods: [
+      {
+        signature: '@Remote report(request: CostReportRequest): CostReportRow[]',
+        description: 'Aggregate the cost ledger into one bucket, scoped by an optional inclusive filter. Ascending by day; otherwise most expensive first.',
+        parameters: [{ name: 'request', description: 'bucket group plus optional scoping filter.' }],
+        returns: 'one row per bucket that priced a settlement.',
+        throws: ['RemoteError when no cost meter is mounted.'],
+      },
+      {
+        signature: '@Remote workspaces(): string[]',
+        description: 'Session roots (header cwds) that have settled events, ascending.',
+        parameters: [],
+        returns: 'the workspace roots the panel offers as a filter.',
+        throws: ['RemoteError when no cost meter is mounted.'],
+      },
+      {
+        signature: '@Remote models(): CostReportModelRow[]',
+        description: 'Routes that have settled events, by provider then model.',
+        parameters: [],
+        returns: 'the routes the panel offers as a filter.',
+        throws: ['RemoteError when no cost meter is mounted.'],
+      },
+      {
+        signature: '@Remote async usdBrlRates(request: UsdBrlRatesRequest): Promise<UsdBrlRate[]>',
+        description: 'USD→BRL rate of every calendar day in a range, from the Central Bank of Brazil\'s PTAX bulletins (cached on disk by the cost meter).',
+        parameters: [{ name: 'request', description: 'inclusive day range.' }],
+        returns: 'one row per day with a known rate, ascending; empty offline before the first successful fetch.',
+        throws: ['RemoteError when no cost meter is mounted.'],
+      },
+    ],
+  },
+  {
+    key: 'costsController',
+    summary: 'Host service backing the generated `ctx.remote.costs` namespace.',
+    description: 'Host service backing the generated `ctx.remote.costs` namespace. Both reads are projections of the SQLite ledger the cost meter maintains, so they survive restarts and never measure on demand.',
+    methods: [
+      {
+        signature: '@Remote byDay(): CostsDayRow[]',
+        description: 'Daily cost totals across all sessions, ascending by day (oldest first).',
+        parameters: [],
+        returns: 'one row per local calendar day that priced a settlement.',
+        throws: ['RemoteError when no cost meter is mounted.'],
+      },
+      {
+        signature: '@Remote byModel(): CostsModelRow[]',
+        description: 'Per provider/model route cost totals across all sessions, most expensive first.',
+        parameters: [],
+        returns: 'one row per routed model that priced a settlement.',
+        throws: ['RemoteError when no cost meter is mounted.'],
       },
     ],
   },
@@ -839,6 +962,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Remove one reference from a configuration surface.',
         parameters: [{ name: 'ref', description: 'reference name to remove.' }],
         throws: ['RemoteError when the request is invalid, no provider is mounted, or the provider refuses the write.'],
+      },
+      {
+        signature: '@Remote async balance(ref: string, provider: string): Promise<CredentialBalance>',
+        description: 'Ask the provider how much credit remains behind one reference. The Host resolves the key and makes the call; the browser receives only the outcome, so this is a read half like describe: no secret rides the wire.',
+        parameters: [{ name: 'ref', description: 'reference name whose key is asked about.' }, { name: 'provider', description: 'provider route id, which selects the balance endpoint.' }],
+        returns: 'the outcome; routes without a public balance endpoint answer `unsupported`.',
+        throws: ['RemoteError when the request is invalid or no credential provider is mounted.'],
       },
     ],
   },
@@ -1492,6 +1622,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'mcpServerStatus',
+    summary: 'Collects the status of every live MCP server plugin in its scope.',
+    description: 'Collects the status of every live MCP server plugin in its scope.',
+    methods: [
+      {
+        signature: 'register(source: McpServerStatusSource): () => void',
+        description: 'Add one server\'s status owner for the lifetime of the calling plugin.',
+        parameters: [{ name: 'source', description: 'the connection\'s status owner.' }],
+        returns: 'the disposer that removes exactly this registration.',
+      },
+    ],
+  },
+  {
     key: 'messageFeedback',
     summary: 'Session-log service; cold operations never construct a Session or Agent.',
     description: 'Session-log service; cold operations never construct a Session or Agent.',
@@ -1790,6 +1933,16 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Launch-time DSH_TELEMETRY_DISABLED value; any non-empty value opts out.',
         parameters: [],
       },
+      {
+        signature: 'readonly safeMode?: boolean',
+        description: 'Safe mode: only shipped bundles and the user rows that configure or add shipped plugins are composed; third-party plugins stay unmounted. Held for the whole process so every reload composes the same way.',
+        parameters: [],
+      },
+      {
+        signature: 'readonly safeReason?: string',
+        description: 'Why the launcher entered safe mode after a failed normal boot (`FORGE_SAFE_REASON`); absent when the user asked for it.',
+        parameters: [],
+      },
     ],
   },
   {
@@ -1819,6 +1972,31 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Execute resolved inputs; program outcomes resolve as result fields.',
         parameters: [{ name: 'spec', description: 'directory, deadline, program, bindings, cancellation and supported policy.' }],
         returns: 'Captured output and the execution outcome.',
+      },
+    ],
+  },
+  {
+    key: 'remoteAccessController',
+    summary: 'Host service backing the generated `ctx.remote.remoteAccess` namespace.',
+    description: 'Host service backing the generated `ctx.remote.remoteAccess` namespace. The link it returns carries the process login token, so it is as sensitive as the address bar of the Forge tab it is opened from: it only ever answers the authenticated operator, who already holds that token.',
+    methods: [
+      {
+        signature: '@Remote async status(): Promise<RemoteAccessStatus>',
+        description: 'Read the current state of the switch without changing it.',
+        parameters: [],
+        returns: '`on` with the phone link, `off`, or why Tailscale cannot be used.',
+      },
+      {
+        signature: '@Remote async enable(): Promise<RemoteAccessStatus>',
+        description: 'Publish this server on the tailnet and admit its host name.',
+        parameters: [],
+        returns: '`on` with the phone link, or why it could not be switched on.',
+      },
+      {
+        signature: '@Remote async disable(): Promise<RemoteAccessStatus>',
+        description: 'Stop publishing and withdraw the host name from the fence.',
+        parameters: [],
+        returns: 'the state after switching off.',
       },
     ],
   },
@@ -2123,6 +2301,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'List every stored session visible to this process, in no promised order.',
         parameters: [{ name: 'options', description: 'optional cancellation.' }],
         returns: 'one snapshot per stored session.',
+      },
+      {
+        signature: 'remove(id: SessionId, options?: SessionPersistenceRemoveOptions): Promise<boolean>',
+        description: 'Permanently remove one stored session and everything the backend keeps for it. This is the only operation that deletes session data; it is irreversible and requires that nobody — this process or another — holds write ownership of the session. A backend that cannot remove sessions keeps this default, which rejects.',
+        parameters: [{ name: 'id', description: 'the stored session to remove.' }, { name: 'options', description: 'optional cancellation.' }],
+        returns: '`true` when a stored session was removed, `false` when none existed.',
+        throws: ['{SessionAlreadyOwnedError} while a write handle owns the session.'],
       },
     ],
   },
@@ -2507,6 +2692,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     summary: 'Project Config schemas into forms and own optional instance-level UI policy.',
     description: 'Project Config schemas into forms and own optional instance-level UI policy.',
     methods: [
+      {
+        signature: 'register<T>(ns: string, schema: z<T>, options?: SettingsRegisterOptions<T>): SettingsScope<T>',
+        description: 'Compatibility for 0.1.x plugins: register a namespace outside the entry-config model. Prefer volatile Config fields in new plugins. The section is stored under `<profile>/legacy-settings`.',
+        parameters: [{ name: 'ns', description: 'Lowercase hyphenated namespace.' }, { name: 'schema', description: 'Schemastery schema resolving the namespace.' }, { name: 'options', description: 'Composition `base` layer and optional validation.' }],
+        returns: 'Scope for reads, observation and updates; unregistered with the calling plugin\'s fiber.',
+      },
       {
         signature: 'configure(presentation: { auto?: boolean }, owner: Fiber = this.ctx.fiber): () => void',
         description: 'Register the calling plugin instance\'s page policy without changing its Config.',
@@ -3573,6 +3764,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the durable Workspace, or undefined when first-use initialization is ineligible; creates no Session or message.',
       },
       {
+        signature: '@Remote(\'gitInfo\') async gitInfo(path: string, signal: AbortSignal): Promise<WorkspaceGitInfoValue>',
+        description: 'Report the git repository containing a directory, for the status bar. Read-only: runs `git` against the path and never writes. A directory outside a repository, a missing directory, a missing `git` executable, and an expired deadline all answer without `git` rather than failing.',
+        parameters: [{ name: 'path', description: 'fully qualified Host directory, typically a Session\'s cwd.' }, { name: 'signal', description: 'caller lifetime; abort terminates the running git child.' }],
+        returns: 'the echoed path plus repository name, root, and branch when inside a repository.',
+      },
+      {
+        signature: '@Remote(\'createWorktree\') async createWorktree(request: WorkspaceWorktreeRequest, signal: AbortSignal): Promise<WorkspaceWorktreeValue>',
+        description: 'Create a git worktree of the repository containing the offered work, so a parallel session writes in a checkout of its own.',
+        parameters: [{ name: 'request', description: 'directory inside the repository and the task title naming the worktree.' }, { name: 'signal', description: 'caller lifetime; abort terminates the running git child.' }],
+        returns: 'the created worktree path and its branch.',
+      },
+      {
         signature: '@Remote(\'rename\') rename(request: WorkspaceRenameRequest): Promise<WorkspaceValue>',
         description: 'Rename one Workspace to a unique non-blank title.',
         parameters: [{ name: 'request', description: 'Workspace identity and proposed title.' }],
@@ -3601,6 +3804,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Hide one known Session from Workspace grouping surfaces.',
         parameters: [{ name: 'request', description: 'Session identity to archive.' }],
         returns: 'the complete resulting archive set.',
+      },
+      {
+        signature: '@Remote(\'deleteSession\') deleteSession(request: WorkspaceDeleteSessionRequest): Promise<WorkspaceDeleteSessionValue>',
+        description: 'Permanently delete one Session and all of its stored data.',
+        parameters: [{ name: 'request', description: 'Session identity to delete and whether to stop its work.' }],
+        returns: 'the deletion receipt.',
       },
       {
         signature: '@Remote(\'unarchiveSession\') unarchiveSession(request: WorkspaceUnarchiveSessionRequest): Promise<WorkspaceArchiveValue>',
@@ -3712,6 +3921,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Archive one session durably. The session must exist (live or in session persistence); its workspace accounting — or lack of one — is irrelevant. Without `stopActivity` the session must also be inactive: the `workspace/session-activity` waterfall is asked once, and any reported activity rejects with WorkspaceActiveSessionError before anything is written. With `stopActivity` the archive is written without an activity check, and the `workspace/session-stop` providers are then asked to stop the session\'s work: the durable archive set is what a provider\'s `agent/pre-step` gate reads, so every wake the stops induce is already blocked. Archiving drops the session\'s pin in the same durable write (pinning and archival are mutually exclusive). An already archived id resolves without writing, asking, or stopping.',
         parameters: [{ name: 'sessionId', description: 'The session to archive.' }, { name: 'options', description: 'Whether running work is stopped instead of refusing.' }],
         returns: 'resolution after durability and, with `stopActivity`, after every stop request was issued.',
+      },
+      {
+        signature: 'deleteSession(sessionId: SessionId, options: DeleteSessionOptions = {}): Promise<void>',
+        description: 'Permanently delete one session: its stored log and artifacts, its archive and pin entries, and its workspace membership. Irreversible. The session must exist. Without `stopActivity` the session must be inactive (the `workspace/session-activity` waterfall is asked once); with it, the `workspace/session-stop` providers are asked first. The `workspace/session-release` providers then release the live runtime, and the stored session is removed from session persistence; a session another writer still owns is refused with WorkspaceSessionInUseError before anything is removed.',
+        parameters: [{ name: 'sessionId', description: 'The session to delete.' }, { name: 'options', description: 'Whether running work is stopped instead of refusing.' }],
+        returns: 'resolution after the stored session and every registry reference are gone.',
       },
       {
         signature: 'unarchiveSession(sessionId: SessionId): Promise<void>',
@@ -4384,6 +4599,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'request', description: 'the session about to be archived.' }, { name: 'next', description: 'delegate to the remaining providers.' }],
   },
   {
+    name: 'workspace/session-release',
+    mode: 'parallel',
+    signature: '\'workspace/session-release\'(request: SessionActivityRequest): Promise<void> | void',
+    summary: 'Release the live runtime of a session that is about to be deleted: the owner of its Agent stops the loop, waits for it to exit, and drops the Agent so the session\'s write ownership is released.',
+    description: 'Release the live runtime of a session that is about to be deleted: the owner of its Agent stops the loop, waits for it to exit, and drops the Agent so the session\'s write ownership is released. Dispatched after the activity check (or the stop) and before the stored session is removed. A rejection aborts the deletion before anything is removed.',
+    parameters: [{ name: 'request', description: 'the session being deleted.' }],
+  },
+  {
     name: 'workspace/session-stop',
     mode: 'parallel',
     signature: '\'workspace/session-stop\'(request: SessionActivityRequest): Promise<void> | void',
@@ -4481,7 +4704,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'AgentPresetRoster',
-    declaration: 'export interface AgentPresetRoster {\n    readonly presets: readonly AgentPresetRow[];\n}',
+    declaration: 'export interface AgentPresetRoster {\n    readonly presets: readonly AgentPresetRow[];\n    readonly workspacePresets?: Readonly<Record<string, string>>;\n}',
   },
   {
     name: 'AgentPresetRow',
@@ -4936,6 +5159,34 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface CordisRuntimeTreeReader {\n    getTree(): Promise<CordisRuntimeTree>;\n}',
   },
   {
+    name: 'CostAggregateRow',
+    declaration: 'export interface CostAggregateRow {\n    readonly costUsd: number;\n    readonly attempts: number;\n    readonly inputTokens: number;\n    readonly outputTokens: number;\n    readonly cacheReadTokens: number;\n    readonly billedUsd: number;\n}',
+  },
+  {
+    name: 'CostModelRow',
+    declaration: 'export interface CostModelRow {\n    readonly provider: string;\n    readonly model: string;\n    readonly costUsd: number;\n    readonly attempts: number;\n    readonly inputTokens: number;\n    readonly outputTokens: number;\n    readonly cacheReadTokens: number;\n    readonly cacheWriteTokens: number;\n}',
+  },
+  {
+    name: 'CostReportModelRow',
+    declaration: 'export interface CostReportModelRow {\n    readonly provider: string;\n    readonly model: string;\n}',
+  },
+  {
+    name: 'CostReportRequest',
+    declaration: 'export interface CostReportRequest {\n    readonly group: CostReportGroup;\n    readonly filter?: CostReportFilter;\n}',
+  },
+  {
+    name: 'CostsDayRow',
+    declaration: 'export interface CostsDayRow {\n    readonly day: string;\n    readonly costUsd: number;\n    readonly attempts: number;\n    readonly inputTokens: number;\n    readonly outputTokens: number;\n}',
+  },
+  {
+    name: 'CostsModelRow',
+    declaration: 'export interface CostsModelRow {\n    readonly provider: string;\n    readonly model: string;\n    readonly costUsd: number;\n    readonly attempts: number;\n    readonly inputTokens: number;\n    readonly outputTokens: number;\n}',
+  },
+  {
+    name: 'CostUsageProjection',
+    declaration: 'export interface CostUsageProjection {\n    readonly totalCostUsd: number;\n    readonly attempts: number;\n    readonly unpricedAttempts: number;\n    readonly byModel: readonly CostModelRow[];\n}',
+  },
+  {
     name: 'CreateAgentOptions',
     declaration: 'export interface CreateAgentOptions {\n    readonly sessionId: SessionId;\n    readonly parentAgent?: Agent;\n    readonly meta?: {\n        readonly cwd?: string;\n        readonly parentSession?: SessionId;\n        readonly isSeeded?: boolean;\n        readonly origin?: \'subagent\';\n        readonly delegationDepth?: number;\n        readonly agentPreset?: string;\n    };\n    readonly inheritedEventCount?: SessionLogOffset;\n    readonly seed?: readonly SessionEvent[];\n    readonly agentOptions?: AgentOptions;\n    readonly signal?: AbortSignal;\n    readonly setup?: AgentSetup;\n}',
   },
@@ -4954,6 +5205,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'CreateTeamTaskRequest',
     declaration: 'export interface CreateTeamTaskRequest {\n    readonly subject: string;\n    readonly description: string;\n    readonly blockedBy?: readonly TeamTaskId[];\n    readonly writeScopes?: readonly string[];\n}',
+  },
+  {
+    name: 'CredentialBalance',
+    declaration: 'export interface CredentialBalance {\n    status: \'ok\' | \'unsupported\' | \'unconfigured\' | \'failed\';\n    amount?: string;\n    currency?: string;\n    detail?: string;\n}',
   },
   {
     name: 'CredentialInfo',
@@ -5012,6 +5267,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type DeepSeekLlmApiJson = null | boolean | number | string | DeepSeekLlmApiJson[] | {\n    [key: string]: DeepSeekLlmApiJson;\n};',
   },
   {
+    name: 'DeleteSessionOptions',
+    declaration: 'export interface DeleteSessionOptions {\n    readonly stopActivity?: boolean;\n}',
+  },
+  {
     name: 'DeliveryRetentionBounds',
     declaration: 'export interface DeliveryRetentionBounds {\n    readonly days: number;\n    readonly records: number;\n}',
   },
@@ -5054,6 +5313,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'DirectoryRegistrationHandle',
     declaration: 'export interface DirectoryRegistrationHandle {\n    (): void;\n    replace(entries: readonly LlmConfigurableProvider[]): void;\n}',
+  },
+  {
+    name: 'DocumentEditOutcome',
+    declaration: 'export type DocumentEditOutcome = \'applied\' | \'pending\' | \'restart-required\';',
   },
   {
     name: 'Domain',
@@ -5684,12 +5947,28 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ManualCompactAgentContext extends CompactionAgentContext {\n    runMaintenance<T>(task: (signal: AbortSignal) => Promise<T>): Promise<T>;\n}',
   },
   {
+    name: 'McpConnectionHalt',
+    declaration: 'export type McpConnectionHalt = \'reconnect-disabled\' | \'attempts-exhausted\' | \'transport-unconfirmed\';',
+  },
+  {
+    name: 'McpConnectionPhase',
+    declaration: 'export type McpConnectionPhase = \'connecting\' | \'connected\' | \'error\';',
+  },
+  {
     name: 'McpResourceProvider',
     declaration: 'export interface McpResourceProvider {\n    request(request: McpResourceRequest, exec: ToolExecution): Promise<JsonValue>;\n}',
   },
   {
     name: 'McpResourceRequest',
     declaration: 'export type McpResourceRequest = {\n    method: \'resources/list\' | \'resources/templates/list\';\n    cursor?: string;\n} | {\n    method: \'resources/read\';\n    uri: string;\n};',
+  },
+  {
+    name: 'McpServerStatus',
+    declaration: 'export interface McpServerStatus {\n    serverName: string;\n    transport: Config[\'transport\'];\n    host?: string;\n    phase: McpConnectionPhase;\n    toolCount: number;\n    error?: string;\n    retry?: {\n        attempt: number;\n        maxAttempts: number;\n    };\n    halted?: McpConnectionHalt;\n}',
+  },
+  {
+    name: 'McpServerStatusSource',
+    declaration: 'export interface McpServerStatusSource {\n    status(): McpServerStatus;\n}',
   },
   {
     name: 'Message',
@@ -6164,6 +6443,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface Reload {\n    filename: string;\n    runtime?: Plugin.Runtime | undefined;\n}',
   },
   {
+    name: 'RemoteAccessState',
+    declaration: 'export type RemoteAccessState = \'off\' | \'on\' | \'unavailable\' | \'needs-login\' | \'needs-serve\' | \'failed\';',
+  },
+  {
+    name: 'RemoteAccessStatus',
+    declaration: 'export interface RemoteAccessStatus {\n    state: RemoteAccessState;\n    host?: string;\n    url?: string;\n    link?: string;\n    detail?: string;\n}',
+  },
+  {
     name: 'RemoteError',
     declaration: 'export class RemoteError<Code extends RemoteErrorCode = RemoteErrorCode> extends Error {\n    readonly isDSHRemoteError: true;\n    constructor(readonly code: Code, message: string, readonly details: RemoteErrorDetailsMap[Code], options?: ErrorOptions);\n}',
   },
@@ -6254,6 +6541,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'RunnerFailureRule',
     declaration: 'export interface RunnerFailureRule {\n    allowedExitCodes?: readonly number[];\n    fatalSignatures: readonly string[];\n    informationalLines?: readonly string[];\n}',
+  },
+  {
+    name: 'SafeModeStatus',
+    declaration: 'export interface SafeModeStatus {\n    active: boolean;\n    reason?: string;\n}',
   },
   {
     name: 'SandboxEnforcement',
@@ -6581,7 +6872,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SessionForkRequest',
-    declaration: 'export interface SessionForkRequest {\n    readonly sessionId: SessionId;\n    readonly atSeq?: number;\n}',
+    declaration: 'export interface SessionForkRequest {\n    readonly sessionId: SessionId;\n    readonly atSeq?: number;\n    readonly workspaceId?: WorkspaceId;\n}',
   },
   {
     name: 'SessionForkSource',
@@ -6708,6 +6999,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SessionPersistenceOpenOptions {\n    readonly signal?: AbortSignal;\n}',
   },
   {
+    name: 'SessionPersistenceRemoveOptions',
+    declaration: 'export interface SessionPersistenceRemoveOptions {\n    readonly signal?: AbortSignal;\n}',
+  },
+  {
     name: 'SessionPersistenceRevision',
     declaration: 'export type SessionPersistenceRevision = Branded<\'SessionPersistenceRevision\'>;',
   },
@@ -6781,7 +7076,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SessionRefreshTitleRequest',
-    declaration: 'export interface SessionRefreshTitleRequest {\n    readonly sessionId: SessionId;\n    /** When true, a Session whose latest title is a user rename (pinned) is left untouched. */\n    readonly skipPinned?: boolean;\n}',
+    declaration: 'export interface SessionRefreshTitleRequest {\n    readonly sessionId: SessionId;\n    readonly skipPinned?: boolean;\n}',
   },
   {
     name: 'SessionRefreshTitleValue',
@@ -6978,6 +7273,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SettingsPathOpView',
     declaration: 'export type SettingsPathOpView = {\n    op: \'set\';\n    path: string[];\n    value: JsonValue;\n} | {\n    op: \'unset\';\n    path: string[];\n};',
+  },
+  {
+    name: 'SettingsRegisterOptions',
+    declaration: 'export interface SettingsRegisterOptions<T> {\n    base?: Partial<T>;\n    applies?: \'live\' | \'restart\';\n    validate?: (value: T) => void;\n}',
+  },
+  {
+    name: 'SettingsScope',
+    declaration: 'export interface SettingsScope<T> {\n    get(): T;\n    watch(callback: (next: T, prev: T) => void | Promise<void>): () => void;\n    update(patch: object): Promise<void>;\n    replace(section: object): Promise<void>;\n}',
   },
   {
     name: 'SettingsSecretView',
@@ -7565,7 +7868,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'TokenUsage',
-    declaration: 'export interface TokenUsage {\n    inputTokens: number;\n    outputTokens: number;\n    totalTokens?: number;\n    cacheReadTokens?: number;\n    cacheWriteTokens?: number;\n    reasoningTokens?: number;\n}',
+    declaration: 'export interface TokenUsage {\n    inputTokens: number;\n    outputTokens: number;\n    totalTokens?: number;\n    cacheReadTokens?: number;\n    cacheWriteTokens?: number;\n    reasoningTokens?: number;\n    costUsd?: number;\n}',
   },
   {
     name: 'ToolAdditionBlock',
@@ -7824,6 +8127,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface UpdateTeamTaskRequest {\n    readonly taskId: TeamTaskId;\n    readonly expectedRevision: number;\n    readonly action: TeamTaskAction;\n    readonly subject?: string;\n    readonly description?: string;\n    readonly blockedBy?: readonly TeamTaskId[];\n    readonly writeScopes?: readonly string[];\n    readonly owner?: string;\n}',
   },
   {
+    name: 'UsdBrlRatesRequest',
+    declaration: 'export interface UsdBrlRatesRequest {\n    readonly fromDay: string;\n    readonly toDay: string;\n}',
+  },
+  {
     name: 'UserMessage',
     declaration: 'export interface UserMessage extends MessageBase {\n    readonly role: \'user\';\n}',
   },
@@ -8048,6 +8355,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface WorkspaceDeleteRequest {\n    readonly workspaceId: WorkspaceId;\n}',
   },
   {
+    name: 'WorkspaceDeleteSessionRequest',
+    declaration: 'export interface WorkspaceDeleteSessionRequest {\n    readonly sessionId: SessionId;\n    readonly stopActivity?: boolean;\n}',
+  },
+  {
+    name: 'WorkspaceDeleteSessionValue',
+    declaration: 'export interface WorkspaceDeleteSessionValue {\n    readonly deleted: true;\n}',
+  },
+  {
     name: 'WorkspaceDeleteValue',
     declaration: 'export interface WorkspaceDeleteValue {\n    readonly deleted: true;\n}',
   },
@@ -8104,6 +8419,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type WorkspaceFollowIncrement = {\n    readonly type: \'upsert\';\n    readonly workspace: WorkspaceView;\n} | {\n    readonly type: \'remove\';\n    readonly workspaceId: WorkspaceId;\n} | {\n    readonly type: \'order\';\n    readonly workspaceIds: readonly WorkspaceId[];\n} | {\n    readonly type: \'archived\';\n    readonly archivedSessionIds: readonly SessionId[];\n} | {\n    readonly type: \'pinned\';\n    readonly pinnedSessionIds: readonly SessionId[];\n};',
   },
   {
+    name: 'WorkspaceGitInfoValue',
+    declaration: 'export interface WorkspaceGitInfoValue {\n    readonly path: string;\n    readonly git?: WorkspaceGitRepo;\n}',
+  },
+  {
+    name: 'WorkspaceGitRepo',
+    declaration: 'export interface WorkspaceGitRepo {\n    readonly repoName: string;\n    readonly root: string;\n    readonly branch: string;\n    readonly detached: boolean;\n}',
+  },
+  {
     name: 'WorkspaceInsertBeforeRequest',
     declaration: 'export interface WorkspaceInsertBeforeRequest {\n    readonly workspaceId: WorkspaceId;\n    readonly beforeWorkspaceId?: WorkspaceId;\n}',
   },
@@ -8142,6 +8465,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WorkspaceView',
     declaration: 'export interface WorkspaceView {\n    readonly workspaceId: WorkspaceId;\n    readonly path: string;\n    readonly title: string;\n    readonly sessionIds: readonly SessionId[];\n    readonly createdAt: string;\n    readonly updatedAt: string;\n}',
+  },
+  {
+    name: 'WorkspaceWorktreeRequest',
+    declaration: 'export interface WorkspaceWorktreeRequest {\n    readonly cwd: string;\n    readonly title: string;\n}',
+  },
+  {
+    name: 'WorkspaceWorktreeValue',
+    declaration: 'export interface WorkspaceWorktreeValue {\n    readonly path: string;\n    readonly branch: string;\n}',
   },
 ]
 

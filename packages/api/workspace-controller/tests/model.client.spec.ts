@@ -8,6 +8,8 @@ import type {
   WorkspaceCreateRequest,
   WorkspaceCreateValue,
   WorkspaceDeleteRequest,
+  WorkspaceDeleteSessionRequest,
+  WorkspaceDeleteSessionValue,
   WorkspaceDeleteValue,
   WorkspaceFollowFrame,
   WorkspaceGitInfoValue,
@@ -20,6 +22,8 @@ import type {
   WorkspaceUnarchiveSessionRequest,
   WorkspaceUnpinSessionRequest,
   WorkspaceValue,
+  WorkspaceWorktreeRequest,
+  WorkspaceWorktreeValue,
   WorkspaceId,
   WorkspaceView,
 } from '../src/types.ts'
@@ -91,6 +95,10 @@ class FakeWorkspaceRemote implements WorkspaceRemote {
     request: WorkspaceArchiveSessionRequest,
   ) => Promise<RemoteResult<WorkspaceArchiveValue>> = request =>
     Promise.resolve(remoteOk({ archivedSessionIds: [request.sessionId] }))
+  onDeleteSession: (
+    request: WorkspaceDeleteSessionRequest,
+  ) => Promise<RemoteResult<WorkspaceDeleteSessionValue>> = () =>
+    Promise.resolve(remoteOk({ deleted: true as const }))
   onUnarchiveSession: (
     request: WorkspaceUnarchiveSessionRequest,
   ) => Promise<RemoteResult<WorkspaceArchiveValue>> = request =>
@@ -106,6 +114,13 @@ class FakeWorkspaceRemote implements WorkspaceRemote {
 
   readonly gitInfo = vi.fn<WorkspaceRemote['gitInfo']>(async (path: string): Promise<RemoteResult<WorkspaceGitInfoValue>> =>
     remoteOk({ path, git: { repoName: 'repo', root: path, branch: 'main', detached: false } }))
+
+  readonly createWorktree = vi.fn<WorkspaceRemote['createWorktree']>(async (
+    request: WorkspaceWorktreeRequest,
+  ): Promise<RemoteResult<WorkspaceWorktreeValue>> => remoteOk({
+    path: `${request.cwd}-worktrees/work`,
+    branch: 'forge/work',
+  }))
 
   create(request: WorkspaceCreateRequest): Promise<RemoteResult<WorkspaceCreateValue>> {
     this.record('create', request)
@@ -135,6 +150,11 @@ class FakeWorkspaceRemote implements WorkspaceRemote {
   archiveSession(request: WorkspaceArchiveSessionRequest): Promise<RemoteResult<WorkspaceArchiveValue>> {
     this.record('archiveSession', request)
     return this.onArchiveSession(request)
+  }
+
+  deleteSession(request: WorkspaceDeleteSessionRequest): Promise<RemoteResult<WorkspaceDeleteSessionValue>> {
+    this.record('deleteSession', request)
+    return this.onDeleteSession(request)
   }
 
   unarchiveSession(request: WorkspaceUnarchiveSessionRequest): Promise<RemoteResult<WorkspaceArchiveValue>> {
@@ -390,6 +410,28 @@ describe('ClientWorkspaceModel', () => {
     await expect(model.unarchiveSession(sid('fresh'))).resolves.toMatchObject({ ok: true })
     expect(model.getSnapshot().archivedSessionIds).toEqual([])
     expect(remote.calls).toContainEqual({ method: 'unarchiveSession', request: { sessionId: 'fresh' } })
+  })
+
+  it('deletes a session on the Host and forgets its archive and pin entries locally', async () => {
+    const remote = new FakeWorkspaceRemote()
+    const model = new ClientWorkspaceModel(remote)
+    model.replaceBaseline({
+      items: [], archivedSessionIds: [sid('gone'), sid('other')], pinnedSessionIds: [sid('gone'), sid('keep')],
+    })
+
+    remote.onDeleteSession = () => Promise.resolve(workspaceError(
+      new RemoteError('workspace/session-in-use', 'owned elsewhere', { sessionId: sid('gone') }),
+    ))
+    await expect(model.deleteSession(sid('gone'))).resolves.toMatchObject({ ok: false })
+    expect(model.getSnapshot().archivedSessionIds).toEqual(['gone', 'other'])
+    expect(model.getSnapshot().pinnedSessionIds).toEqual(['gone', 'keep'])
+
+    remote.onDeleteSession = () => Promise.resolve(remoteOk({ deleted: true as const }))
+    await expect(model.deleteSession(sid('gone'), { stopActivity: true })).resolves.toMatchObject({ ok: true })
+    expect(model.getSnapshot().archivedSessionIds).toEqual(['other'])
+    expect(model.getSnapshot().pinnedSessionIds).toEqual(['keep'])
+    expect(remote.calls).toContainEqual({ method: 'deleteSession', request: { sessionId: 'gone', stopActivity: true } })
+    expect(remote.calls).toContainEqual({ method: 'deleteSession', request: { sessionId: 'gone' } })
   })
 
   it('keeps the latest unarchive reply when overlapping requests settle out of order', async () => {

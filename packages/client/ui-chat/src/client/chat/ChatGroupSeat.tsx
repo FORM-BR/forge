@@ -7,17 +7,22 @@ import {
   IconThinkOutlineRegular, TextShimmer,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { GroupKey, NodeReference } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type { ProcessActivity } from '../contract/process-groups.ts'
+import type { ProcessActivity, ProcessStep } from '../contract/process-groups.ts'
 import type { ChatStoreState } from '../contract/store.ts'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { storedTurnProcessEntry } from '../stores.ts'
 import { ChatNodeSeat } from './ChatNodeSeat.tsx'
+import { formatLiveRunDuration, LIVE_RUN_CLOCK_INTERVAL_MS } from './message-chrome.ts'
 import { chatRenderKey } from './render-entry.ts'
 import { processTitle } from './step-process.ts'
 import { useSearchableHidden } from './searchable-hidden.ts'
 import { useDisclosure } from './use-disclosure.ts'
 import { useProcessScroll } from './use-process-scroll.ts'
 import css from './ChatGroupSeat.module.css'
+
+/** Trail rows kept under a collapsed live header; older members stay behind the toggle. */
+const TRAIL_LIMIT = 3
+
 
 type SeatProps = Omit<ComponentProps<typeof ChatNodeSeat>, 'nodeKey' | 'groupPart'>
 type ChatGroupSeatProps = SeatProps & {
@@ -88,7 +93,39 @@ const GroupMembers = memo(function GroupMembers({ members, ...props }: SeatProps
     {...member.groupPart === undefined ? {} : { groupPart: member.groupPart }} />)
 })
 
-const ProcessGroupHeader = memo(function ProcessGroupHeader({ groupKey, useChatGroup, usePresentation, t, open, bodyId, toggle }: {
+/** Tick the header clock only while this group is live. */
+function useLiveNow(startTime: number | undefined, live: boolean): number {
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    if (!live || startTime === undefined) return
+    setNow(Date.now())
+    const timer = setInterval(() => { setNow(Date.now()) }, LIVE_RUN_CLOCK_INTERVAL_MS)
+    return () => { clearInterval(timer) }
+  }, [live, startTime])
+  return now
+}
+
+const ProcessTrail = memo(function ProcessTrail({ steps, t }: {
+  readonly steps: readonly ProcessStep[]
+  readonly t: ChatViewSlotProps['t']
+}) {
+  return (
+    <ol className={css.trail} data-step-process-trail>
+      {steps.slice(-TRAIL_LIMIT).map((step, index) => (
+        <li key={`${step.kind}-${index}`} className={css.trailRow} data-step-state={step.state}>
+          <span className={css.trailIcon} data-step-process-icon>{PROCESS_ICONS[step.kind]}</span>
+          <span className={css.trailLabel}>
+            {step.detail === '' ? t(`message.stepProcess.${step.kind}`) : step.detail}
+          </span>
+        </li>
+      ))}
+    </ol>
+  )
+})
+
+const ProcessGroupHeader = memo(function ProcessGroupHeader({
+  groupKey, useChatGroup, usePresentation, t, open, bodyId, toggle, startTime, trail,
+}: {
   readonly groupKey: GroupKey
   readonly useChatGroup: ChatViewSlotProps['useChatGroup']
   readonly usePresentation: ChatViewSlotProps['usePresentation']
@@ -96,6 +133,8 @@ const ProcessGroupHeader = memo(function ProcessGroupHeader({ groupKey, useChatG
   readonly open: boolean
   readonly bodyId: string
   readonly toggle: () => void
+  readonly startTime: number | undefined
+  readonly trail: boolean
 }) {
   const data = useChatGroup(groupKey, group => group?.data)
   const detailed = usePresentation(policy => data?.closed === false && policy.liveProcessDetail)
@@ -104,6 +143,7 @@ const ProcessGroupHeader = memo(function ProcessGroupHeader({ groupKey, useChatG
     detail: data?.summary.runningDetail ?? '',
     preparing: data?.summary.preparing === true,
   }, data !== undefined && !data.closed)
+  const now = useLiveNow(startTime, data?.closed === false)
   if (data === undefined) return null
   const label = data.closed ? processTitle(data.summary, t)
     : live.preparing ? t(`message.stepProcess.prepare.${live.activity === 'thinking' ? 'tools' : live.activity}`)
@@ -111,21 +151,42 @@ const ProcessGroupHeader = memo(function ProcessGroupHeader({ groupKey, useChatG
   const detail = detailed && !data.closed ? live.detail : ''
   const title = detail === '' ? label : `${label}${t('message.turnProcess.separator')}${detail}`
   const activity = data.closed ? data.summary.counts[0]?.kind ?? 'thinking' : live.activity
-  return (
-    <button type="button" className={css.title} aria-expanded={open} aria-controls={bodyId}
-      data-process-activity={activity} onClick={(event) => { event.currentTarget.focus(); toggle() }}>
-      <span className={css.leading} aria-hidden="true">
-        <span className={css.activityIcon} data-step-process-icon>{PROCESS_ICONS[activity]}</span>
-        <span className={css.chevron} data-step-process-chevron>
-          {open ? <IconChevronUpOutlineRegular /> : <IconChevronDownOutlineRegular />}
-        </span>
+  const steps = data.summary.steps
+  const count = data.closed || steps.length === 0 ? ''
+    : steps.length === 1 ? t('message.stepProcess.steps.one')
+      : t('message.stepProcess.steps.other', { count: steps.length })
+  const clock = data.closed || startTime === undefined
+    ? '' : formatLiveRunDuration(Math.max(1000, now - startTime), t)
+  const meta = count === '' ? ''
+    : clock === '' ? count : `${count}${t('message.turnProcess.separator')}${clock}`
+  const leading = (
+    <span className={css.leading} aria-hidden="true">
+      <span className={css.activityIcon} data-step-process-icon>{PROCESS_ICONS[activity]}</span>
+      <span className={css.chevron} data-step-process-chevron>
+        {open ? <IconChevronUpOutlineRegular /> : <IconChevronDownOutlineRegular />}
       </span>
-      <TextShimmer active={!data.closed}>
-        <TextShimmer className={css.label}>{title}</TextShimmer>
-      </TextShimmer>
-    </button>
+    </span>
+  )
+  const content = (
+    <TextShimmer active={!data.closed}>
+      <TextShimmer className={css.label}>{title}</TextShimmer>
+    </TextShimmer>
+  )
+  return (
+    <div className={css.header}>
+      <div className={css.titleRow}>
+        <button type="button" className={css.title} aria-expanded={open} aria-controls={bodyId}
+          data-process-activity={activity} onClick={(event) => { event.currentTarget.focus(); toggle() }}>
+          {leading}
+          {content}
+        </button>
+        {meta !== '' && <span className={css.meta} data-step-process-meta>{meta}</span>}
+      </div>
+      {trail && !data.closed && steps.length > 0 && <ProcessTrail steps={steps} t={t} />}
+    </div>
   )
 })
+
 
 /** Render a process group with local disclosure and the existing outer-Turn visibility. */
 export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGroup, ...props }: ChatGroupSeatProps) {
@@ -142,6 +203,9 @@ export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGrou
   })
   const grouped = props.usePresentation(policy => policy.stepGrouping === 'collapsed'
     || (policy.stepGrouping === 'history' && turnLocation?.status !== 'open'))
+  const workTrail = props.usePresentation(policy => policy.liveWorkTrail)
+  const showHeader = grouped
+  const startTime = turnLocation?.start?.time
   const reason = turnLocation?.end?.data.reason.kind
   const alwaysOpen = presentation?.turnClosed === false || presentation?.hasInterleavedInput === true
     || reason === 'aborted' || reason === 'error'
@@ -175,9 +239,10 @@ export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGrou
       data-chat-flow-key={groupKey} data-chat-anchor-key={`group:${groupKey}`} data-chat-turn={turn}
       data-chat-paging-anchor={grouped && !open || undefined}
       data-step-process data-group-expanded-mode={!grouped || undefined}>
-      <div hidden={!grouped}>
+      <div hidden={!showHeader}>
         <ProcessGroupHeader groupKey={groupKey} useChatGroup={useChatGroup}
-          usePresentation={props.usePresentation} t={props.t} open={open} bodyId={bodyId} toggle={toggle} />
+          usePresentation={props.usePresentation} t={props.t} open={open} bodyId={bodyId} toggle={toggle}
+          startTime={startTime} trail={workTrail && !open && closed === false} />
       </div>
       <div ref={bodyRef} id={bodyId} className={classes.join(' ')} data-step-process-body
         data-scroll-up={edges.canScrollUp || undefined} data-scroll-down={edges.canScrollDown || undefined}

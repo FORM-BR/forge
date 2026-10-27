@@ -29,9 +29,13 @@ import clsx from 'clsx'
 import type { ModelReasoningEffort, ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import {
   IconCheckOutlineRegular, IconChevronDownOutlineRegular, IconChevronRightOutlineRegular,
+  IconChevronsUpDownOutlineRegular, IconChevronUpOutlineRegular,
   IconDataOutlineRegular, IconWarningOutlineRegular, StateDot, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsLocale, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
+import type { createModelMenuStore } from './menu-store.ts'
+import { fitMenuSize, resizeMenuRect, type MenuCorner, type MenuRect } from './resize.ts'
+import { ResizeHandle } from './ResizeHandle.tsx'
 import type { ModelSelectInjected } from './slots.ts'
 import css from './ModelSelect.module.css'
 
@@ -45,6 +49,16 @@ interface EffortChoice {
   label: string
 }
 
+/** Corners that carry a resize grip in the model list pane. */
+const RESIZE_CORNERS: readonly MenuCorner[] = ['nw', 'ne', 'sw', 'se']
+
+/** Composed seat props: injected face, owner share, locale seat and the menu preference store. */
+type ModelSelectProps =
+  & ModelSelectInjected
+  & { locked: boolean }
+  & PropsLocale<'model'>
+  & PropsStore<ReturnType<typeof createModelMenuStore>>
+
 /** Unplaced portal card: hidden but laid out at a fixed origin so offsetWidth/offsetHeight are real (Menu primitive's measure pass). */
 const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
 
@@ -55,8 +69,7 @@ const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
  * @returns the trigger and, while open, the two-level menu.
  */
 export function ModelSelect(
-  { locked, available, directory, load, select, t }:
-  ModelSelectInjected & { locked: boolean } & PropsLocale<'model'>,
+  { locked, available, directory, load, select, t, useStore, actions }: ModelSelectProps,
 ) {
   const state = useSyncExternalStore(
     fn => directory.subscribe(fn),
@@ -77,6 +90,18 @@ export function ModelSelect(
   const [menuPos, setMenuPos] = useState<CSSProperties | null>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
   const id = useId()
+  // Provider-group disclosure: collapsing UNMOUNTS a group's rows rather than
+  // hiding them, because the keyboard walk is built from the mounted rows in
+  // itemRefs — a hidden-but-mounted row would stay reachable. The choice lives
+  // on the seat, not on the portaled card: the card unmounts on close, the
+  // seat does not, so a folded group stays folded when the menu reopens.
+  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<string>>(() => new Set())
+  // Card size: `storedSize` is the persisted preference applied on every open;
+  // `dragRect` is the live rectangle of a resize, kept until the card closes so
+  // a corner other than the anchored one does not jump back on release.
+  const storedSize = useStore(snapshot => snapshot.size)
+  const [dragRect, setDragRect] = useState<MenuRect | null>(null)
+  const dragRef = useRef<{ base: MenuRect; latest: MenuRect | null } | null>(null)
 
   const groups = useMemo(() => state.groups.toSorted((left, right) =>
     (left.id === 'deepseek-account' ? 0 : left.id === 'deepseek-official' ? 1 : 2)
@@ -168,7 +193,7 @@ export function ModelSelect(
      that hook only places from the anchor's LEFT edge, while this card aligns
      right edges (x = rect.right - width), so the measure-and-clamp plumbing repeats. */
   useLayoutEffect(() => {
-    if (!open) { setMenuPos(null); return }
+    if (!open) { setMenuPos(null); setDragRect(null); return }
     const place = (): void => {
       /* v8 ignore next 2 -- the trigger ref is attached whenever the menu is open. */
       const rect = triggerRef.current?.getBoundingClientRect()
@@ -191,7 +216,7 @@ export function ModelSelect(
       window.removeEventListener('scroll', place, true)
       window.removeEventListener('resize', place)
     }
-  }, [open, pane, state])
+  }, [open, pane, state, collapsedGroups, storedSize])
   /* jscpd:ignore-end */
 
   if (!available) return null
@@ -213,6 +238,45 @@ export function ModelSelect(
   const drill = (next: Pane): void => {
     paneFocus.current = 'drill'
     setPane(next)
+  }
+
+  /** Fold or unfold one provider group's rows. */
+  const toggleGroup = (groupId: string): void => {
+    setCollapsedGroups((previous) => {
+      const next = new Set(previous)
+      if (next.has(groupId)) next.delete(groupId)
+      else next.add(groupId)
+      return next
+    })
+  }
+
+  /** Fold every provider group, or unfold them all when every one is already folded. */
+  const toggleAllGroups = (): void => {
+    setCollapsedGroups(allFolded ? new Set() : new Set(groups.map(group => group.id)))
+  }
+
+  /** Start a corner drag from the card's current rectangle. */
+  const startResize = (): void => {
+    const box = menuRef.current?.getBoundingClientRect()
+    /* v8 ignore next -- the grip only exists inside the mounted card. */
+    if (box === undefined) return
+    dragRef.current = { base: { left: box.left, top: box.top, width: box.width, height: box.height }, latest: null }
+  }
+
+  /** Apply a drag movement from one corner; the opposite corner stays put. */
+  const dragResize = (corner: MenuCorner, dx: number, dy: number): void => {
+    const drag = dragRef.current
+    /* v8 ignore next -- a move only follows a start. */
+    if (drag === null) return
+    drag.latest = resizeMenuRect(corner, drag.base, { x: dx, y: dy }, { width: window.innerWidth, height: window.innerHeight })
+    setDragRect(drag.latest)
+  }
+
+  /** Persist the dragged size; a press without movement saves nothing. */
+  const endResize = (): void => {
+    const latest = dragRef.current?.latest
+    dragRef.current = null
+    if (latest !== null && latest !== undefined) actions.setSize(latest.width, latest.height)
   }
 
   /** Leave a drilled pane for the root one, handing the keyboard back to its cell. */
@@ -329,6 +393,19 @@ export function ModelSelect(
     submit(selection)
   }
 
+  const allFolded = groups.length > 0 && groups.every(group => collapsedGroups.has(group.id))
+  // Only the model list is resizable; the two-row root and the effort list keep their compact fit.
+  const cardRect: CSSProperties | null = pane !== 'model'
+    ? null
+    : dragRect !== null
+      ? dragRect
+      : storedSize === null
+        ? null
+        : fitMenuSize(storedSize, { width: window.innerWidth, height: window.innerHeight })
+  const cardStyle: CSSProperties = {
+    ...menuPos ?? MEASURE_STYLE,
+    ...cardRect === null ? {} : { ...cardRect, maxWidth: 'none', maxHeight: 'none' },
+  }
   const waiting = state.current === null && state.status === 'loading'
   const modelLabel = waiting
     ? t('trigger.loading')
@@ -395,7 +472,7 @@ export function ModelSelect(
           ref={menuRef}
           id={`${id}-menu`}
           className={css.menu}
-          style={menuPos ?? MEASURE_STYLE}
+          style={cardStyle}
           role="menu"
           aria-label={t('menu.aria')}
           aria-busy={state.status === 'loading' || busy}
@@ -434,13 +511,44 @@ export function ModelSelect(
                   <button type="button" className={css.retry} onClick={reload}>{t('retry')}</button>
                 </div>
               ))}
+              {groups.length > 1 && (
+                <div className={css.toolbar}>
+                  <button
+                    ref={itemRef()}
+                    type="button"
+                    role="menuitem"
+                    className={css.toolbarButton}
+                    aria-label={allFolded ? t('action.expandAll') : t('action.collapseAll')}
+                    title={allFolded ? t('action.expandAll') : t('action.collapseAll')}
+                    onClick={toggleAllGroups}
+                  >
+                    {allFolded
+                      ? <IconChevronsUpDownOutlineRegular size={14} />
+                      : <IconChevronUpOutlineRegular size={14} />}
+                  </button>
+                </div>
+              )}
               <div className={clsx(css.groups, 'scrollable')}>
                 {groups.map((group) => {
                   const headingId = `${id}-${group.id}`
+                  const folded = collapsedGroups.has(group.id)
                   return (
                     <section role="group" aria-labelledby={headingId} className={css.group} key={group.id}>
-                      <div className={css.groupTitle} id={headingId}>{group.id === 'deepseek-account' ? t('provider.account') : group.name}</div>
-                      {group.models.map((model) => {
+                      <button
+                        type="button"
+                        className={css.groupTitle}
+                        id={headingId}
+                        aria-expanded={!folded}
+                        onClick={() => { toggleGroup(group.id) }}
+                      >
+                        <IconChevronRightOutlineRegular
+                          className={clsx(css.groupChevron, !folded && css.groupChevronOpen)}
+                        />
+                        <span className={css.groupName}>
+                          {group.id === 'deepseek-account' ? t('provider.account') : group.name}
+                        </span>
+                      </button>
+                      {!folded && group.models.map((model) => {
                         const selected = state.current?.provider === group.id && state.current.model === model.id
                         return (
                           <button
@@ -472,6 +580,16 @@ export function ModelSelect(
               {state.status === 'ready' && choices.length === 0 && (
                 <div className={css.empty}>{t('empty.models')}</div>
               )}
+              {RESIZE_CORNERS.map(corner => (
+                <ResizeHandle
+                  key={corner}
+                  corner={corner}
+                  label={t('menu.resize')}
+                  onStart={startResize}
+                  onDrag={(dx, dy) => { dragResize(corner, dx, dy) }}
+                  onEnd={endResize}
+                />
+              ))}
             </>
           )}
 
