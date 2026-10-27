@@ -249,8 +249,10 @@ export class SessionCommandController {
   /**
    * Create a new ordinary Session from an exact event prefix. An explicit
    * `atSeq` is the inclusive cut; an omitted value selects the latest
-   * completed-turn prefix. An open cut receives synthetic fork closers.
-   * @param request - source Session and optional exact event boundary.
+   * completed-turn prefix. An open cut receives synthetic fork closers. With
+   * `workspaceId` the child continues the conversation in that Workspace's
+   * directory instead of the source's.
+   * @param request - source Session, optional exact event boundary, and optional target Workspace.
    * @returns the new Session identity.
    */
   async fork(request: SessionForkRequest): Promise<SessionForkValue> {
@@ -290,8 +292,18 @@ export class SessionCommandController {
     const seed = buildForkSeed(source.events, boundary)
     let workspace: Workspace | undefined
     try {
-      workspace = await this.forkWorkspace(source.header)
+      if (request.workspaceId === undefined) {
+        workspace = await this.forkWorkspace(source.header)
+      } else {
+        workspace = this.ctx.workspaceRegistry.get(request.workspaceId)
+        if (workspace === undefined) {
+          throw new RemoteError('workspace/not-found', `workspace "${request.workspaceId}" not found`, {
+            workspaceId: request.workspaceId,
+          })
+        }
+      }
     } catch (error) {
+      if (error instanceof RemoteError) throw error
       throw new RemoteError(
         'gateway/internal',
         `failed to resolve fork workspace for session "${request.sessionId}": ${String(error)}`,
@@ -302,12 +314,12 @@ export class SessionCommandController {
     const composition = await this.agents.composeAgent(this.agents.presetForObservation(source))
     try {
       const { provider, model } = this.ctx.agentDefaultModel.currentSelection()
-      await this.ctx.agents.create({
+      this.agents.track(await this.ctx.agents.create({
         sessionId: childId,
         seed,
         inheritedEventCount: SessionLogOffset(boundary + 1),
         meta: {
-          ...(source.header.cwd === undefined ? {} : { cwd: source.header.cwd }),
+          ...forkCwd(source.header, request.workspaceId === undefined ? undefined : workspace),
           parentSession: source.header.id,
           isSeeded: true,
           ...(composition.agentPreset === undefined
@@ -316,7 +328,7 @@ export class SessionCommandController {
         },
         agentOptions: { provider, model },
         setup: composition.setup,
-      })
+      }))
     } catch (error) {
       throw new RemoteError(
         'gateway/internal',
@@ -611,6 +623,18 @@ export class SessionCommandController {
     }
     return undefined
   }
+}
+
+/**
+ * The child's working directory: the target Workspace's when the caller chose
+ * one, otherwise the source's own.
+ * @param source - header of the forked Session.
+ * @param target - the Workspace the caller chose, when it chose one.
+ * @returns the `cwd` metadata field, or nothing when the source has none.
+ */
+function forkCwd(source: SessionHeader, target: Workspace | undefined): { cwd?: string } {
+  const cwd = target?.path ?? source.cwd
+  return cwd === undefined ? {} : { cwd }
 }
 
 function resolvePromptFileReceipts(

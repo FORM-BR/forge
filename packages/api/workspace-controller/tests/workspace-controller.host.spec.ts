@@ -8,7 +8,7 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import Storage from '@deepseek-ai/dsh-storage'
 import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
-import WorkspaceRegistry from '@deepseek-ai/dsh-workspace'
+import WorkspaceRegistry, { WorkspaceSessionInUseError } from '@deepseek-ai/dsh-workspace'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import WorkspaceController from '../src/index.ts'
 import { DEFAULT_WORKSPACE_DIRECTORY } from '../src/default-workspace.ts'
@@ -62,7 +62,7 @@ async function harness(options: { systemDocuments?: boolean } = {}) {
   const storageDomain = new DomainFacility(ctx, { backend: 'memory', routes: {} })
   ctx.storage.mount('domain', storageDomain)
   ctx.provide('storageDomain', storageDomain)
-  ctx.provide('sessionPersistence', { list: () => Promise.resolve([]) } as never)
+  ctx.provide('sessionPersistence', { list: () => Promise.resolve([]), remove: () => Promise.resolve(true) } as never)
   await ctx.plugin(WorkspaceRegistry)
   const dispose = (): void => {}
   ctx.provide('typert', {
@@ -273,6 +273,41 @@ describe('WorkspaceController commands', () => {
     // Unarchive is idempotent: an id that is not archived is not an error.
     await expect(controller.unarchiveSession({ sessionId: session.id }))
       .resolves.toEqual({ archivedSessionIds: [] })
+  })
+
+  it('deletes Sessions and maps the registry refusals to stable failures', async () => {
+    const { controller, ctx, root } = await harness()
+    const created = await controller.create({ path: stageDir(root, 'deletes') })
+    const session = ctx.sessions.create(SessionId('delete-me'), { meta: { cwd: created.workspace.path } })
+    await controller.archiveSession({ sessionId: session.id })
+
+    await expect(controller.deleteSession({ sessionId: SessionId('unknown') }))
+      .rejects.toMatchObject({ code: 'session/not-found' })
+
+    const activity = [{ kind: 'probe' as const }]
+    const stopReporting = ctx.on('workspace/session-activity', async ({ sessionId }, next) =>
+      sessionId === session.id ? [...activity, ...(await next())] : next())
+    await expect(controller.deleteSession({ sessionId: session.id })).rejects.toMatchObject({
+      code: 'workspace/session-active',
+      details: { sessionId: session.id, activity },
+    })
+    expect([...ctx.workspaceRegistry.archivedSessionIds]).toEqual([session.id])
+
+    const inUse = new WorkspaceSessionInUseError(session.id)
+    vi.spyOn(ctx.workspaceRegistry, 'deleteSession').mockRejectedValueOnce(inUse)
+    await expect(controller.deleteSession({ sessionId: session.id, stopActivity: true })).rejects.toMatchObject({
+      code: 'workspace/session-in-use',
+      details: { sessionId: session.id },
+    })
+
+    const storageFailure = new Error('removal failed')
+    vi.spyOn(ctx.workspaceRegistry, 'deleteSession').mockRejectedValueOnce(storageFailure)
+    await expect(controller.deleteSession({ sessionId: session.id })).rejects.toBe(storageFailure)
+    stopReporting()
+
+    await expect(controller.deleteSession({ sessionId: session.id, stopActivity: true }))
+      .resolves.toEqual({ deleted: true })
+    expect([...ctx.workspaceRegistry.archivedSessionIds]).toEqual([])
   })
 
   it('pins only known unarchived Sessions and unpins idempotently', async () => {

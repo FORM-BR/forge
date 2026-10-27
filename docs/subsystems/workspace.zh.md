@@ -127,7 +127,7 @@ interface Workspace {
 
 ## 会话置顶
 
-控制器的[传输类型](../../packages/api/workspace-controller/src/types.ts)定义了 `WorkspacePinSessionRequest` 和 `WorkspaceUnpinSessionRequest`，两者都携带一个 `sessionId`。两个操作都返回 `WorkspacePinValue`：完整的会话 id 数组 `pinnedSessionIds`，最近置顶的会话排在前面。置顶要求会话已知且未归档；对未置顶的 id 取消置顶会成功，且不改变集合。归档在同一次持久化写入中移除该会话的置顶，取消归档不会恢复置顶。
+控制器的[传输类型](../../packages/api/workspace-controller/src/types.ts)定义了 `WorkspacePinSessionRequest` 和 `WorkspaceUnpinSessionRequest`，两者都携带一个 `sessionId`。两个操作都返回 `WorkspacePinValue`：完整的会话 id 数组 `pinnedSessionIds`，最近置顶的会话排在前面。置顶要求会话已知且未归档；对未置顶的 id 取消置顶会成功，且不改变集合。归档在同一次持久化写入中移除该会话的置顶，取消归档不会恢复置顶。`deleteSession` 永久删除会话（`WorkspaceDeleteSessionRequest`，返回 `{ deleted: true }`）：有运行中的工作时以 `workspace/session-active` 拒绝，除非设置 `stopActivity`；仍被其他进程占用的会话以 `workspace/session-in-use` 拒绝；成功后还会移除该会话的归档与置顶条目。
 
 ## 归档准入
 
