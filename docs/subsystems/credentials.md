@@ -257,6 +257,17 @@ Host service backing the generated `ctx.remote.credentials` namespace. It carrie
  * @throws RemoteError when the request is invalid, no provider is mounted, or the provider refuses the write.
  */
 @Remote async unset(ref: string): Promise<void>
+
+/**
+ * Ask the provider how much credit remains behind one reference. The Host
+ * resolves the key and makes the call; the browser receives only the outcome,
+ * so this is a read half like {@link describe}: no secret rides the wire.
+ * @param ref - reference name whose key is asked about.
+ * @param provider - provider route id, which selects the balance endpoint.
+ * @returns the outcome; routes without a public balance endpoint answer `unsupported`.
+ * @throws RemoteError when the request is invalid or no credential provider is mounted.
+ */
+@Remote async balance(ref: string, provider: string): Promise<CredentialBalance>
 ```
 
 Source: [`packages/api/settings-controller/src/credentials.ts`](../../packages/api/settings-controller/src/credentials.ts)
