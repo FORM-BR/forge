@@ -7,7 +7,8 @@
 #     o Tailscale Serve a cada subida e este instalador cria o atalho do link do celular; se nao, o resto funciona igual.
 # Tudo que depende do usuario (login do Tailscale, chave de API do modelo) e feito no proprio app depois.
 param(
-  [switch]$SemAbrir      # nao abre o navegador no fim (testes)
+  [switch]$SemAbrir,     # nao abre o navegador no fim (testes)
+  [int]$Porta = 3080     # porta do servidor (so mude para testes; o acesso pelo celular so funciona na 3080)
 )
 $ErrorActionPreference = 'Stop'
 $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -66,7 +67,7 @@ $ErrorActionPreference = 'Stop'
 # --- 3. Build + primeira subida ---------------------------------------------------------------------------------------
 Titulo '3/5 Construindo o FORGE (alguns minutos na primeira vez; uma janela de progresso vai abrir)'
 Remove-Item (Join-Path $env:LOCALAPPDATA 'forge-launch\forge-remoto-url.txt') -Force -ErrorAction SilentlyContinue
-$args3 = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $dir 'launch-forge.ps1'), 'web', '-Atualizar')
+$args3 = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $dir 'launch-forge.ps1'), 'web', '-Atualizar', '-Port', $Porta)
 if ($SemAbrir) { $args3 += '-NoOpen' }
 & powershell @args3
 if ($LASTEXITCODE -ne 0) { Parar "O FORGE nao subiu. Veja os logs em $env:LOCALAPPDATA (forge-launch-web.log.err) e rode de novo." }
