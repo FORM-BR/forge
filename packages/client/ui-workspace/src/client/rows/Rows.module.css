@@ -421,3 +421,19 @@
     transition: none;
   }
 }
+
+/* Target list of the continue-in-another-workspace dialog: one full-width choice per Workspace. */
+.workspaceChoices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workspaceChoice {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+}

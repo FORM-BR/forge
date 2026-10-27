@@ -489,6 +489,44 @@ export interface SessionDeleteDialogInjected {
   deleteSession: (sessionId: SessionId, options: { readonly stopActivity: boolean }) => Promise<SessionDeleteOutcome>
 }
 
+/** Switch-Workspace action share: the row only raises the request; the dialog entry answers it. */
+export interface SwitchWorkspaceInjected {
+  /** Ask for the target-Workspace dialog of one Session. */
+  requestWorkspaceSwitch: (sessionId: SessionId, displayTitle: string) => void
+}
+
+/** A target-Workspace choice the switch action asked for. */
+export interface WorkspaceSwitchRequest {
+  /** Session to move. */
+  sessionId: SessionId
+  /** The row's display title, named in the dialog. */
+  displayTitle: string
+}
+
+/** What one switch attempt came to; the dialog renders each case without reading Host errors. */
+export type WorkspaceSwitchOutcome =
+  | { readonly status: 'switched' }
+  /** The Session still has running work; nothing changed. */
+  | { readonly status: 'busy' }
+  /** Another writer, such as another running FORGE, owns the Session; nothing changed. */
+  | { readonly status: 'in-use' }
+  | { readonly status: 'failed'; readonly message: string }
+
+/** Switch dialog share: the pending request, its settlement, and the Host hop. */
+export interface WorkspaceSwitchDialogInjected {
+  hooks: {
+    /** The request raised by the row, until the dialog consumes or cancels it. */
+    switchRequest: HostObservable<WorkspaceSwitchRequest | null>
+  }
+  /** Consume or cancel the pending request. */
+  settleWorkspaceSwitch: () => void
+  /**
+   * Move the Session to the chosen Workspace; the conversation continues
+   * there under the same title. Never rejects: every failure arrives as an outcome.
+   */
+  switchWorkspace: (sessionId: SessionId, workspaceId: WorkspaceId) => Promise<WorkspaceSwitchOutcome>
+}
+
 /** Fork action share. */
 export interface ForkSessionInjected {
   /** Fork a Session at its last completed turn; the child arrives through the Host list. */
@@ -581,6 +619,13 @@ export type SessionArchiveConfirmProps =
   & PropsLocale<'workspace'>
   & Omit<SessionArchiveConfirmInjected, 'hooks'>
   & PropsHooks<SessionArchiveConfirmInjected['hooks']>
+
+/** Props of the target-Workspace dialog entry in `shell.overlay`. */
+export type WorkspaceSwitchDialogProps =
+  PropsRuntime<'shell.overlay'>
+  & PropsLocale<'workspace'>
+  & Omit<WorkspaceSwitchDialogInjected, 'hooks'>
+  & PropsHooks<WorkspaceSwitchDialogInjected['hooks']>
 
 /** Props of the permanent-deletion dialog entry in `shell.overlay`. */
 export type SessionDeleteDialogProps =

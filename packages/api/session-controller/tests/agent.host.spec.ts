@@ -485,3 +485,44 @@ describe('ApiSession create or adoption', () => {
       .rejects.toThrow('failed to ensure project directory')
   })
 })
+
+describe('ApiSession release', () => {
+  function observed(meta: SessionHeader): SessionObservation {
+    return {
+      source: 'prepared', header: meta, events: [], cursor: -1, projections: { asOfSeq: -1, values: {} },
+      retain: vi.fn(), [Symbol.dispose]: vi.fn(),
+    } as unknown as SessionObservation
+  }
+
+  it('disposes the Agent it published when the registry releases the session, and only once', async () => {
+    const { ctx, agents } = await harness()
+    const meta = header('release-me')
+    const resumed = unpublishedAgent(ctx, meta)
+    const dispose = vi.fn(() => Promise.resolve())
+    vi.spyOn(ctx.agents, 'resume').mockResolvedValue({ agent: resumed, dispose })
+    await agents.resolveObservedAgent(observed(meta))
+
+    await ctx.parallel('workspace/session-release', { sessionId: meta.id })
+    expect(dispose).toHaveBeenCalledOnce()
+    await agents.release(meta.id)
+    expect(dispose).toHaveBeenCalledOnce()
+  })
+
+  it('has nothing to release for a session it never published', async () => {
+    const { agents } = await harness()
+    await expect(agents.release(SessionId('never-published'))).resolves.toBeUndefined()
+  })
+
+  it('forgets the disposal capability of an Agent the registry already disposed', async () => {
+    const { ctx, agents } = await harness()
+    const meta = header('already-gone')
+    const resumed = unpublishedAgent(ctx, meta)
+    const dispose = vi.fn(() => Promise.resolve())
+    vi.spyOn(ctx.agents, 'resume').mockResolvedValue({ agent: resumed, dispose })
+    await agents.resolveObservedAgent(observed(meta))
+
+    await ctx.parallel('agent/disposed', { agent: resumed })
+    await agents.release(meta.id)
+    expect(dispose).not.toHaveBeenCalled()
+  })
+})

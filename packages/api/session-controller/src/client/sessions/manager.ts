@@ -527,16 +527,18 @@ export class SessionManager {
    * preserve it or lower it after an exact cut before the first `turn/start`;
    * lineage rides parentSessionId. A child published before Workspace
    * attachment fails is also reconciled into the list.
-   * @param opts - source session and the optional exact inclusive boundary seq.
+   * @param opts - source session, the optional exact inclusive boundary seq,
+   *   and the optional Workspace the child continues in.
    * @returns the fork result (the child session id).
    */
   async fork(
-    opts: { sessionId: SessionId; atSeq?: SessionSeq },
+    opts: { sessionId: SessionId; atSeq?: SessionSeq; workspaceId?: WorkspaceId },
   ): Promise<RemoteResult<{ sessionId: SessionId }>> {
     const source = this.summaries.find(s => s.sessionId === opts.sessionId)
     const result = await this.remote.session.fork({
       sessionId: opts.sessionId,
       ...opts.atSeq === undefined ? {} : { atSeq: opts.atSeq },
+      ...opts.workspaceId === undefined ? {} : { workspaceId: opts.workspaceId },
     })
     const childId = result.ok
       ? result.value.sessionId
@@ -545,7 +547,7 @@ export class SessionManager {
       this.recordMutation({ kind: 'placeholder', summary: { agentAvailable: true,
         sessionId: childId, updatedAt: Date.now(), running: false, blank: true,
         parentSessionId: opts.sessionId,
-        ...(source?.cwd !== undefined ? { cwd: source.cwd } : {}),
+        ...(source?.cwd !== undefined && opts.workspaceId === undefined ? { cwd: source.cwd } : {}),
       } })
     }
     return result

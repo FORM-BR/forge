@@ -443,7 +443,8 @@ export class ClientSessions implements ISessions {
    *   seq (a real event seq the caller already knows; a cut inside an open
    *   turn is balanced Host-side with synthetic closers, and omission selects
    *   the latest completed-turn prefix), and whether to increment an
-   *   inherited durable title before resolving.
+   *   inherited durable title before resolving, and the optional Workspace
+   *   the child continues in (omitted keeps the source's directory).
    * @returns the child session id.
    * @throws {SessionForkError} with the source id.
    * @throws {Error} when a requested child-title rename fails after creation.
@@ -451,6 +452,7 @@ export class ClientSessions implements ISessions {
   async fork(opts: {
     sessionId: SessionId
     atSeq?: number
+    workspaceId?: WorkspaceId
     increaseTitle?: boolean
     onCreated?: (childId: SessionId) => void
   }): Promise<SessionId> {
@@ -460,6 +462,7 @@ export class ClientSessions implements ISessions {
     const result = await this.manager.fork({
       sessionId: opts.sessionId,
       ...(opts.atSeq === undefined ? {} : { atSeq: SessionSeq(opts.atSeq) }),
+      ...(opts.workspaceId === undefined ? {} : { workspaceId: opts.workspaceId }),
     })
     if (!result.ok) throw new SessionForkError(result.error, opts.sessionId)
     this.projectList()

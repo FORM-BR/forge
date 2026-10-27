@@ -531,6 +531,62 @@ describe('UiWorkspaceService', () => {
     expect(b.sessions.create).not.toHaveBeenCalled()
   })
 
+  it('switches Workspace by forking into it without a title change, deleting the original, and following it on screen', async () => {
+    const b = bench()
+    b.sessions.fork.mockResolvedValueOnce(sid('replacement'))
+    b.uiWorkspace.openSession(sid('source'))
+    b.sessions.retain.mockClear()
+
+    await b.uiWorkspace.switchWorkspace(sid('source'), wid('other'))
+
+    expect(b.sessions.fork).toHaveBeenCalledWith({ sessionId: sid('source'), workspaceId: 'other' })
+    expect(b.sessions.retain).toHaveBeenCalledExactlyOnceWith(sid('replacement'), { source: 'mainView' })
+    expect(b.workspaces.deleteCalls).toEqual([{ sessionId: sid('source'), options: undefined }])
+    expect(b.sessions.refresh).toHaveBeenCalledOnce()
+  })
+
+  it('switches a Session that is not on screen without touching the current view', async () => {
+    const b = bench()
+    b.sessions.fork.mockResolvedValueOnce(sid('replacement'))
+    b.uiWorkspace.openSession(sid('shown'))
+    b.sessions.retain.mockClear()
+
+    await b.uiWorkspace.switchWorkspace(sid('elsewhere'), wid('other'))
+
+    expect(b.sessions.retain).not.toHaveBeenCalled()
+    expect(b.workspaces.deleteCalls).toEqual([{ sessionId: sid('elsewhere'), options: undefined }])
+  })
+
+  it('removes the replacement and returns to the original when the original cannot be deleted', async () => {
+    const b = bench()
+    b.sessions.fork.mockResolvedValueOnce(sid('replacement'))
+    b.uiWorkspace.openSession(sid('source'))
+    b.sessions.retain.mockClear()
+    b.workspaces.onDelete = async (id) => { if (id === sid('source')) throw new Error('still running') }
+
+    await expect(b.uiWorkspace.switchWorkspace(sid('source'), wid('other'))).rejects.toThrow('still running')
+
+    expect(b.workspaces.deleteCalls.map(call => [call.sessionId, call.options])).toEqual([
+      [sid('source'), undefined],
+      [sid('replacement'), { stopActivity: true }],
+    ])
+    expect(b.sessions.retain.mock.calls.map(call => call[0])).toEqual([sid('replacement'), sid('source')])
+    expect(b.sessions.refresh).not.toHaveBeenCalled()
+  })
+
+  it('still reports the original failure when removing the replacement fails too', async () => {
+    const b = bench()
+    b.sessions.fork.mockResolvedValueOnce(sid('replacement'))
+    b.workspaces.onDelete = async (id) => { throw new Error(id === sid('source') ? 'busy' : 'rollback broke') }
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      await expect(b.uiWorkspace.switchWorkspace(sid('source'), wid('other'))).rejects.toThrow('busy')
+      expect(warn).toHaveBeenCalledWith('workspace switch rollback failed:', expect.objectContaining({ message: 'rollback broke' }))
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
   it('forks with title increment without selecting or retaining the child, and rejects failure', async () => {
     const b = bench()
     b.uiWorkspace.openSession(sid('source'))

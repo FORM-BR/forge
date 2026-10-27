@@ -13,7 +13,8 @@ import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply, inject } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { WorkspaceBrowserInjected, WorkspacePickerInjected } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import {
-  type ArchiveSessionInjected, type DeleteSessionInjected, type ForkSessionInjected, type SessionDeleteDialogInjected,
+  type ArchiveSessionInjected, type SwitchWorkspaceInjected, type WorkspaceSwitchDialogInjected, type DeleteSessionInjected,
+  type ForkSessionInjected, type SessionDeleteDialogInjected,
   type RetitleSessionInjected, menuOpenStateFactory, type PinSessionInjected,
   workspaceMenuOpenStateFactory,
   type RenameSessionInjected, type RowToastInjected, type SessionArchiveConfirmInjected, type SessionRenameDialogInjected,
@@ -21,6 +22,7 @@ import {
 } from '../src/client/contract/slots.ts'
 import { WorkspaceBrowser } from '../src/client/rows/WorkspaceBrowser.tsx'
 import { ArchiveSessionMenuItem, ArchiveSessionRowButton, SessionArchiveConfirmDialog } from '../src/client/session-actions/ArchiveSession.tsx'
+import { SwitchWorkspaceMenuItem, WorkspaceSwitchDialog } from '../src/client/session-actions/SwitchWorkspace.tsx'
 import { DeleteSessionMenuItem, SessionDeleteDialog } from '../src/client/session-actions/DeleteSession.tsx'
 import { ForkSessionMenuItem } from '../src/client/session-actions/ForkSession.tsx'
 import { PinSessionMenuItem, PinSessionRowButton } from '../src/client/session-actions/PinSession.tsx'
@@ -35,6 +37,11 @@ import { UNGROUPED_KEY } from '../src/client/tree.ts'
 import { apply as hostApply } from '../src/index.ts'
 
 const sid = (id: string) => id as SessionId
+/** A Host refusal as the Workspace Controller facade throws it for archive, delete, and switch. */
+const failure = (code: string, details: object) => Object.assign(new Error(`workspace session delete failed: ${code}`), {
+  name: 'WorkspaceArchiveError',
+  rpcError: new RemoteError(code as 'workspace/session-active', 'refused', details as never),
+})
 const summary = (id: string, updatedAt: number): SessionSummary => ({
   id: sid(id), displayTitle: id, running: false, blank: false, updatedAt, retainedBy: {},
 })
@@ -230,9 +237,9 @@ describe('ui-workspace apply', () => {
     await Promise.resolve()
     expect(after.slots.entries('conversation.hero.workspace')[0]!.component).toBe(WorkspacePicker)
     // The row actions follow the browser's own declaration, whenever it lands.
-    expect(after.slots.entries(MENU_ITEM)).toHaveLength(6)
+    expect(after.slots.entries(MENU_ITEM)).toHaveLength(7)
     expect(after.slots.entries(ROW_ACTION)).toHaveLength(2)
-    expect(after.slots.entries('shell.overlay')).toHaveLength(4)
+    expect(after.slots.entries('shell.overlay')).toHaveLength(5)
   })
 
   it('declares the Workspace menu and badge seats, binding the menu open state into the rows', async () => {
@@ -308,6 +315,7 @@ describe('ui-workspace apply', () => {
       ['rename', 200, RenameSessionMenuItem, 'workspace'],
       ['retitle', 250, RetitleSessionMenuItem, 'workspace'],
       ['fork', 300, ForkSessionMenuItem, 'workspace'],
+      ['switch-workspace', 350, SwitchWorkspaceMenuItem, 'workspace'],
       ['archive', 400, ArchiveSessionMenuItem, 'workspace'],
       ['delete', 1000, DeleteSessionMenuItem, 'workspace'],
     ])
@@ -318,6 +326,7 @@ describe('ui-workspace apply', () => {
     expect(rows('shell.overlay')).toEqual([
       ['workspace.session-rename', undefined, SessionRenameDialog, 'workspace'],
       ['workspace.session-archive', undefined, SessionArchiveConfirmDialog, 'workspace'],
+      ['workspace.workspace-switch', undefined, WorkspaceSwitchDialog, 'workspace'],
       ['workspace.session-delete', undefined, SessionDeleteDialog, 'workspace'],
       ['workspace.row-toast', undefined, RowActionToast, 'workspace'],
     ])
@@ -572,6 +581,45 @@ describe('ui-workspace apply', () => {
     }
   })
 
+  it('the switch row raises the request, and the dialog share maps every outcome of moving the Session', async () => {
+    const b = await bench()
+    b.setSessions(sessionState([{ ...summary('source', 3), displayTitle: 'Source session' }]))
+    declare(b.slots, 'sidebar.workspaces', 'shell.overlay')
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const row = faceOf(entry(b.slots, MENU_ITEM, 'switch-workspace')) as SwitchWorkspaceInjected
+    const dialog = faceOf(entry(b.slots, 'shell.overlay', 'workspace.workspace-switch')) as WorkspaceSwitchDialogInjected
+    const switchWorkspace = vi.spyOn(b.ctx.uiWorkspace, 'switchWorkspace').mockResolvedValue(undefined)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      expect(dialog.hooks.switchRequest.getSnapshot()).toBeNull()
+      row.requestWorkspaceSwitch(sid('source'), 'Source session')
+      expect(dialog.hooks.switchRequest.getSnapshot()).toEqual({ sessionId: 'source', displayTitle: 'Source session' })
+
+      await expect(dialog.switchWorkspace(sid('source'), 'other' as WorkspaceId)).resolves.toEqual({ status: 'switched' })
+      expect(switchWorkspace).toHaveBeenCalledWith('source', 'other')
+
+      switchWorkspace.mockRejectedValueOnce(failure('workspace/session-active', { sessionId: sid('source'), activity: [{ kind: 'turn' }] }))
+      await expect(dialog.switchWorkspace(sid('source'), 'other' as WorkspaceId)).resolves.toEqual({ status: 'busy' })
+      switchWorkspace.mockRejectedValueOnce(failure('workspace/session-in-use', { sessionId: sid('source') }))
+      await expect(dialog.switchWorkspace(sid('source'), 'other' as WorkspaceId)).resolves.toEqual({ status: 'in-use' })
+      expect(warn).not.toHaveBeenCalled()
+
+      switchWorkspace.mockRejectedValueOnce(new Error('fork refused'))
+      await expect(dialog.switchWorkspace(sid('source'), 'other' as WorkspaceId))
+        .resolves.toEqual({ status: 'failed', message: 'fork refused' })
+      switchWorkspace.mockRejectedValueOnce('plain failure')
+      await expect(dialog.switchWorkspace(sid('source'), 'other' as WorkspaceId))
+        .resolves.toEqual({ status: 'failed', message: 'plain failure' })
+      expect(warn).toHaveBeenCalledTimes(2)
+
+      dialog.settleWorkspaceSwitch()
+      expect(dialog.hooks.switchRequest.getSnapshot()).toBeNull()
+    } finally {
+      warn.mockRestore()
+      switchWorkspace.mockRestore()
+    }
+  })
+
   it('the delete row raises the confirmation, and the dialog share maps every Host outcome', async () => {
     const b = await bench()
     b.setSessions(sessionState([{ ...summary('doomed', 3), displayTitle: 'Doomed session' }]))
@@ -580,10 +628,6 @@ describe('ui-workspace apply', () => {
     const row = faceOf(entry(b.slots, MENU_ITEM, 'delete')) as DeleteSessionInjected
     const dialog = faceOf(entry(b.slots, 'shell.overlay', 'workspace.session-delete')) as SessionDeleteDialogInjected
     const deleteSession = vi.spyOn(b.ctx.uiWorkspace, 'deleteSession').mockResolvedValue(undefined)
-    const failure = (code: string, details: object) => Object.assign(new Error(`workspace session delete failed: ${code}`), {
-      name: 'WorkspaceArchiveError',
-      rpcError: new RemoteError(code as 'workspace/session-active', 'refused', details as never),
-    })
     const activity = [{ kind: 'turn' as const }]
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     try {
@@ -776,9 +820,9 @@ describe('ui-workspace apply', () => {
     declare(b.slots, 'sidebar.workspaces', 'conversation.hero.workspace', 'conversation.empty.workspace', 'shell.overlay')
     const fiber = b.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    expect(b.slots.entries(MENU_ITEM)).toHaveLength(6)
+    expect(b.slots.entries(MENU_ITEM)).toHaveLength(7)
     expect(b.slots.entries(ROW_ACTION)).toHaveLength(2)
-    expect(b.slots.entries('shell.overlay')).toHaveLength(4)
+    expect(b.slots.entries('shell.overlay')).toHaveLength(5)
     await fiber.dispose()
     expect(b.slots.entries('sidebar.workspaces')).toHaveLength(0)
     expect(b.slots.entries('conversation.hero.workspace')).toHaveLength(0)

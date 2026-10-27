@@ -123,7 +123,7 @@ describe('session rename through the assembled browser', () => {
     const trigger = within(row as HTMLElement).getByLabelText('会话“Persisted title”的操作')
     fireEvent.click(trigger)
     expect(view.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
-      '置顶会话', '重命名', '重新生成标题', '分叉会话', '归档会话', 'Export action', 'Last action', '删除会话',
+      '置顶会话', '重命名', '重新生成标题', '分叉会话', '切换工作区', '归档会话', 'Export action', 'Last action', '删除会话',
     ])
     // One hairline opens the plugin group and one sets the destructive row apart.
     expect(view.getAllByRole('separator')).toHaveLength(2)

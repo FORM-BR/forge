@@ -39,9 +39,11 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 // Type-only: pulls the Session root standard-hook merge.
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import {
-  type ArchiveSessionInjected, type DeleteSessionInjected, type ForkSessionInjected, type RetitleSessionInjected,
+  type ArchiveSessionInjected, type SwitchWorkspaceInjected, type DeleteSessionInjected, type ForkSessionInjected,
+  type RetitleSessionInjected,
   menuOpenStateFactory, type PinSessionInjected,
   type SessionArchiveConfirmInjected, type SessionArchiveConfirmRequest,
+  type WorkspaceSwitchDialogInjected, type WorkspaceSwitchOutcome, type WorkspaceSwitchRequest,
   type SessionDeleteDialogInjected, type SessionDeleteOutcome, type SessionDeleteRequest,
   type RenameSessionInjected, type RowToast, type RowToastInjected, type RowToastState, type SessionRenameDialogInjected,
   type WorkspaceBrowserInjected, type WorkspacePickerInjected, type WorkspaceStatusInjected,
@@ -52,6 +54,7 @@ import { UiWorkspaceService } from './navigation.ts'
 import { createWorkspaceViewStore } from './stores.ts'
 import { WorkspaceBrowser } from './rows/WorkspaceBrowser.tsx'
 import { ArchiveSessionMenuItem, ArchiveSessionRowButton, SessionArchiveConfirmDialog } from './session-actions/ArchiveSession.tsx'
+import { SwitchWorkspaceMenuItem, WorkspaceSwitchDialog } from './session-actions/SwitchWorkspace.tsx'
 import { DeleteSessionMenuItem, SessionDeleteDialog } from './session-actions/DeleteSession.tsx'
 import { derive } from './session-actions/derived.ts'
 import { ForkSessionMenuItem } from './session-actions/ForkSession.tsx'
@@ -215,6 +218,25 @@ export function apply(ctx: Context): void {
     stopAndArchiveSession: async (sessionId) => {
       await uiWorkspace.archiveSession(sessionId, { stopActivity: true })
       notify({ kind: 'stoppedAndArchived', sessionId })
+    },
+  })
+  const switchRequest = createSnapshotStore<WorkspaceSwitchRequest | null>(null)
+  const switchInjected = (): SwitchWorkspaceInjected => ({
+    requestWorkspaceSwitch: (sessionId, displayTitle) => { switchRequest.set({ sessionId, displayTitle }) },
+  })
+  const switchDialogInjected = (): WorkspaceSwitchDialogInjected => ({
+    hooks: { switchRequest },
+    settleWorkspaceSwitch: () => { switchRequest.set(null) },
+    switchWorkspace: async (sessionId, workspaceId): Promise<WorkspaceSwitchOutcome> => {
+      try {
+        await uiWorkspace.switchWorkspace(sessionId, workspaceId)
+        return { status: 'switched' }
+      } catch (reason: unknown) {
+        if (activeSessionRefusal(reason) !== undefined) return { status: 'busy' }
+        if (sessionInUseRefusal(reason)) return { status: 'in-use' }
+        console.warn('workspace switch rejected:', reason)
+        return { status: 'failed', message: reason instanceof Error ? reason.message : String(reason) }
+      }
     },
   })
   const deleteRequest = createSnapshotStore<SessionDeleteRequest | null>(null)
@@ -381,6 +403,7 @@ export function apply(ctx: Context): void {
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'rename', order: 200, locale: NS, inject: renameInjected }, RenameSessionMenuItem)
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'retitle', order: 250, locale: NS, inject: retitleInjected }, RetitleSessionMenuItem)
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'fork', order: 300, locale: NS, inject: forkInjected }, ForkSessionMenuItem)
+    yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'switch-workspace', order: 350, locale: NS, inject: switchInjected }, SwitchWorkspaceMenuItem)
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'archive', order: 400, locale: NS, inject: archiveInjected }, ArchiveSessionMenuItem)
     yield ctx.slots.register({ name: 'sidebar.workspaces.session.menu.item', id: 'delete', order: 1000, locale: NS, inject: deleteInjected }, DeleteSessionMenuItem)
   })
@@ -397,6 +420,9 @@ export function apply(ctx: Context): void {
     yield ctx.slots.register({
       name: 'shell.overlay', id: 'workspace.session-archive', locale: NS, inject: archiveConfirmInjected,
     }, SessionArchiveConfirmDialog)
+    yield ctx.slots.register({
+      name: 'shell.overlay', id: 'workspace.workspace-switch', locale: NS, inject: switchDialogInjected,
+    }, WorkspaceSwitchDialog)
     yield ctx.slots.register({
       name: 'shell.overlay', id: 'workspace.session-delete', locale: NS, inject: deleteDialogInjected,
     }, SessionDeleteDialog)
