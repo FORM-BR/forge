@@ -20,6 +20,7 @@ export const pt: Record<string, string> = {
   'input.send': 'Enviar mensagem',
   'input.send.queue': 'Enfileirar mensagem',
   'input.send.steer': 'Direcionar mensagem',
+  'input.quote.remove': 'Remover citação',
   'attachment.pending': 'Anexos pendentes',
   'attachment.scrollLeft': 'Rolar anexos para a esquerda',
   'attachment.scrollRight': 'Rolar anexos para a direita',

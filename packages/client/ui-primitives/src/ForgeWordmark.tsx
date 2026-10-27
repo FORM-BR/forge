@@ -6,13 +6,19 @@ import type { IconProps } from './icons/props.ts'
  */
 export const FORGE_WORDMARK_VIEWBOX = { advance: 72, height: 24 }
 
+/** Props of the wordmark: icon props plus the product name to draw. */
+export interface ForgeWordmarkProps extends IconProps {
+  /** Locale-owned product name; primitives have no locale seat, so the caller passes it already localized. */
+  label: string
+}
+
 /**
- * Render the FORGE wordmark as text in the brand font, sized to the wordmark
+ * Render the product name as text in the brand font, sized to the wordmark
  * box. The glyph baseline centers the capitals in the box's height.
- * @param props - icon props; `size` is the rendered box height in px.
+ * @param props - icon props plus `label`; `size` is the rendered box height in px.
  * @returns the wordmark svg, hidden from the accessibility tree.
  */
-export function ForgeWordmark({ size = 24, className }: IconProps) {
+export function ForgeWordmark({ size = 24, className, label }: ForgeWordmarkProps) {
   return (
     <svg
       width={(size * FORGE_WORDMARK_VIEWBOX.advance) / FORGE_WORDMARK_VIEWBOX.height}
@@ -32,7 +38,7 @@ export function ForgeWordmark({ size = 24, className }: IconProps) {
         fontSize="19"
         fontWeight="600"
       >
-        FORGE
+        {label}
       </text>
     </svg>
   )

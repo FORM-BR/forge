@@ -42,6 +42,7 @@ export { ConnectionIndicator } from './ConnectionIndicator.tsx'
 export type { ConnectionIndicatorState } from './ConnectionIndicator.tsx'
 export { ForgeLogo, FORGE_LOGO_VIEWBOX } from './ForgeLogo.tsx'
 export { ForgeWordmark, FORGE_WORDMARK_VIEWBOX } from './ForgeWordmark.tsx'
+export type { ForgeWordmarkProps } from './ForgeWordmark.tsx'
 export {
   PermissionIconFullAccessMedium, PermissionIconFullAccessRegular,
   PermissionIconReadOnlyMedium, PermissionIconReadOnlyRegular,

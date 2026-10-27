@@ -16,6 +16,7 @@ export interface DraftEditorProps {
   readonly phase: InputState['phase'] | 'inert'
   readonly placeholderText: string
   readonly ariaLabel: string
+  readonly quoteDismissLabel: string
   readonly workspaceTrigger: boolean
   readonly workspacePickerOpen: boolean
   readonly onWorkspaceKeyDown: KeyboardEventHandler<HTMLDivElement>
@@ -30,7 +31,7 @@ export interface DraftEditorProps {
  */
 export function DraftEditor({
   classNames: css, editor, scrollRef, editable, editorDisabled, phase, placeholderText, ariaLabel,
-  workspaceTrigger, workspacePickerOpen, onWorkspaceKeyDown, hint, showPlaceholder,
+  quoteDismissLabel, workspaceTrigger, workspacePickerOpen, onWorkspaceKeyDown, hint, showPlaceholder,
 }: DraftEditorProps): ReactNode {
   return (
     <div ref={scrollRef} className={css.scroll} data-input-scroll>
@@ -56,7 +57,7 @@ export function DraftEditor({
             {placeholderText}
           </div>
         )}
-        <DecoratorPortals editor={workspaceTrigger ? null : editor} />
+        <DecoratorPortals editor={workspaceTrigger ? null : editor} quoteDismissLabel={quoteDismissLabel} />
       </div>
     </div>
   )

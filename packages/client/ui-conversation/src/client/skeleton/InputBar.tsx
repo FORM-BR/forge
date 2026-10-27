@@ -409,6 +409,7 @@ export const InputBar = memo(function InputBar({
           phase={input?.phase ?? 'inert'}
           placeholderText={placeholderText}
           ariaLabel={workspaceTrigger ? t('hero.chooseWorkspace') : placeholderText}
+          quoteDismissLabel={t('input.quote.remove')}
           workspaceTrigger={workspaceTrigger}
           workspacePickerOpen={workspacePickerOpen}
           onWorkspaceKeyDown={onWorkspaceKeyDown}
