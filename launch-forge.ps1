@@ -148,7 +148,14 @@ $lockHashFile = Join-Path $state 'pnpm-lock.sha256'
 $Host.UI.RawUI.WindowTitle = 'Atualizando FORGE - aguarde'
 Set-Location $Raiz
 
-$tempos = New-Object System.Collections.Generic.List[object]
+# Sem .git (instalacao por zip) o build do desktop nao consegue ler o commit: usa o hash gravado no zip (forge-commit.txt).
+if (-not (Test-Path (Join-Path $Raiz '.git')) -and -not $env:DSH_CLIENT_COMMIT_HASH) {
+  $arqHash = Join-Path $Raiz 'forge-commit.txt'
+  $h = if (Test-Path $arqHash) { (Get-Content $arqHash -Raw).Trim() } else { '' }
+  $env:DSH_CLIENT_COMMIT_HASH = if ($h -match '^[0-9a-fA-F]{7,40}$') { $h } else { '0000000' }
+}
+
+$tempos =New-Object System.Collections.Generic.List[object]
 
 function Registrar([string]$fase, [double]$segundos, [bool]$falhou, [string]$nota) {
   $tempos.Add([pscustomobject]@{ Fase = $fase; Segundos = $segundos; Falhou = $falhou; Nota = $nota })
