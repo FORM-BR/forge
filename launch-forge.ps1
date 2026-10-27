@@ -19,15 +19,19 @@ param(
 #  - o servidor roda com cwd num diretorio neutro, NUNCA na raiz do repo (o sandbox do Forge marca o cwd
 #    com integridade Low e isso quebrou os hooks do git; ver Vault-IA/geral/Forge - sandbox Windows ...).
 $ErrorActionPreference = 'Stop'
-$r = if ($env:FORGE_REPO_ROOT) { $env:FORGE_REPO_ROOT } else { 'C:\Users\Felipe\Dev\deepseek-harness' }   # FORGE_REPO_ROOT: so para testar outra worktree
-$serverCwd = 'C:\Users\Felipe\Dev\forge-tasks\server-cwd'
+$r = if ($env:FORGE_REPO_ROOT) { $env:FORGE_REPO_ROOT } else { $PSScriptRoot }   # a pasta deste script (instalacao portatil); FORGE_REPO_ROOT: so para testar outra worktree
 $state = Join-Path $env:LOCALAPPDATA 'forge-launch'
+$serverCwd = if ($env:FORGE_SERVER_CWD) { $env:FORGE_SERVER_CWD } else { Join-Path $state 'server-cwd' }   # fora do repo e do OneDrive
 # Um log por porta: uma subida de teste/corrida nao pode apagar o log (com o token) da instancia que esta no ar.
 $log = Join-Path $env:LOCALAPPDATA $(if ($Port -eq 3080) { "forge-launch-$Profile.log" } else { "forge-launch-$Profile-$Port.log" })
 $bin = Join-Path $r 'apps\cli\lib\bin.js'
 $stampFile = Join-Path $state 'build-stamp'
 $fallbackLog = Join-Path $serverCwd 'forge-safe-fallback.log'
 $oldStamp = Join-Path $r '.launch-build-stamp'
+# Tailscale e opcional: so liga o acesso pelo celular. Sem ele (nao instalado/parado/sem login) o resto segue normal.
+$tailscale = (Get-Command tailscale.exe -ErrorAction SilentlyContinue).Source
+if (-not $tailscale -and (Test-Path 'C:\Program Files\Tailscale\tailscale.exe')) { $tailscale = 'C:\Program Files\Tailscale\tailscale.exe' }
+$urlFile = Join-Path $state 'forge-remoto-url.txt'
 New-Item -ItemType Directory -Force $state, $serverCwd | Out-Null
 
 function Show-Toast([string]$title, [string]$text) {
@@ -52,6 +56,61 @@ function Test-PortOpen([int]$p) {
   catch { return $false } finally { $c.Close() }
 }
 
+# --- Tailscale (acceso do celular): helpers ----------------------------------------------------------------------
+
+function Invoke-Ts {
+  # Tailscale parado/sem login escreve no stderr; com $ErrorActionPreference='Stop' o `2>&1` virava excecao e derrubava o launcher
+  # antes de subir o servidor. Aqui qualquer falha vira saida vazia (= "sem Tailscale", segue so local).
+  if (-not $tailscale) { return '' }
+  $ErrorActionPreference = 'Continue'
+  try { (& $tailscale @args 2>&1 | Out-String) } catch { '' }
+}
+
+function Get-TailscaleHost {
+  # Hostname MagicDNS do dispositivo (ex.: desktop-trkmgsj.tail496ab6.ts.net); $null se Tailscale
+  # nao esta logado/conectado. Serve publica a base dele.
+  $st = (Invoke-Ts status --json).Trim()
+  if (-not $st) { return $null }
+  $j = try { $st | ConvertFrom-Json } catch { return $null }
+  if (-not $j -or $j.BackendState -ne 'Running' -or -not $j.Self.DNSName) { return $null }
+  $j.Self.DNSName.TrimEnd('.')
+}
+
+function Get-ServeHost {
+  # Hostname publico que Serve publica: le a autoridade da config Web do `serve status --json`
+  # (ex.: "desktop-trkmgsj.tail496ab6.ts.net:443") e quita o puerto. Fallback: MagicDNS do device.
+  $st = (Invoke-Ts serve status --json).Trim()
+  $j = try { if ($st) { $st | ConvertFrom-Json } } catch { $null }
+  if ($j -and $j.Web) {
+    $k = ($j.Web.PSObject.Properties | Select-Object -First 1 -ExpandProperty Name)
+    if ($k) { return $k.Replace(':' + (($k -split ':')[-1]), '') }
+  }
+  Get-TailscaleHost
+}
+
+function Ensure-Serve([int]$port) {
+  # Idempotente: se Serve ja proxya "/" a este loopback, nao toca nada; senao reseta e
+  # configura `serve --bg <port>`. Devolve $null (ok) ou un motivo de falha.
+  $st = (Invoke-Ts serve status --json).Trim()
+  $probe = '"Proxy":\s*"http://127\.0\.0\.1:' + $port + '"'
+  if ($st -and $st -match $probe) { return $null }
+  Invoke-Ts serve reset | Out-Null
+  $out = (Invoke-Ts serve --bg $port)
+  if ($out -match 'not enabled') { return "Serve no esta habilitado na tailnet. Ativa em: https://login.tailscale.com/f/serve" }
+  if ($out -match 'invalid argument') { return "Erro de sintaxis de tailscale serve: $($out.Trim())" }
+  $st2 = (Invoke-Ts serve status --json).Trim()
+  if (-not ($st2 -match $probe)) { return 'Serve nao confirmou o proxy ao loopback' }
+  $null
+}
+
+function Get-CodeStamp {
+  # Identifica a versao do codigo: HEAD do git (checkout) ou o hash do pnpm-lock.yaml (instalacao por zip, sem .git).
+  if (Test-Path (Join-Path $r '.git')) { try { return (git -C $r rev-parse HEAD).Trim() } catch { } }
+  $lock = Join-Path $r 'pnpm-lock.yaml'
+  if (Test-Path $lock) { return (Get-FileHash $lock -Algorithm SHA256).Hash }
+  ''
+}
+
 function Get-ForgeProcs {
   Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
     Where-Object { $_.CommandLine -match 'apps\\cli\\lib\\bin\.js' }
@@ -73,16 +132,94 @@ function Open-Existing([int]$p) {
   return $true
 }
 
+# Script das fases do build, materializado em %LOCALAPPDATA%\forge-launch (fora do repo) por Build-Forge.
+# Literal de proposito: o que esta escrito aqui roda no processo filho sem interpolacao do launcher.
+$buildFases = @'
+param([Parameter(Mandatory)][string]$Raiz)
+
+# Build do FORGE em fases, com o tempo de cada uma (gerado por launch-forge.ps1 - nao editar aqui:
+# a proxima atualizacao sobrescreve este arquivo).
+$ErrorActionPreference = 'Stop'
+$state = Join-Path $env:LOCALAPPDATA 'forge-launch'
+New-Item -ItemType Directory -Force $state | Out-Null
+$tempoLog = Join-Path $state 'build-forge-tempos.log'
+$lockHashFile = Join-Path $state 'pnpm-lock.sha256'
+
+$Host.UI.RawUI.WindowTitle = 'Atualizando FORGE - aguarde'
+Set-Location $Raiz
+
+$tempos = New-Object System.Collections.Generic.List[object]
+
+function Registrar([string]$fase, [double]$segundos, [bool]$falhou, [string]$nota) {
+  $tempos.Add([pscustomobject]@{ Fase = $fase; Segundos = $segundos; Falhou = $falhou; Nota = $nota })
+}
+
+function Encerrar([int]$codigo) {
+  $total = ($tempos | Measure-Object -Property Segundos -Sum).Sum
+  if (-not $total) { $total = 0 }
+  Write-Host ''
+  if ($codigo -eq 0) { Write-Host ('Build concluido em {0}s' -f [math]::Round($total, 1)) -ForegroundColor Green }
+  else { Write-Host ('Build interrompido depois de {0}s' -f [math]::Round($total, 1)) -ForegroundColor Red }
+  $head = ''
+  try { if (Test-Path (Join-Path $Raiz '.git')) { $head = (git rev-parse --short HEAD).Trim() } } catch { }
+  $linhas = $tempos | ForEach-Object {
+    $estado = if ($_.Falhou) { '  FALHOU' } else { '' }
+    $nota = if ($_.Nota) { '  ' + $_.Nota } else { '' }
+    '{0,-12} {1,7}s{2}{3}' -f $_.Fase, $_.Segundos, $estado, $nota
+  }
+  Add-Content -Path $tempoLog -Encoding UTF8 -Value (@(
+    ('=== {0}  (HEAD {1}) ===' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $head)
+    $linhas
+    ''
+  ) -join "`r`n")
+  exit $codigo
+}
+
+function Passo([string]$nome, [scriptblock]$acao) {
+  Write-Host ''
+  Write-Host ('== ' + $nome) -ForegroundColor Cyan
+  $sw = [Diagnostics.Stopwatch]::StartNew()
+  & $acao
+  $codigo = $LASTEXITCODE
+  $sw.Stop()
+  $s = [math]::Round($sw.Elapsed.TotalSeconds, 1)
+  if ($codigo) { Write-Host ('   FALHOU depois de {0}s' -f $s) -ForegroundColor Red }
+  else { Write-Host ('   ok em {0}s' -f $s) -ForegroundColor DarkGray }
+  Registrar $nome $s ([bool]$codigo) ''
+  if ($codigo) { Encerrar 1 }
+}
+
+# install: so quando o lockfile mudou. Sem mudanca o pnpm responde "Already up to date" em ~1s, mas
+# pulando a atualizacao nao toca no store nem na rede. Com dependencia nova, roda normal.
+$lock = Join-Path $Raiz 'pnpm-lock.yaml'
+$hash = (Get-FileHash $lock -Algorithm SHA256).Hash
+$anterior = if (Test-Path $lockHashFile) { (Get-Content $lockHashFile -Raw).Trim() } else { '' }
+if ((Test-Path (Join-Path $Raiz 'node_modules\.pnpm')) -and $hash -eq $anterior) {
+  Write-Host ''
+  Write-Host '== install: pulado (lockfile igual ao do ultimo build)' -ForegroundColor DarkGray
+  Registrar 'install' 0 $false '(pulado)'
+} else {
+  Passo 'install' { pnpm install --frozen-lockfile }
+  Set-Content -Path $lockHashFile -Value $hash -Encoding UTF8
+}
+
+# As tres fases seguem os scripts do repo (sem reimplementar os internos deles aqui).
+Passo 'host' { pnpm run build:lib:host }
+Passo 'client' { pnpm run build:lib:client }
+Passo 'web' { pnpm run build:web }
+
+Encerrar 0
+'@
+
 function Build-Forge {
   # Janela visivel de proposito: e o caminho lento (so primeira vez, `-Atualizar` ou lib ausente).
+  # O processo filho roda o script das fases acima e grava o tempo de cada uma em
+  # build-forge-tempos.log (ao lado de build-stamp), para saber onde a atualizacao pesa.
   Set-Location $r
-  $head = (git rev-parse HEAD).Trim()
-  $cmd = '$Host.UI.RawUI.WindowTitle="Atualizando FORGE - aguarde"; cd "' + $r + '"; ' +
-    'pnpm install --frozen-lockfile; if($LASTEXITCODE){exit 1}; ' +
-    'pnpm run build:lib:host; if($LASTEXITCODE){exit 1}; ' +
-    'pnpm run build:lib:client; if($LASTEXITCODE){exit 1}; ' +
-    'pnpm run build:web; exit $LASTEXITCODE'
-  $p = Start-Process powershell -ArgumentList '-NoProfile', '-Command', $cmd -Wait -PassThru
+  $head = Get-CodeStamp
+  $fases = Join-Path $state 'build-forge.ps1'
+  Set-Content -Path $fases -Encoding UTF8 -Value $buildFases
+  $p = Start-Process powershell -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$fases`"", '-Raiz', "`"$r`"" -Wait -PassThru
   if ($p.ExitCode -eq 0) { Set-Content $stampFile $head }
   else { Show-Toast 'FORGE' 'Falha ao reconstruir; abrindo a versao anterior.' }
 }
@@ -155,7 +292,7 @@ function Stop-ServerTree($p) {
   for ($i = 0; $i -lt 50 -and (Test-PortOpen $Port); $i++) { Start-Sleep -Milliseconds 100 }
 }
 
-function Start-Server([bool]$safe, [bool]$noOpen, [bool]$simulateFailure) {
+function Start-Server([bool]$safe, [bool]$noOpen, [bool]$simulateFailure, [string]$publicHost) {
   $a = @("`"$bin`"", $Profile)
   if ($safe) { $a += '--safe' }   # flags do launcher: logo apos o profile, antes das flags do app
   if ($simulateFailure) {
@@ -165,6 +302,7 @@ function Start-Server([bool]$safe, [bool]$noOpen, [bool]$simulateFailure) {
   }
   if ($Profile -eq 'web') {
     if ($Port -ne 3080) { $a += @('--port', $Port) }
+    if ($publicHost) { $a += @('--trusted-host', $publicHost) }   # acesso do celular por Tailscale (solo porta 3080)
     if ($noOpen) { $a += '--no-open' }
   }
   Start-Process $node -ArgumentList $a -WorkingDirectory $serverCwd -WindowStyle Hidden -PassThru `
@@ -185,7 +323,7 @@ if ($Profile -eq 'web' -and -not $Atualizar -and (Test-PortOpen $Port)) {
 }
 
 # --- 2. Build: so bloqueia se nao existe ou foi pedido ---------------------------------------------------------
-$head = (git -C $r rev-parse HEAD).Trim()
+$head = Get-CodeStamp
 $stamp = if (Test-Path $stampFile) { (Get-Content $stampFile -Raw).Trim() }
          elseif (Test-Path $oldStamp) { (Get-Content $oldStamp -Raw).Trim() } else { '' }
 if ($Atualizar) { Stop-Forge }
@@ -199,10 +337,32 @@ if (-not (Test-Path $bin)) { Show-Toast 'FORGE nao abriu' 'Build ausente e a rec
 if ($Profile -eq 'plain') { Stop-Forge }
 $node = (Get-Command node -ErrorAction SilentlyContinue).Source
 if (-not $node) { $node = 'C:\Program Files\nodejs\node.exe' }
+
+# --- 3b. Tailscale (so porta 3080): liga o servidor ao tailnet para o celular ------------------------------------
+# O serve web segue em 127.0.0.1:3080 (o schema do plugin webserver so aceita loopback/0.0.0.0);
+# Tailscale Serve publica https://<hostname>.ts.net que faz proxy ao loopback, e
+# `--trusted-host <hostname>` abre o fence /api para essa authority. Se Tailscale nao esta
+# conectado (ou Serve falha), tudo segue igual: so que sen acceso do celular.
+$hostPublico = ''
+$hostServe = ''
+if ($Profile -eq 'web' -and $Port -eq 3080) {
+  $tailHost = Get-TailscaleHost
+  if ($tailHost) {
+    $tailErr = Ensure-Serve $Port
+    if ($tailErr) {
+      Show-Toast 'FORGE' "$tailErr - abriendo solo local (sen celular)."
+    } else {
+      $hostPublico = Get-ServeHost
+      if (-not $hostPublico) { $hostPublico = $tailHost }
+      $hostServe = $hostPublico
+    }
+  }
+}
+
 # Fallback automatico so no web em modo normal. Nele o launcher abre o navegador (so apos o veredito do boot), entao o
 # servidor sobe com --no-open; no resto o `dsh web` abre sozinho, como sempre.
 $autoFallback = ($Profile -eq 'web' -and -not $Safe)
-$proc = Start-Server ([bool]$Safe) ($NoOpen -or $autoFallback) ([bool]$SimularFalha)
+$proc = Start-Server ([bool]$Safe) ($NoOpen -or $autoFallback) ([bool]$SimularFalha) $hostPublico
 
 # --- 4. Espera subir; detecta corrida (outra instancia ganhou a porta) e falha --------------------------------------
 $fellBack = $false
@@ -215,7 +375,7 @@ if ($autoFallback) {
     Write-FallbackLog 'boot normal falhou' $reason
     Stop-ServerTree $proc
     $env:FORGE_SAFE_REASON = $reason
-    try { $proc = Start-Server $true ([bool]$NoOpen) $false } finally { Remove-Item Env:\FORGE_SAFE_REASON -ErrorAction SilentlyContinue }
+    try { $proc = Start-Server $true ([bool]$NoOpen) $false $hostPublico } finally { Remove-Item Env:\FORGE_SAFE_REASON -ErrorAction SilentlyContinue }
     $fellBack = $true
   }
 }
@@ -252,6 +412,15 @@ if ($fellBack) {
   exit 0
 }
 
+# --- URL para o celular (so com tailnet): reescribe a URL do token ao hostname publico -----------------------------
+if ($hostServe) {
+  $localUrl = Get-ServerUrl
+  if ($localUrl) {
+    $remoteUrl = $localUrl.Replace("http://127.0.0.1:$Port", "https://$hostServe")
+    Set-Content -Path $urlFile -Encoding UTF8 -Value ($remoteUrl + "`r`n`r`n(Acesso por Tailscale Serve. Abre esta URL no navegador do celular com a app Tailscale logada con a tua conta pessoal -`r`nsolo ela pode alcancar https://$hostServe. O token renova em cada subida: corre FORGE.lnk para atualizar.)")
+  }
+}
+
 if ($head -ne $stamp) {
-  Show-Toast 'FORGE aberto - ha versao nova' 'O codigo do FORGE mudou desde o ultimo build. Para aplicar: feche o FORGE e rode atualizar-forge.bat (pasta do repo).'
+  Show-Toast 'FORGE aberto - ha versao nova' 'O codigo do FORGE mudou desde o ultimo build. Para aplicar: feche o FORGE e use o atalho "Atualizar FORGE" (ou atualizar-forge.bat, na pasta do FORGE).'
 }
