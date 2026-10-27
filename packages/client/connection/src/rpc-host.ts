@@ -10,7 +10,7 @@ import {
 } from './rpc.ts'
 import { clientRequestSchema } from './rpc-schema.ts'
 import { bridge } from './http-bridge.ts'
-import { isTrustedApiRequest } from './api-request-trust.ts'
+import { assertTrustedAuthority, isTrustedApiRequest } from './api-request-trust.ts'
 import { API_PATH } from './api-path.ts'
 import type { BrowserAuth } from './browser-auth.ts'
 import { OperatorPeer } from './operator-peer.ts'
@@ -65,19 +65,22 @@ export class HostConnectionService extends Service implements HostConnectionHand
   readonly operator: PeerScope
   private readonly interceptors = new Map<string, ConnectionRpcInterceptor>()
   private readonly fetchRoutes = new Map<string, RegisteredFetchRoute>()
+  /** Boot-time authorities plus those admitted later through {@link trustHost}. */
+  private readonly trustedHosts: string[]
 
   /**
    * Provide the Host half over the active HTTP server.
    * @param ctx - owning Connection plugin context.
-   * @param trustedHosts - deployment authorities accepted by the Host/Origin fence.
+   * @param trustedHosts - deployment authorities accepted by the Host/Origin fence at boot.
    * @param browserAuth - process token and persistent browser-session owner.
    */
   constructor(
     ctx: Context,
-    private readonly trustedHosts: readonly string[],
+    trustedHosts: readonly string[],
     private readonly browserAuth: BrowserAuth,
   ) {
     super(ctx, 'connection')
+    this.trustedHosts = [...trustedHosts]
     this.operator = new OperatorPeer(ctx)
     ctx.effect(() => () => this.operator.dispose(), 'client-connection: operator Peer')
   }
@@ -97,6 +100,20 @@ export class HostConnectionService extends Service implements HostConnectionHand
     const owner = this.ctx
     return {
       register: route => this.registerFetchRoute(owner, route),
+    }
+  }
+
+  /** Admit an authority to the Host/Origin fence until the returned disposer runs. */
+  trustHost(authority: string): () => void {
+    assertTrustedAuthority(authority)
+    this.trustedHosts.push(authority)
+    let active = true
+    return () => {
+      if (!active) return
+      active = false
+      const index = this.trustedHosts.indexOf(authority)
+      /* v8 ignore next -- each disposer owns exactly one pushed entry and runs once, so the entry is always present */
+      if (index !== -1) this.trustedHosts.splice(index, 1)
     }
   }
 

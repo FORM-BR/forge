@@ -4,7 +4,6 @@ param(
   [switch]$NoOpen,          # nao abre o navegador (testes)
   [switch]$Atualizar,       # reconstroi agora (janela visivel) mesmo que o build pareca em dia
   [switch]$Safe,            # modo seguro: so plugins do FORGE, sem terceiros/MCP; nenhum arquivo do profile e alterado
-  [switch]$Reiniciar,       # para o FORGE desta pasta e sobe de novo (usado pelo atalho FORGE (celular) ao ligar/desligar o acesso)
   [switch]$SimularFalha     # teste do fallback: o boot normal recebe um plugin que nao existe (so nesta subida; nada e gravado no profile)
 )
 # Abre o FORGE rapido e sem janela: usa o build compilado (apps\cli\lib\bin.js), sobe o servidor escondido
@@ -29,16 +28,6 @@ $bin = Join-Path $r 'apps\cli\lib\bin.js'
 $stampFile = Join-Path $state 'build-stamp'
 $fallbackLog = Join-Path $serverCwd 'forge-safe-fallback.log'
 $oldStamp = Join-Path $r '.launch-build-stamp'
-# Tailscale e opcional: so liga o acesso pelo celular. Sem ele (nao instalado/parado/sem login) o resto segue normal.
-$tailscale = if ($env:FORGE_TAILSCALE -and (Test-Path $env:FORGE_TAILSCALE)) { $env:FORGE_TAILSCALE }   # FORGE_TAILSCALE: so para testes
-             else { (Get-Command tailscale.exe -ErrorAction SilentlyContinue).Source }
-if (-not $tailscale) {
-  $tailscale = @("$env:ProgramFiles\Tailscale\tailscale.exe", "${env:ProgramFiles(x86)}\Tailscale\tailscale.exe") |
-    Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
-}
-$urlFile = Join-Path $state 'forge-remoto-url.txt'
-# Preferencia do acesso pelo celular, gravada por forge-celular.ps1: 'on', 'off' ou ausente (ausente = liga sozinho se o Tailscale estiver conectado).
-$celularPref = if (Test-Path (Join-Path $state 'celular.txt')) { (Get-Content (Join-Path $state 'celular.txt') -Raw).Trim() } else { '' }
 New-Item -ItemType Directory -Force $state, $serverCwd | Out-Null
 
 function Show-Toast([string]$title, [string]$text) {
@@ -61,53 +50,6 @@ function Test-PortOpen([int]$p) {
   $c = New-Object Net.Sockets.TcpClient
   try { $a = $c.BeginConnect('127.0.0.1', $p, $null, $null); return ($a.AsyncWaitHandle.WaitOne(300) -and $c.Connected) }
   catch { return $false } finally { $c.Close() }
-}
-
-# --- Tailscale (acceso do celular): helpers ----------------------------------------------------------------------
-
-function Invoke-Ts {
-  # Tailscale parado/sem login escreve no stderr; com $ErrorActionPreference='Stop' o `2>&1` virava excecao e derrubava o launcher
-  # antes de subir o servidor. Aqui qualquer falha vira saida vazia (= "sem Tailscale", segue so local).
-  if (-not $tailscale) { return '' }
-  $ErrorActionPreference = 'Continue'
-  try { (& $tailscale @args 2>&1 | Out-String) } catch { '' }
-}
-
-function Get-TailscaleHost {
-  # Hostname MagicDNS do dispositivo (ex.: desktop-trkmgsj.tail496ab6.ts.net); $null se Tailscale
-  # nao esta logado/conectado. Serve publica a base dele.
-  $st = (Invoke-Ts status --json).Trim()
-  if (-not $st) { return $null }
-  $j = try { $st | ConvertFrom-Json } catch { return $null }
-  if (-not $j -or $j.BackendState -ne 'Running' -or -not $j.Self.DNSName) { return $null }
-  $j.Self.DNSName.TrimEnd('.')
-}
-
-function Get-ServeHost {
-  # Hostname publico que Serve publica: le a autoridade da config Web do `serve status --json`
-  # (ex.: "desktop-trkmgsj.tail496ab6.ts.net:443") e quita o puerto. Fallback: MagicDNS do device.
-  $st = (Invoke-Ts serve status --json).Trim()
-  $j = try { if ($st) { $st | ConvertFrom-Json } } catch { $null }
-  if ($j -and $j.Web) {
-    $k = ($j.Web.PSObject.Properties | Select-Object -First 1 -ExpandProperty Name)
-    if ($k) { return $k.Replace(':' + (($k -split ':')[-1]), '') }
-  }
-  Get-TailscaleHost
-}
-
-function Ensure-Serve([int]$port) {
-  # Idempotente: se Serve ja proxya "/" a este loopback, nao toca nada; senao reseta e
-  # configura `serve --bg <port>`. Devolve $null (ok) ou un motivo de falha.
-  $st = (Invoke-Ts serve status --json).Trim()
-  $probe = '"Proxy":\s*"http://127\.0\.0\.1:' + $port + '"'
-  if ($st -and $st -match $probe) { return $null }
-  Invoke-Ts serve reset | Out-Null
-  $out = (Invoke-Ts serve --bg $port)
-  if ($out -match 'not enabled') { return "Serve no esta habilitado na tailnet. Ativa em: https://login.tailscale.com/f/serve" }
-  if ($out -match 'invalid argument') { return "Erro de sintaxis de tailscale serve: $($out.Trim())" }
-  $st2 = (Invoke-Ts serve status --json).Trim()
-  if (-not ($st2 -match $probe)) { return 'Serve nao confirmou o proxy ao loopback' }
-  $null
 }
 
 function Get-CodeStamp {
@@ -306,7 +248,7 @@ function Stop-ServerTree($p) {
   for ($i = 0; $i -lt 50 -and (Test-PortOpen $Port); $i++) { Start-Sleep -Milliseconds 100 }
 }
 
-function Start-Server([bool]$safe, [bool]$noOpen, [bool]$simulateFailure, [string]$publicHost) {
+function Start-Server([bool]$safe, [bool]$noOpen, [bool]$simulateFailure) {
   $a = @("`"$bin`"", $Profile)
   if ($safe) { $a += '--safe' }   # flags do launcher: logo apos o profile, antes das flags do app
   if ($simulateFailure) {
@@ -316,14 +258,11 @@ function Start-Server([bool]$safe, [bool]$noOpen, [bool]$simulateFailure, [strin
   }
   if ($Profile -eq 'web') {
     if ($Port -ne 3080) { $a += @('--port', $Port) }
-    if ($publicHost) { $a += @('--trusted-host', $publicHost) }   # acesso do celular por Tailscale (solo porta 3080)
     if ($noOpen) { $a += '--no-open' }
   }
   Start-Process $node -ArgumentList $a -WorkingDirectory $serverCwd -WindowStyle Hidden -PassThru `
     -RedirectStandardOutput $log -RedirectStandardError "$log.err"
 }
-
-if ($Reiniciar) { Stop-Forge; Start-Sleep 1 }
 
 # --- 1. Instancia ja no ar? So reaproveita (web) ---------------------------------------------------------------
 if ($Profile -eq 'web' -and -not $Atualizar -and (Test-PortOpen $Port)) {
@@ -354,31 +293,10 @@ if ($Profile -eq 'plain') { Stop-Forge }
 $node = (Get-Command node -ErrorAction SilentlyContinue).Source
 if (-not $node) { $node = 'C:\Program Files\nodejs\node.exe' }
 
-# --- 3b. Tailscale (so porta 3080): liga o servidor ao tailnet para o celular ------------------------------------
-# O serve web segue em 127.0.0.1:3080 (o schema do plugin webserver so aceita loopback/0.0.0.0);
-# Tailscale Serve publica https://<hostname>.ts.net que faz proxy ao loopback, e
-# `--trusted-host <hostname>` abre o fence /api para essa authority. Se Tailscale nao esta
-# conectado (ou Serve falha), tudo segue igual: so que sen acceso do celular.
-$hostPublico = ''
-$hostServe = ''
-if ($Profile -eq 'web' -and $Port -eq 3080 -and $celularPref -ne 'off') {
-  $tailHost = Get-TailscaleHost
-  if ($tailHost) {
-    $tailErr = Ensure-Serve $Port
-    if ($tailErr) {
-      Show-Toast 'FORGE' "$tailErr - abriendo solo local (sen celular)."
-    } else {
-      $hostPublico = Get-ServeHost
-      if (-not $hostPublico) { $hostPublico = $tailHost }
-      $hostServe = $hostPublico
-    }
-  }
-}
-
 # Fallback automatico so no web em modo normal. Nele o launcher abre o navegador (so apos o veredito do boot), entao o
 # servidor sobe com --no-open; no resto o `dsh web` abre sozinho, como sempre.
 $autoFallback = ($Profile -eq 'web' -and -not $Safe)
-$proc = Start-Server ([bool]$Safe) ($NoOpen -or $autoFallback) ([bool]$SimularFalha) $hostPublico
+$proc = Start-Server ([bool]$Safe) ($NoOpen -or $autoFallback) ([bool]$SimularFalha)
 
 # --- 4. Espera subir; detecta corrida (outra instancia ganhou a porta) e falha --------------------------------------
 $fellBack = $false
@@ -391,7 +309,7 @@ if ($autoFallback) {
     Write-FallbackLog 'boot normal falhou' $reason
     Stop-ServerTree $proc
     $env:FORGE_SAFE_REASON = $reason
-    try { $proc = Start-Server $true ([bool]$NoOpen) $false $hostPublico } finally { Remove-Item Env:\FORGE_SAFE_REASON -ErrorAction SilentlyContinue }
+    try { $proc = Start-Server $true ([bool]$NoOpen) $false } finally { Remove-Item Env:\FORGE_SAFE_REASON -ErrorAction SilentlyContinue }
     $fellBack = $true
   }
 }
@@ -426,15 +344,6 @@ if ($fellBack) {
   $short = if ($reason.Length -gt 150) { $reason.Substring(0, 150) } else { $reason }
   Show-Toast 'FORGE abriu em modo seguro' "$short. Corrija e abra pelo atalho normal."
   exit 0
-}
-
-# --- URL para o celular (so com tailnet): reescribe a URL do token ao hostname publico -----------------------------
-if ($hostServe) {
-  $localUrl = Get-ServerUrl
-  if ($localUrl) {
-    $remoteUrl = $localUrl.Replace("http://127.0.0.1:$Port", "https://$hostServe")
-    Set-Content -Path $urlFile -Encoding UTF8 -Value ($remoteUrl + "`r`n`r`n(Acesso por Tailscale Serve. Abre esta URL no navegador do celular com a app Tailscale logada con a tua conta pessoal -`r`nsolo ela pode alcancar https://$hostServe. O token renova em cada subida: corre FORGE.lnk para atualizar.)")
-  }
 }
 
 if ($head -ne $stamp) {

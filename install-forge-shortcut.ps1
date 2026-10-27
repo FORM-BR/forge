@@ -3,8 +3,6 @@
 # duas "areas de trabalho" (a redirecionada, ex.: OneDrive, e %USERPROFILE%\Desktop) e cria na redirecionada se ainda
 # nao houver. Rode de novo, de dentro da pasta definitiva, se a pasta do FORGE mudar de lugar.
 # O launch-dsh.bat segue na pasta como fallback (caminho lento: pnpm + tsx, janela visivel).
-# -ComCelular: cria tambem o atalho que abre o link de acesso pelo celular (so faz sentido com Tailscale).
-param([switch]$ComCelular)
 $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $icone = Join-Path $dir 'apps\desktop\resources\forge-logo.ico'
 $sh = New-Object -ComObject WScript.Shell
@@ -43,27 +41,8 @@ foreach ($d in $alvos) {
   $u.Description = 'Reconstroi o FORGE (pnpm install + builds) e reabre'
   $u.Save()
   "Atalho atualizado: $lnkUpd -> $($u.TargetPath)"
-  # Atalho que liga/desliga o acesso pelo celular (Tailscale) sem reinstalar.
-  $lnkTog = Join-Path $d 'FORGE (celular).lnk'
-  $g = $sh.CreateShortcut($lnkTog)
-  $g.TargetPath = Join-Path $dir 'forge-celular.bat'
-  $g.WorkingDirectory = $dir
-  $g.IconLocation = $s.IconLocation
-  $g.Description = 'Liga ou desliga o acesso do FORGE pelo celular (Tailscale)'
-  $g.Save()
-  "Atalho atualizado: $lnkTog -> $($g.TargetPath)"
-  # Atalho do link do celular (Tailscale): abre o texto com a URL (com token) que o launcher grava a cada subida.
-  # Sem celular ligado ele some, para nao apontar para um arquivo que nao existe.
-  $lnkCel = Join-Path $d 'FORGE (link do celular).lnk'
-  if (-not $ComCelular) { Remove-Item -LiteralPath $lnkCel -Force -ErrorAction SilentlyContinue }
-  if ($ComCelular) {
-    $lnkCel = Join-Path $d 'FORGE (link do celular).lnk'
-    $c = $sh.CreateShortcut($lnkCel)
-    $c.TargetPath = Join-Path $env:WINDIR 'System32\notepad.exe'
-    $c.Arguments = '"' + (Join-Path $env:LOCALAPPDATA 'forge-launch\forge-remoto-url.txt') + '"'
-    $c.IconLocation = $s.IconLocation
-    $c.Description = 'Link do FORGE para abrir no celular (Tailscale)'
-    $c.Save()
-    "Atalho atualizado: $lnkCel"
+  # Atalhos de celular de versoes anteriores: o acesso pelo celular agora liga e desliga DENTRO do FORGE.
+  foreach ($velho in 'FORGE (celular).lnk', 'FORGE (link do celular).lnk') {
+    Remove-Item -LiteralPath (Join-Path $d $velho) -Force -ErrorAction SilentlyContinue
   }
 }

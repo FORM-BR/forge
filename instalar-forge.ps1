@@ -68,12 +68,16 @@ $ErrorActionPreference = 'Stop'
 
 # --- 3. Tailscale (opcional) ------------------------------------------------------------------------------------------
 # Vem ANTES do build para o login (que abre o navegador) acontecer enquanto voce esta na frente do computador. A logica e
-# do forge-celular.ps1, o mesmo do atalho "FORGE (celular)", que liga e desliga isso depois sem reinstalar.
+# do preparar-celular.ps1. Depois, ligar e desligar o acesso pelo celular e feito DENTRO do FORGE (Configuracoes > Geral).
 Titulo '3/5 Tailscale (opcional: usar o FORGE no celular)'
-$args3t = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $dir 'forge-celular.ps1'), '-Modo', 'Preparar', '-Porta', $Porta)
-if ($SemPerguntas) { $args3t += '-SemPerguntas' }
-& powershell @args3t
-$celularPronto = ($LASTEXITCODE -eq 0)
+$celularPronto = $false
+if ($Porta -ne 3080) { Aviso 'Porta diferente de 3080: o acesso pelo celular so funciona na porta padrao.' }
+else {
+  $args3t = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $dir 'preparar-celular.ps1'))
+  if ($SemPerguntas) { $args3t += '-SemPerguntas' }
+  & powershell @args3t
+  $celularPronto = ($LASTEXITCODE -eq 0)
+}
 
 # --- 4. Build + primeira subida ---------------------------------------------------------------------------------------
 if ($SoTailscale) {
@@ -92,20 +96,16 @@ if ($SoTailscale) {
 
 # --- 5. Atalhos -------------------------------------------------------------------------------------------------------
 Titulo '5/5 Atalhos na area de trabalho'
-# O arquivo com o link nasce quando o FORGE sobe com o Tailscale ligado; o atalho so o abre.
-$comCelular = $celularPronto
-if ($comCelular) { & (Join-Path $dir 'install-forge-shortcut.ps1') -ComCelular | Out-Null } else { & (Join-Path $dir 'install-forge-shortcut.ps1') | Out-Null }
+& (Join-Path $dir 'install-forge-shortcut.ps1') | Out-Null
 Ok 'Atalhos criados: FORGE, FORGE (modo seguro), Atualizar FORGE.'
 
-if ($comCelular) {
+if ($celularPronto) {
   Write-Host ''
-  Ok 'Celular pronto:'
-  Write-Host '   1. Instale o app Tailscale no celular e entre na MESMA conta.'
-  Write-Host '   2. No PC, abra o atalho "FORGE (link do celular)" e abra o link que aparece no navegador do celular.'
-  Write-Host '   O link muda a cada vez que o FORGE inicia (o token renova): pegue o link de novo no mesmo atalho.'
+  Ok 'Celular pronto: o acesso liga sozinho quando o FORGE abrir. O link para o celular fica em Configuracoes > Geral > Acesso pelo celular.'
+  Write-Host '   No celular: instale o app Tailscale e entre na MESMA conta; depois abra o link mostrado ali.'
 } else {
   Write-Host ''
-  Write-Host '   Acesso pelo celular desligado. Para ligar (ou desligar) depois, sem reinstalar: atalho "FORGE (celular)" na area de trabalho.'
+  Write-Host '   Acesso pelo celular desligado. Para ligar depois, sem reinstalar: Configuracoes > Geral > Acesso pelo celular, dentro do FORGE.'
 }
 
 Write-Host ''
