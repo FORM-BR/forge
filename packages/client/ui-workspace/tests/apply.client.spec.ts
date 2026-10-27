@@ -18,7 +18,7 @@ import {
   type RetitleSessionInjected, menuOpenStateFactory, type PinSessionInjected,
   workspaceMenuOpenStateFactory,
   type RenameSessionInjected, type RowToastInjected, type SessionArchiveConfirmInjected, type SessionRenameDialogInjected,
-  type WorkspaceStatusInjected, type WorkspaceViewStoreHandle,
+  type WorkspaceStatusInjected, type WorkspaceSwitcherInjected, type WorkspaceViewStoreHandle,
 } from '../src/client/contract/slots.ts'
 import { WorkspaceBrowser } from '../src/client/rows/WorkspaceBrowser.tsx'
 import { ArchiveSessionMenuItem, ArchiveSessionRowButton, SessionArchiveConfirmDialog } from '../src/client/session-actions/ArchiveSession.tsx'
@@ -30,7 +30,8 @@ import { RenameSessionMenuItem, SessionRenameDialog } from '../src/client/sessio
 import { RetitleSessionMenuItem } from '../src/client/session-actions/RetitleSession.tsx'
 import { RowActionToast } from '../src/client/session-actions/RowActionToast.tsx'
 import { HeroGitChip } from '../src/client/status/HeroGitChip.tsx'
-import { WorkspaceStatusLine } from '../src/client/status/WorkspaceStatusLine.tsx'
+import { WorkspaceSwitcher } from '../src/client/status/WorkspaceSwitcher.tsx'
+import { PinWorkspaceMenuItem } from '../src/client/session-actions/PinWorkspace.tsx'
 import { WorkspacePicker } from '../src/client/WorkspacePicker.tsx'
 import { FLAT_SESSION_ORDER_KEY } from '../src/client/stores.ts'
 import { UNGROUPED_KEY } from '../src/client/tree.ts'
@@ -250,33 +251,68 @@ describe('ui-workspace apply', () => {
       kind: 'list', scope: 'root', inject: { hooks: { menuOpenState: workspaceMenuOpenStateFactory } },
     })
     expect(b.slots.spec('sidebar.workspaces.workspace.badge')).toEqual({ kind: 'list', scope: 'root' })
-    // The shipped package registers nothing into them: plugins fill the seats.
-    expect(b.slots.entries('sidebar.workspaces.workspace.menu.item')).toHaveLength(0)
+    // The shipped package adds only the pin row to the menu and nothing to the badge seat: plugins fill the rest.
+    expect(b.slots.entries('sidebar.workspaces.workspace.menu.item').map(row => row.options.id)).toEqual(['pin'])
     expect(b.slots.entries('sidebar.workspaces.workspace.badge')).toHaveLength(0)
     const openState = [true, () => {}] as const
     const factory = workspaceMenuOpenStateFactory as unknown as (standard: object, state: typeof openState) => () => typeof openState
     expect(factory({}, openState)()).toBe(openState)
   })
 
-  it('registers the status line into the composer dock ahead of the stats pills and wires its git lookup', async () => {
+  it('registers the Workspace switcher beside the Session title and wires its Host callbacks', async () => {
     const b = await bench()
     onTestFinished(() => b.ctx.fiber.dispose())
     await b.ctx.plugin({ inject: [...inject], apply }).await()
-    // The dock is declared by ui-conversation, whenever that apply lands.
-    expect(b.slots.entries('conversation.composer.dock')).toHaveLength(0)
+    // The header actions list is declared by ui-conversation, whenever that apply lands.
+    expect(b.slots.entries('conversation.session.header.actions')).toHaveLength(0)
     b.slots.register({
-      name: 'root', children: { 'conversation.composer.dock': { kind: 'list', scope: 'session' } },
+      name: 'root', children: { 'conversation.session.header.actions': { kind: 'list', scope: 'session' } },
     } as never, () => null)
     await Promise.resolve()
-    const dock = b.slots.entries('conversation.composer.dock')
-    expect(dock).toHaveLength(1)
-    expect(dock[0]!.component).toBe(WorkspaceStatusLine)
-    expect(dock[0]!.options).toMatchObject({ id: 'workspace-status', order: -100 })
-    expect(dock[0]!.locale).toBe('workspace')
-    const face = faceOf(dock[0]!) as WorkspaceStatusInjected
+    const actions = b.slots.entries('conversation.session.header.actions')
+    expect(actions).toHaveLength(1)
+    expect(actions[0]!.component).toBe(WorkspaceSwitcher)
+    expect(actions[0]!.options).toMatchObject({ id: 'workspace', order: -5 })
+    expect(actions[0]!.locale).toBe('workspace')
+    expect(actions[0]!.store).toBeUndefined()
+    expect(b.slots.spec('conversation.session.header.workspace.directoryFlow')).toMatchObject({ kind: 'single' })
+
+    const face = faceOf(actions[0]!) as WorkspaceSwitcherInjected
     const signal = new AbortController().signal
     await expect(face.gitInfo('/projects/alpha', signal)).resolves.toMatchObject({ git: { repoName: 'repo' } })
     expect(b.gitInfo).toHaveBeenCalledWith('/projects/alpha', signal)
+    await face.createWorkspace({ path: '/tmp/opened' })
+    expect(b.create).toHaveBeenCalledWith({ path: '/tmp/opened' })
+
+    // The pin set rides the hooks compartment and follows the shared viewing store.
+    expect(face.hooks.pinnedWorkspaces.getSnapshot()).toEqual([])
+    face.toggleWorkspacePin('alpha' as WorkspaceId)
+    expect(face.hooks.pinnedWorkspaces.getSnapshot()).toEqual(['alpha'])
+    face.toggleWorkspacePin('alpha' as WorkspaceId)
+    expect(face.hooks.pinnedWorkspaces.getSnapshot()).toEqual([])
+
+    // The switcher's own directory-flow hole reports occupancy like the other two surfaces.
+    expect(face.hooks.directoryFlow.getSnapshot()).toBe(false)
+    const dispose = b.slots.register({ name: 'conversation.session.header.workspace.directoryFlow' } as never, () => null)
+    expect(face.hooks.directoryFlow.getSnapshot()).toBe(true)
+    dispose()
+    expect(face.hooks.directoryFlow.getSnapshot()).toBe(false)
+
+    const switchWorkspace = vi.spyOn(b.ctx.uiWorkspace, 'switchWorkspace').mockResolvedValue(undefined)
+    await expect(face.switchWorkspace(sid('source'), 'other' as WorkspaceId)).resolves.toEqual({ status: 'switched' })
+    expect(switchWorkspace).toHaveBeenCalledWith('source', 'other')
+  })
+
+  it('registers the pin row into the Workspace header menu with the shared viewing store', async () => {
+    const b = await bench()
+    declare(b.slots, 'sidebar.workspaces', 'shell.overlay')
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const rows = b.slots.entries('sidebar.workspaces.workspace.menu.item')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.component).toBe(PinWorkspaceMenuItem)
+    expect(rows[0]!.options).toMatchObject({ id: 'pin', order: 50 })
+    expect(rows[0]!.locale).toBe('workspace')
+    expect(rows[0]!.store).toBe(b.slots.entries('sidebar.workspaces')[0]!.store)
   })
 
   it('registers the hero git chip into the hero status seat and wires its git lookup', async () => {

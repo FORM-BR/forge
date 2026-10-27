@@ -80,16 +80,20 @@ export function apply(ctx: ClientContext): void {
     createDirectory: (path, name) => ctx.uiWorkspace.createDirectory(path, name),
     t: ctx.locale.bind(LOCALE_NS),
   })
-  // Both declaration lifetimes must be live before the pair installs; the
-  // generator makes the two registrations one transactional effect. The
-  // outer/inner nesting order is arbitrary; neither hole has precedence.
+  // All three declaration lifetimes must be live before the set installs; the
+  // generator makes the registrations one transactional effect. The
+  // nesting order is arbitrary; no hole has precedence.
   ctx.slots.inject('conversation.hero.workspace.directoryFlow', () =>
-    ctx.slots.inject('sidebar.workspaces.directoryFlow', function* () {
-      yield ctx.slots.register({
-        name: 'conversation.hero.workspace.directoryFlow', inject: injected,
-      }, BrowseDirectoryFlow)
-      yield ctx.slots.register({
-        name: 'sidebar.workspaces.directoryFlow', inject: injected,
-      }, BrowseDirectoryFlow)
-    }))
+    ctx.slots.inject('conversation.session.header.workspace.directoryFlow', () =>
+      ctx.slots.inject('sidebar.workspaces.directoryFlow', function* () {
+        yield ctx.slots.register({
+          name: 'conversation.hero.workspace.directoryFlow', inject: injected,
+        }, BrowseDirectoryFlow)
+        yield ctx.slots.register({
+          name: 'conversation.session.header.workspace.directoryFlow', inject: injected,
+        }, BrowseDirectoryFlow)
+        yield ctx.slots.register({
+          name: 'sidebar.workspaces.directoryFlow', inject: injected,
+        }, BrowseDirectoryFlow)
+      })))
 }

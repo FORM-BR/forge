@@ -142,6 +142,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
     /** Directory-flow hole under the conversation empty-state picker (declared by the WorkspacePicker entry). */
     'conversation.hero.workspace.directoryFlow': { kind: 'single'; scope: 'root'; owner: DirectoryFlowOwnerProps }
+    /** The header Workspace switcher's own directory-flow hole (Open, to move the Session to a new directory). */
+    'conversation.session.header.workspace.directoryFlow': { kind: 'single'; scope: 'session'; owner: DirectoryFlowOwnerProps }
     /** Directory-flow hole under the sidebar browsing region (declared by the WorkspaceBrowser entry). */
     'sidebar.workspaces.directoryFlow': { kind: 'single'; scope: 'root'; owner: DirectoryFlowOwnerProps }
     /**
@@ -236,9 +238,10 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-/** The two directory-flow holes; a flow package's client half registers its one component into both. */
+/** The three directory-flow holes; a flow package's client half registers its one component into all of them. */
 export type DirectoryFlowSlotName =
   | 'conversation.hero.workspace.directoryFlow'
+  | 'conversation.session.header.workspace.directoryFlow'
   | 'sidebar.workspaces.directoryFlow'
 
 /**
@@ -560,15 +563,42 @@ export interface WorkspaceStatusInjected {
   gitInfo: (path: string, signal: AbortSignal) => Promise<WorkspaceGitInfoValue>
 }
 
+/**
+ * Header Workspace switcher share: the Host git lookup, Workspace adoption
+ * for a newly opened directory, and the move of the Session to a Workspace.
+ */
+export type WorkspaceSwitcherInjected = WorkspaceStatusInjected & {
+  hooks: {
+    /** True while the switcher's directory-flow hole is occupied. */
+    directoryFlow: HostObservable<boolean>
+    /** Pinned Workspace ids, most recently pinned first (the browser-local viewing preference). */
+    pinnedWorkspaces: HostObservable<readonly string[]>
+  }
+  /** Pin or unpin one Workspace. */
+  toggleWorkspacePin: (workspaceId: WorkspaceId) => void
+  /** Adopt a picked host directory as a real Workspace before moving the Session into it. */
+  createWorkspace: (input: { path: string }) => Promise<WorkspaceView>
+  /** Move the Session to a Workspace; never rejects, every failure arrives as an outcome. */
+  switchWorkspace: (sessionId: SessionId, workspaceId: WorkspaceId) => Promise<WorkspaceSwitchOutcome>
+}
+
+/** Props of the Workspace switcher entry in `conversation.session.header.actions`. */
+export type WorkspaceSwitcherProps =
+  PropsRuntime<'conversation.session.header.actions'>
+  & PropsRenderSlots<'conversation.session.header.workspace.directoryFlow'>
+  & PropsLocale<'workspace'>
+  & Omit<WorkspaceSwitcherInjected, 'hooks'>
+  & PropsHooks<WorkspaceSwitcherInjected['hooks']>
+
+/** Props of the pin row entry in `sidebar.workspaces.workspace.menu.item`. */
+export type PinWorkspaceMenuItemProps =
+  PropsRuntime<'sidebar.workspaces.workspace.menu.item'>
+  & PropsLocale<'workspace'>
+  & PropsStore<WorkspaceViewStoreHandle>
+
 /** Props of the git chip entry in `conversation.hero.workspace.status`. */
 export type HeroGitChipProps =
   PropsRuntime<'conversation.hero.workspace.status'>
-  & PropsLocale<'workspace'>
-  & InjectFace<WorkspaceStatusInjected>
-
-/** Props of the status line entry in `conversation.composer.dock`. */
-export type WorkspaceStatusProps =
-  PropsRuntime<'conversation.composer.dock'>
   & PropsLocale<'workspace'>
   & InjectFace<WorkspaceStatusInjected>
 

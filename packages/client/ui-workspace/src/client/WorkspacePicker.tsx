@@ -11,7 +11,8 @@
 import type { ReactNode, RefObject } from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import {
-  Button, IconFolderCloseRegular, IconPlusOutlineRegular, Menu, Modal, type MenuEntry,
+  Button, IconFolderCloseRegular, IconPinFillRegular, IconPinOutlineRegular, IconPlusOutlineRegular, Menu, Modal,
+  type MenuEntry, type MenuItem,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   WorkspaceId, WorkspaceSnapshot, WorkspaceView,
@@ -22,6 +23,16 @@ import type { DirectoryFlowOwnerProps, WorkspacePickerProps } from './contract/s
 import css from './WorkspacePicker.module.css'
 
 const ADD_WORKSPACE = '::add-workspace'
+
+/** Pinned/recent grouping of the header switcher's list; the owner decides which Workspaces fall in each group. */
+export interface WorkspacePickSections {
+  /** Pinned Workspaces, in display order. */
+  pinnedIds: readonly WorkspaceId[]
+  /** Recently used Workspaces that are not pinned, in display order. */
+  recentIds: readonly WorkspaceId[]
+  /** Pin or unpin one Workspace from its row. */
+  onTogglePin: (workspaceId: WorkspaceId) => void
+}
 
 /** Core flow props: the owner supplies popover control and pick semantics. */
 export interface WorkspacePickFlowProps {
@@ -51,6 +62,8 @@ export interface WorkspacePickFlowProps {
   side?: 'bottom' | 'top' | 'right'
   /** Currently active workspace (trailing check in the picker list). */
   selectedId?: WorkspaceId | undefined
+  /** Group the list into Pinned and Recent with a pin toggle per row; omitted lists every Workspace flat. */
+  sections?: WorkspacePickSections | undefined
 }
 
 /**
@@ -72,6 +85,7 @@ export function WorkspacePickFlow({
   onBusyChange,
   side = 'bottom',
   selectedId,
+  sections,
 }: WorkspacePickFlowProps) {
   const workspaceSnapshot = useWorkspaces(state => state)
   const workspaces = workspaceSnapshot.items
@@ -109,18 +123,56 @@ export function WorkspacePickFlow({
   // With workspaces listed, the add action pins below the scroll region
   // (divider + always visible); otherwise it IS the menu.
   const pinAdd = !addOnly && workspaces.length > 0
-  const items: MenuEntry[] = pinAdd
-    ? workspaces.map(workspace => ({
+  const rowOf = (workspace: WorkspaceView): MenuItem => {
+    const title = workspaceDisplayTitle(workspace.title, t('workspace.defaultName'))
+    const pinned = sections?.pinnedIds.includes(workspace.workspaceId) === true
+    return {
       id: workspace.workspaceId,
-      label: workspaceDisplayTitle(workspace.title, t('workspace.defaultName')),
+      label: sections === undefined
+        ? title
+        : (
+          <span className={css.pinRow}>
+            <span className={css.pinRowName}>{title}</span>
+            {/* A span, not a button: the row itself is a button and buttons cannot nest. */}
+            <span
+              role="button"
+              tabIndex={-1}
+              className={`${css.pinToggle} ${pinned ? css.pinToggleOn : ''}`}
+              aria-label={t(pinned ? 'picker.unpin' : 'picker.pin', { name: title })}
+              title={t(pinned ? 'picker.unpin' : 'picker.pin', { name: title })}
+              onMouseDown={(event) => { event.preventDefault() }}
+              onClick={(event) => {
+                event.stopPropagation()
+                sections.onTogglePin(workspace.workspaceId)
+              }}
+            >
+              {pinned ? <IconPinFillRegular size={14} /> : <IconPinOutlineRegular size={14} />}
+            </span>
+          </span>
+        ),
       icon: <IconFolderCloseRegular size={16} />,
       disabled: flowBusy,
-    }))
+    }
+  }
+  const sectionEntries = (): MenuEntry[] => {
+    if (sections === undefined) return []
+    const byId = new Map(workspaces.map(workspace => [workspace.workspaceId, workspace]))
+    const rows = (ids: readonly WorkspaceId[]): MenuItem[] =>
+      ids.flatMap(id => byId.has(id) ? [rowOf(byId.get(id) as WorkspaceView)] : [])
+    const pinnedRows = rows(sections.pinnedIds)
+    const recentRows = rows(sections.recentIds)
+    return [
+      ...pinnedRows.length === 0 ? [] : [{ type: 'label' as const, id: '::pinned', text: t('picker.pinned') }, ...pinnedRows],
+      ...recentRows.length === 0 ? [] : [{ type: 'label' as const, id: '::recent', text: t('picker.recent') }, ...recentRows],
+    ]
+  }
+  const items: MenuEntry[] = pinAdd
+    ? sections === undefined ? workspaces.map(rowOf) : sectionEntries()
     : addEntries
   // Nothing listed and nothing to add with (a composition that mounts this
   // package without any directory-picker): an empty popover would claim a
   // choice that does not exist, so the anchor gesture shows nothing at all.
-  const menuIsEmpty = items.length === 0
+  const menuIsEmpty = items.length === 0 && !(pinAdd && addEntries.length > 0)
 
   const closeModal = (): void => {
     setErrorOpen(false)

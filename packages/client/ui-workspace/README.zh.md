@@ -67,9 +67,9 @@ Session 行渲染运行时的实时 `pendingInteraction` 分类：审批显示**
 
 当成组的与平铺的 Session 行所对应的 Session 存在活动定时任务时，该行显示时钟标记。它是行首 `sidebar.session.row.leading` seat 的占用方，因此仅在该行主状态为 idle 时渲染，绝不与行自身的状态点同时出现；归档行该格同样留空，搜索结果没有该 seat，也不显示标记。它不是按钮，没有 Tab stop，点击其所在区域不会打开整行。标记自身的读取及其「活动」条件的确切含义由 [ui-schedule](../ui-schedule/README.zh.md) 负责。
 
-### 工作区状态行
+### 工作区切换器
 
-在输入框下方，`conversation.composer.dock` 显示一行低调的状态：会话的工作目录（过长时缩短为末尾若干段，完整路径作为提示文字），以及该目录位于 git 仓库内时的仓库名与分支；HEAD 游离时显示缩写提交。目录来自会话列表行；git 信息来自按目录发起的一次 `workspaces.gitInfo(path, signal)` 查询，会话开始或结束运行时会重新查询，使智能体自己的命令所切换的分支能够显示。查询失败、目录不在任何仓库内、或 Host 没有 `git` 时，只显示目录。该行只出现在常驻输入框中。在空白会话的主视觉区，`conversation.hero.workspace.status` slot（由 ui-conversation 声明）在工作区 chip 旁为所选工作区显示分支 chip，按工作区目录查询；仅当仓库名与工作区标题或文件夹名不同时才附带仓库名。
+在会话标题旁，`conversation.session.header.actions` 显示一个按钮，写明容纳该会话的工作区（其标题；若没有工作区容纳它，则为缩短到末尾若干段的工作目录，完整路径作为提示文字），以及该目录位于 git 仓库内时的仓库名与分支；HEAD 游离时显示缩写提交。点击后，列表分为 **已固定** 与 **最近**（未固定的工作区按其最近会话排序，最多八个），当前工作区带勾选，每行有固定开关，另有 **添加工作区…** 操作，通过 `conversation.session.header.workspace.directoryFlow` 插槽接入一个新目录。选择某个工作区会通过与“切换工作区”行相同的流程把会话移到那里（不显示副本，标题保持不变）；被拒绝时（有运行中的工作、会话被另一个 FORGE 占用，或 Host 失败）会弹出对话框，会话保持原处。也可在侧栏的工作区标题菜单中固定工作区；固定集合是浏览器本地的查看偏好。目录来自会话列表行；git 信息来自按目录发起的一次 `workspaces.gitInfo(path, signal)` 查询，会话开始或结束运行时会重新查询，使智能体自己的命令所切换的分支能够显示。查询失败、目录不在任何仓库内、或 Host 没有 `git` 时，只显示目录。该按钮只出现在常驻会话标题中。在空白会话的主视觉区，`conversation.hero.workspace.status` slot（由 ui-conversation 声明）在工作区 chip 旁为所选工作区显示分支 chip，按工作区目录查询；仅当仓库名与工作区标题或文件夹名不同时才附带仓库名。
 
 -----
 

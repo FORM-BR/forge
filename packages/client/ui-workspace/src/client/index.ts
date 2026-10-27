@@ -23,7 +23,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { RemoteHostFacts } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type {
-  IWorkspaces, SessionActivity, WorkspaceArchiveError, WorkspaceSnapshot,
+  IWorkspaces, SessionActivity, WorkspaceArchiveError, WorkspaceId, WorkspaceSnapshot,
 } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { HostObservable, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
@@ -46,7 +46,8 @@ import {
   type WorkspaceSwitchDialogInjected, type WorkspaceSwitchOutcome, type WorkspaceSwitchRequest,
   type SessionDeleteDialogInjected, type SessionDeleteOutcome, type SessionDeleteRequest,
   type RenameSessionInjected, type RowToast, type RowToastInjected, type RowToastState, type SessionRenameDialogInjected,
-  type WorkspaceBrowserInjected, type WorkspacePickerInjected, type WorkspaceStatusInjected,
+  type DirectoryFlowSlotName, type WorkspaceBrowserInjected, type WorkspacePickerInjected, type WorkspaceStatusInjected,
+  type WorkspaceSwitcherInjected,
   workspaceMenuOpenStateFactory,
 } from './contract/slots.ts'
 import { createWorkspaceShortcutControls, installWorkspaceShortcuts } from './shortcuts.ts'
@@ -59,11 +60,12 @@ import { DeleteSessionMenuItem, SessionDeleteDialog } from './session-actions/De
 import { derive } from './session-actions/derived.ts'
 import { ForkSessionMenuItem } from './session-actions/ForkSession.tsx'
 import { PinSessionMenuItem, PinSessionRowButton } from './session-actions/PinSession.tsx'
+import { PinWorkspaceMenuItem } from './session-actions/PinWorkspace.tsx'
 import { RenameSessionMenuItem, SessionRenameDialog } from './session-actions/RenameSession.tsx'
 import { RetitleSessionMenuItem } from './session-actions/RetitleSession.tsx'
 import { RowActionToast } from './session-actions/RowActionToast.tsx'
 import { HeroGitChip } from './status/HeroGitChip.tsx'
-import { WorkspaceStatusLine } from './status/WorkspaceStatusLine.tsx'
+import { WorkspaceSwitcher } from './status/WorkspaceSwitcher.tsx'
 import { WorkspacePicker } from './WorkspacePicker.tsx'
 import { en, zh, type WorkspaceKey } from './locales.ts'
 
@@ -143,7 +145,7 @@ export function apply(ctx: Context): void {
 
   // Stable per-surface occupancy sources (the renderer's hook cache keys by
   // source identity): true while the surface's directory-flow hole is filled.
-  const flowSource = (hole: 'sidebar.workspaces.directoryFlow' | 'conversation.hero.workspace.directoryFlow'): HostObservable<boolean> => ({
+  const flowSource = (hole: DirectoryFlowSlotName): HostObservable<boolean> => ({
     getSnapshot: () => ctx.slots.entries(hole).length > 0,
     subscribe: listener => ctx.slots.subscribe(hole, listener),
   })
@@ -153,6 +155,7 @@ export function apply(ctx: Context): void {
     subscribe: listener => ctx.on('connection/reset', listener),
   }
   const pickerFlowSource = flowSource('conversation.hero.workspace.directoryFlow')
+  const switcherFlowSource = flowSource('conversation.session.header.workspace.directoryFlow')
   const openSession: WorkspaceBrowserInjected['open'] = (sessionId) => {
     uiWorkspace.openSession(sessionId)
   }
@@ -220,6 +223,28 @@ export function apply(ctx: Context): void {
       notify({ kind: 'stoppedAndArchived', sessionId })
     },
   })
+  /** Move a Session to a Workspace and fold every refusal into an outcome the surfaces can render. */
+  const moveSession = async (sessionId: SessionId, workspaceId: WorkspaceId): Promise<WorkspaceSwitchOutcome> => {
+    try {
+      await uiWorkspace.switchWorkspace(sessionId, workspaceId)
+      return { status: 'switched' }
+    } catch (reason: unknown) {
+      if (activeSessionRefusal(reason) !== undefined) return { status: 'busy' }
+      if (sessionInUseRefusal(reason)) return { status: 'in-use' }
+      console.warn('workspace switch rejected:', reason)
+      return { status: 'failed', message: reason instanceof Error ? reason.message : String(reason) }
+    }
+  }
+  // The header entry is session-scoped while the viewing store is mounted under root-scoped
+  // entries (one handle, one scope), so the switcher reads the pin set through the hooks compartment.
+  const pinnedWorkspaces = derive(viewInstance, state => state.pinnedWorkspaceIds ?? NO_PINNED_WORKSPACES)
+  const switcherInjected = (): WorkspaceSwitcherInjected => ({
+    gitInfo: (path, signal) => workspaces.gitInfo(path, signal),
+    createWorkspace: input => workspaces.create(input),
+    switchWorkspace: moveSession,
+    toggleWorkspacePin: (workspaceId) => { viewInstance.actions.toggleWorkspacePin(workspaceId) },
+    hooks: { directoryFlow: switcherFlowSource, pinnedWorkspaces },
+  })
   const switchRequest = createSnapshotStore<WorkspaceSwitchRequest | null>(null)
   const switchInjected = (): SwitchWorkspaceInjected => ({
     requestWorkspaceSwitch: (sessionId, displayTitle) => { switchRequest.set({ sessionId, displayTitle }) },
@@ -227,17 +252,7 @@ export function apply(ctx: Context): void {
   const switchDialogInjected = (): WorkspaceSwitchDialogInjected => ({
     hooks: { switchRequest },
     settleWorkspaceSwitch: () => { switchRequest.set(null) },
-    switchWorkspace: async (sessionId, workspaceId): Promise<WorkspaceSwitchOutcome> => {
-      try {
-        await uiWorkspace.switchWorkspace(sessionId, workspaceId)
-        return { status: 'switched' }
-      } catch (reason: unknown) {
-        if (activeSessionRefusal(reason) !== undefined) return { status: 'busy' }
-        if (sessionInUseRefusal(reason)) return { status: 'in-use' }
-        console.warn('workspace switch rejected:', reason)
-        return { status: 'failed', message: reason instanceof Error ? reason.message : String(reason) }
-      }
-    },
+    switchWorkspace: moveSession,
   })
   const deleteRequest = createSnapshotStore<SessionDeleteRequest | null>(null)
   const deleteInjected = (): DeleteSessionInjected => ({
@@ -432,12 +447,22 @@ export function apply(ctx: Context): void {
       name: 'shell.overlay', id: 'workspace.row-toast', locale: NS, store: viewStore, inject: rowToastInjected,
     }, RowActionToast)
   })
-  // Ambient line under the composer, ahead of the session stats pills (order 0).
-  ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register(
+  // Workspace switcher beside the Session title, right after the agent-preset label (order -10).
+  ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register(
     {
-      name: 'conversation.composer.dock', id: 'workspace-status', order: -100, locale: NS, inject: statusInjected,
+      name: 'conversation.session.header.actions',
+      id: 'workspace',
+      order: -5,
+      locale: NS,
+      children: { 'conversation.session.header.workspace.directoryFlow': { kind: 'single', scope: 'session' } },
+      inject: switcherInjected,
     },
-    WorkspaceStatusLine,
+    WorkspaceSwitcher,
+  ))
+  // Pin or unpin a Workspace from its header menu, ahead of the other Workspace rows.
+  ctx.slots.inject('sidebar.workspaces.workspace.menu.item', () => ctx.slots.register(
+    { name: 'sidebar.workspaces.workspace.menu.item', id: 'pin', order: 50, locale: NS, store: viewStore },
+    PinWorkspaceMenuItem,
   ))
   // Branch chip beside the blank-session Workspace chip.
   ctx.slots.inject('conversation.hero.workspace.status', () => ctx.slots.register(
@@ -463,6 +488,9 @@ function sessionInUseRefusal(reason: unknown): boolean {
   return reason instanceof Error && reason.name === 'WorkspaceArchiveError'
     && (reason as WorkspaceArchiveError).rpcError.code === 'workspace/session-in-use'
 }
+
+/** The pin set of a viewing state saved before Workspace pinning existed; one instance keeps the snapshot identity stable. */
+const NO_PINNED_WORKSPACES: readonly string[] = []
 
 /**
  * The activity a Host `workspace/session-active` refusal reported, or nothing

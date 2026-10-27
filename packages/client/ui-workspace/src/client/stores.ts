@@ -28,6 +28,8 @@ type WorkspaceViewState = {
   sessionOrderByAccount: Record<string, string[]>
   /** Archived-row visibility; omitted in pre-filter v5 snapshots and read as 'default'. */
   archivedFilter?: ArchivedFilter
+  /** Pinned Workspace ids, most recently pinned first; omitted in snapshots saved before Workspace pinning. */
+  pinnedWorkspaceIds?: string[]
 }
 
 type SessionOrderSource = {
@@ -66,6 +68,7 @@ type WorkspaceViewActions = {
     source: SessionOrderSource,
   ) => void
   setArchivedFilter: (draft: WorkspaceViewState, filter: ArchivedFilter) => void
+  toggleWorkspacePin: (draft: WorkspaceViewState, workspaceId: string) => void
 }
 
 /** Copy read-only projections into the persisted mutable store representation. */
@@ -125,6 +128,12 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
         }))
       },
       setArchivedFilter: (d, filter: ArchivedFilter) => { d.archivedFilter = filter },
+      toggleWorkspacePin: (d, workspaceId: string) => {
+        const pinned = d.pinnedWorkspaceIds ?? []
+        d.pinnedWorkspaceIds = pinned.includes(workspaceId)
+          ? pinned.filter(id => id !== workspaceId)
+          : [workspaceId, ...pinned]
+      },
     },
   })
 }

@@ -18,3 +18,42 @@
 .menuStatus {
   color: var(--dsw-alias-label-secondary);
 }
+
+/* Switcher rows: the Workspace name with a pin toggle at the trailing edge. */
+.pinRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+.pinRowName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pinToggle {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--dsw-radius-sm);
+  color: var(--dsw-alias-menu-icon);
+  opacity: 0;
+}
+
+.pinToggleOn,
+.pinRow:hover .pinToggle,
+.pinToggle:focus-visible {
+  opacity: 1;
+}
+
+.pinToggle:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
