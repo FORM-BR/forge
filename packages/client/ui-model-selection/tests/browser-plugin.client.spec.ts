@@ -122,11 +122,17 @@ async function bench(locale: 'zh' | 'en' = 'zh') {
   const seats = new Map<string, {
     inject: ((sessionId: SessionId) => ModelSelectInjected) | undefined
     locale: string | undefined
+    store: { create: () => unknown } | undefined
   }>()
   ctx.provide('slots', {
     inject(_name: string, callback: () => () => void) { return callback() },
-    register(options: { name: string; locale?: string; inject?: (sessionId: SessionId) => ModelSelectInjected }) {
-      seats.set(options.name, { inject: options.inject, locale: options.locale })
+    register(options: {
+      name: string
+      locale?: string
+      inject?: (sessionId: SessionId) => ModelSelectInjected
+      store?: { create: () => unknown }
+    }) {
+      seats.set(options.name, { inject: options.inject, locale: options.locale, store: options.store })
       return () => { seats.delete(options.name) }
     },
   })
@@ -223,6 +229,9 @@ describe('ui-model-selection dual entry', () => {
     expect(b.seat().inject).toBeTypeOf('function')
     // Copy rides the standard locale seat.
     expect(b.seat().locale).toBe('model')
+    // The card-size store is one shared instance, so every composer seat shows the same size.
+    const store = b.seat().store!
+    expect(store.create()).toBe(store.create())
   })
 
   it('localizes built-in descriptions and preserves external provider descriptions', async () => {

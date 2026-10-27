@@ -326,3 +326,48 @@
   height: 12px;
   color: var(--dsw-alias-menu-icon);
 }
+
+/* Fold-all control above the provider list; the right inset keeps it clear of
+   the top-right resize grip. */
+.toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  margin: 0 8px 2px 0;
+}
+
+.toolbarButton {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: var(--dsw-radius-sm);
+  outline: none;
+  background: transparent;
+  color: var(--dsw-alias-menu-icon);
+  cursor: pointer;
+}
+
+.toolbarButton:hover,
+.toolbarButton:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* Corner grips of the resizable model list: invisible hit areas inside the
+   card, above the sticky group headings. touch-action keeps a finger drag from
+   scrolling the page. */
+.resizeHandle {
+  position: absolute;
+  z-index: 2;
+  width: 10px;
+  height: 10px;
+  touch-action: none;
+}
+
+.resizeNw { top: 0; left: 0; cursor: nwse-resize; }
+.resizeNe { top: 0; right: 0; cursor: nesw-resize; }
+.resizeSw { bottom: 0; left: 0; cursor: nesw-resize; }
+.resizeSe { right: 0; bottom: 0; cursor: nwse-resize; }

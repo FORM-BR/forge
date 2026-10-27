@@ -5,6 +5,8 @@ import { RemoteError } from '@deepseek-ai/dsh-client-test-runtime'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
+import { createModelMenuStore } from '../src/client/menu-store.ts'
 import type { ComponentProps } from 'react'
 import type { ModelDirectoryState } from '../src/client/directory.ts'
 import { ModelSelect } from '../src/client/ModelSelect.tsx'
@@ -53,6 +55,11 @@ function state(overrides: Partial<ModelDirectoryState> = {}): ModelDirectoryStat
   }
 }
 
+/** Wire a fresh (or given) card-size store the way the renderer binds the seat's store share. */
+function menuProps(instance = createModelMenuStore().create()) {
+  return { useStore: bindSnapshotSelector(instance), actions: instance.actions }
+}
+
 afterEach(cleanup)
 
 describe('ModelSelect reasoning effort', () => {
@@ -62,7 +69,7 @@ describe('ModelSelect reasoning effort', () => {
       directory.set(state({ current: selection }))
       return { ok: true as const, value: undefined }
     })
-    render(<ModelSelect
+    render(<ModelSelect {...menuProps()}
       locked={false}
       available
       directory={directory}
@@ -105,7 +112,7 @@ describe('ModelSelect reasoning effort', () => {
       }],
       current: { provider: 'provider', model: 'model' },
     }))
-    render(<ModelSelect
+    render(<ModelSelect {...menuProps()}
       locked={false}
       available
       directory={directory}
@@ -127,7 +134,7 @@ describe('ModelSelect reasoning effort', () => {
       current: { provider: 'deepseek-official', model: 'removed-model' },
     }))
     const select = vi.fn().mockResolvedValue({ ok: true, value: undefined })
-    render(<ModelSelect
+    render(<ModelSelect {...menuProps()}
       locked={false}
       available
       directory={directory}
@@ -148,7 +155,7 @@ describe('ModelSelect reasoning effort', () => {
 
   it.each(['model', 'provider'])('keeps the saved id and effort when the selected %s disappears', (removed) => {
     const directory = createSnapshotStore(state({ retainedEffort: 'High' }))
-    render(<ModelSelect locked={false} available directory={directory} load={vi.fn()} select={vi.fn()} t={t} />)
+    render(<ModelSelect {...menuProps()} locked={false} available directory={directory} load={vi.fn()} select={vi.fn()} t={t} />)
     expect(screen.getByRole('button', { name: /选择模型，当前/ }).textContent).toContain('DeepSeek-V4-Flash')
     act(() => { directory.update((snapshot) => {
       snapshot.groups = removed === 'provider' ? [] : snapshot.groups.map(group => ({ ...group, models: [] }))
@@ -166,7 +173,7 @@ describe('ModelSelect reasoning effort', () => {
       groups: [],
       status: 'loading',
     }))
-    render(<ModelSelect
+    render(<ModelSelect {...menuProps()}
       locked={false}
       available
       directory={directory}
@@ -202,7 +209,7 @@ describe('ModelSelect reasoning effort', () => {
       directory.set(state({ groups, status: 'error', error: 'unrelated catalog refresh' }))
       return { ok: false as const, error }
     })
-    render(<ModelSelect
+    render(<ModelSelect {...menuProps()}
       locked={false}
       available
       directory={directory}
@@ -244,7 +251,7 @@ describe('ModelSelect reasoning effort', () => {
         }
       })
     })
-    render(<ModelSelect locked={false} available directory={directory} load={vi.fn()} select={select} t={t} />)
+    render(<ModelSelect {...menuProps()} locked={false} available directory={directory} load={vi.fn()} select={select} t={t} />)
     const spinners = () => document.querySelectorAll('[data-state="ongoing"]')
 
     const trigger = screen.getByRole('button', { name: /选择模型|当前/ })
@@ -273,7 +280,7 @@ describe('ModelSelect reasoning effort', () => {
       directory.set(state({ status: 'selecting', pending: selection }))
       return new Promise<undefined>(() => {})
     })
-    render(<ModelSelect locked={false} available directory={directory} load={vi.fn()} select={select} t={t} />)
+    render(<ModelSelect {...menuProps()} locked={false} available directory={directory} load={vi.fn()} select={select} t={t} />)
 
     fireEvent.click(screen.getByRole('button', { name: /选择模型|当前/ }))
     fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
@@ -289,7 +296,7 @@ describe('ModelSelect reasoning effort', () => {
     Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, get: () => 200 })
     Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => 300 })
     try {
-      const { container } = render(<ModelSelect
+      const { container } = render(<ModelSelect {...menuProps()}
         locked={false}
         available
         directory={createSnapshotStore(state())}
@@ -322,7 +329,7 @@ describe('ModelSelect reasoning effort', () => {
 
   it('renders no Agent-bound control for an addressed subagent session', () => {
     const load = vi.fn()
-    render(<ModelSelect
+    render(<ModelSelect {...menuProps()}
       locked={false}
       available={false}
       directory={createSnapshotStore(state())}
@@ -339,7 +346,7 @@ describe('ModelSelect reasoning effort', () => {
 describe('ModelSelect keyboard walk', () => {
   function mountOpen() {
     const select = vi.fn().mockResolvedValue({ ok: true, value: undefined })
-    render(<ModelSelect
+    render(<ModelSelect {...menuProps()}
       locked={false}
       available
       directory={createSnapshotStore(state())}
@@ -412,7 +419,7 @@ describe('ModelSelect keyboard walk', () => {
   })
 
   it('Tab with the keyboard still on the trigger enters the menu at the value in use', () => {
-    render(<ModelSelect
+    render(<ModelSelect {...menuProps()}
       locked={false}
       available
       directory={createSnapshotStore(state())}
@@ -458,7 +465,7 @@ describe('ModelSelect keyboard walk', () => {
     const directory = createSnapshotStore<ModelDirectoryState>(state({
       groups: [], failures: [], status: 'error', error: 'catalog down',
     }))
-    render(<ModelSelect
+    render(<ModelSelect {...menuProps()}
       locked={false}
       available
       directory={directory}
@@ -522,7 +529,7 @@ describe('ModelSelect keyboard walk', () => {
 
   it('a pane whose rows mark no current value opens on its first row', () => {
     // The session runs a model the catalog no longer lists: no row is checked.
-    render(<ModelSelect
+    render(<ModelSelect {...menuProps()}
       locked={false}
       available
       directory={createSnapshotStore(state({ current: { provider: 'gone', model: 'gone' } }))}
@@ -540,7 +547,7 @@ describe('ModelSelect keyboard walk', () => {
 
 it('shows the unselected model control with the inherited effort', async () => {
   const directory = createSnapshotStore<ModelDirectoryState>(state({ current: null, routable: false, retainedEffort: 'High' }))
-  render(<ModelSelect locked={false} available directory={directory} load={vi.fn()} select={vi.fn()} t={t} />)
+  render(<ModelSelect {...menuProps()} locked={false} available directory={directory} load={vi.fn()} select={vi.fn()} t={t} />)
   const trigger = screen.getByRole('button', { name: '请选择模型' })
   expect(trigger.hasAttribute('disabled')).toBe(false)
   await expect(`${trigger.textContent}\n`).toMatchFileSnapshot('./expected/unselected-model.txt')
@@ -559,7 +566,7 @@ it('places account and official models before third-party models', async () => {
     id, name: id, models: [1, 2].map(index => ({ id: `${id}-${index}`, name: `${id}-${index}` })),
   }))
   const directory = createSnapshotStore<ModelDirectoryState>(state({ current: null, groups }))
-  render(<ModelSelect locked={false} available directory={directory} load={vi.fn()} select={vi.fn()} t={t} />)
+  render(<ModelSelect {...menuProps()} locked={false} available directory={directory} load={vi.fn()} select={vi.fn()} t={t} />)
   fireEvent.click(screen.getByRole('button', { name: '请选择模型' }))
   const names = screen.getAllByRole('menuitemradio').map(row => row.textContent)
   expect(names).toEqual([
@@ -575,7 +582,7 @@ it.each([en, zh])('localizes the account group while preserving external names',
     id, name: id === 'deepseek-account' ? 'DeepSeek Account' : 'My Gateway',
     models: [{ id: 'model', name: 'Model' }],
   }))
-  render(<ModelSelect locked={false} available
+  render(<ModelSelect {...menuProps()} locked={false} available
     directory={createSnapshotStore(state({ current: null, groups }))}
     load={vi.fn()} select={vi.fn()} t={key => key in copy ? copy[key as keyof typeof copy] : key} />)
   fireEvent.click(screen.getByRole('button', { name: copy['trigger.selectAria'] }))
@@ -589,7 +596,7 @@ it('restores the account model name after login without changing the saved route
   ] }]
   const selected = { provider: 'deepseek-account', model: 'deepseek-flash', reasoningEffort: 'high' }
   const directory = createSnapshotStore(state({ current: selected, groups, retainedEffort: 'High' }))
-  render(<ModelSelect locked={false} available directory={directory} load={vi.fn()} select={vi.fn()} t={t} />)
+  render(<ModelSelect {...menuProps()} locked={false} available directory={directory} load={vi.fn()} select={vi.fn()} t={t} />)
   expect(screen.getByRole('button', { name: /选择模型，当前/ }).textContent).toBe('DeepSeek FlashHigh')
   act(() => { directory.update((snapshot) => { snapshot.groups = []; snapshot.routable = false }) })
   expect(screen.getByRole('button', { name: /选择模型，当前/ }).textContent)
@@ -615,7 +622,7 @@ describe('ModelSelect provider group disclosure', () => {
         { id: 'beta', name: 'Beta', models: [{ id: 'beta-one', name: 'Beta One' }] },
       ],
     }))
-    render(<ModelSelect
+    render(<ModelSelect {...menuProps()}
       locked={false}
       available
       directory={directory}
@@ -665,7 +672,7 @@ describe('ModelSelect provider group disclosure', () => {
         id: 'deepseek-v4-flash', name: 'DeepSeek-V4-Flash',
       }] }],
     }))
-    render(<ModelSelect
+    render(<ModelSelect {...menuProps()}
       locked={false}
       available
       directory={directory}
