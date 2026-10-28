@@ -179,16 +179,6 @@ export interface PiAiProviderProfile {
   /** Maximum provider idle time while one stream read is outstanding. */
   streamIdleTimeoutMs?: number
   /**
-   * Request-shape shims a third-party OpenAI-compatible gateway demands before
-   * it accepts a request as coming from its own client. `opencode-gateway`
-   * covers the OpenCode free tier, which answers `400` for a tool whose
-   * `parameters` is not an object schema and `403 FreeTierError` for a request
-   * that declares no function at all — including harness calls that carry no
-   * tool surface, such as session-title and compaction requests. Absent means
-   * the route is sent exactly as the harness builds it.
-   */
-  gatewayCompat?: 'opencode-gateway'
-  /**
    * Maximum base64-encoded image payload per request. When a request's
    * accumulated images exceed it, the oldest images are replaced by text
    * placeholders until the request fits, so a long session keeps completing
@@ -373,7 +363,6 @@ const profile = z.object({
   timeoutMs: z.natural(),
   websocketConnectTimeoutMs: z.natural(),
   streamIdleTimeoutMs: z.number().min(Number.MIN_VALUE).max(MAX_TIMER_DELAY_MS).default(DEFAULT_STREAM_IDLE_TIMEOUT_MS),
-  gatewayCompat: z.union(['opencode-gateway']),
   maxRequestImageBytes: z.number().step(1).min(1).default(DEFAULT_MAX_REQUEST_IMAGE_BYTES),
   requestImagePixelBudget: z.number().step(1).min(1).default(DEFAULT_REQUEST_IMAGE_PIXEL_BUDGET),
   requestImageMaxBytes: z.number().step(1).min(1).default(DEFAULT_REQUEST_IMAGE_MAX_BYTES),
