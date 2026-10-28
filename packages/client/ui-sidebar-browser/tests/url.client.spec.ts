@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseBrowserAddress } from '../src/client/browser/url.ts'
+import { looksLikeWorkspacePath, parseBrowserAddress } from '../src/client/browser/url.ts'
 
 const APP = 'https://dsh.example'
 
@@ -48,5 +48,26 @@ describe('Browser address policy', () => {
     expect(parseBrowserAddress('https://example.test', 'not an origin')).toMatchObject({ ok: true })
     expect(parseBrowserAddress('https://example.test')).toMatchObject({ ok: true })
     expect(parseBrowserAddress('https://example.test', 'null')).toMatchObject({ ok: true })
+  })
+})
+
+describe('looksLikeWorkspacePath', () => {
+  it('recognizes only unambiguous local-file forms', () => {
+    expect(looksLikeWorkspacePath('/work/notes.md')).toBe(true)
+    expect(looksLikeWorkspacePath(String.raw`C:\work\notes.md`)).toBe(true)
+    expect(looksLikeWorkspacePath('C:/work/notes.md')).toBe(true)
+    expect(looksLikeWorkspacePath(String.raw`\\server\share\notes.md`)).toBe(true)
+    expect(looksLikeWorkspacePath('./notes.md')).toBe(true)
+    expect(looksLikeWorkspacePath('../notes.md')).toBe(true)
+    expect(looksLikeWorkspacePath(String.raw`.\notes.md`)).toBe(true)
+    expect(looksLikeWorkspacePath(String.raw`..\notes.md`)).toBe(true)
+  })
+
+  it('leaves hostname-ambiguous and protocol forms to the HTTP(S) parser', () => {
+    expect(looksLikeWorkspacePath('notes.md')).toBe(false)
+    expect(looksLikeWorkspacePath('docs/notes.md')).toBe(false)
+    expect(looksLikeWorkspacePath('example.com')).toBe(false)
+    expect(looksLikeWorkspacePath('https://example.com/a')).toBe(false)
+    expect(looksLikeWorkspacePath('')).toBe(false)
   })
 })

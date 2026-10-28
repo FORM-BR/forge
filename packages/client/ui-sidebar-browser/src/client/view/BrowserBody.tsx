@@ -1,5 +1,5 @@
 /** Common browser chrome; a presentation adapter attaches the page inside its content container. */
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import {
   Button,
@@ -12,6 +12,7 @@ import {
   ICON_REGULAR_STROKE,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
+import { fileAddressFor } from '@deepseek-ai/dsh-util-workspace-path'
 import type { BrowserInjected } from '../browser/BrowserController.ts'
 import { emptyBrowserFrame } from '../browser/BrowserFrame.ts'
 import { currentBrowserTarget } from '../browser/BrowserPersistence.ts'
@@ -45,7 +46,10 @@ function useBrowserDraft(url: string | undefined, revision: number): readonly [s
 
 /** Render provider-neutral navigation state and optional controls. */
 export function BrowserBody(props: BrowserBodyProps): ReactNode {
-  const { mount, loadUrl, restore, goBack, goForward, reload, setSandbox, useBrowserState, useStore, useTabInfo, t } = props
+  const {
+    mount, loadUrl, restore, goBack, goForward, reload, setSandbox,
+    useBrowserState, useSessions, useStore, useTabInfo, sessionId, t,
+  } = props
   const { tab } = useTabInfo()
   useEffect(() => tab.actions.bindCommands({ refresh: () => { reload(tab.id) } }), [tab.actions, tab.id, reload])
   const saved = useStore(state => state.byTab[tab.id])
@@ -58,16 +62,27 @@ export function BrowserBody(props: BrowserBodyProps): ReactNode {
   const restoreTarget = state === undefined ? currentBrowserTarget(initial.current) : state.restoreTarget
   const target = frame.target ?? restoreTarget
   const [draft, setDraft] = useBrowserDraft(target?.url ?? initialUrl.current, state?.addressRevision ?? 0)
+  // A ref keeps the mount effect's closure stable while still reading the
+  // latest workspace root: the Session's cwd can change independently of the
+  // tab lifecycle and must not force a page remount.
+  const cwd = useSessions(list => list.byId[sessionId]?.cwd)
+  const openResource = useCallback((address: string) => { tab.actions.openResource(address) }, [tab.actions])
+  const latestFileOpen = useRef({ cwd, openResource })
+  latestFileOpen.current = { cwd, openResource }
 
   useLayoutEffect(() => {
     const hide = mount({
       tabId: tab.id, signal: tab.signal, viewportId, applicationOrigin: window.location.origin,
       initial: initial.current, initialUrl: initialUrl.current,
       openTab: (url) => { tab.actions.openTab('browser', { params: { url }, revealIfOpened: false }) },
+      openFilePath: (value) => {
+        latestFileOpen.current.openResource(fileAddressFor(sessionId, latestFileOpen.current.cwd, value.trim()))
+        return true
+      },
     })
     setMountEpoch(value => value + 1)
     return hide
-  }, [mount, tab.id, tab.signal, tab.actions, viewportId, props.actions])
+  }, [mount, tab.id, tab.signal, tab.actions, sessionId, viewportId, props.actions])
 
   const unknown = frame.address === 'unknown'
   const externalUrl = unknown ? undefined : target?.url

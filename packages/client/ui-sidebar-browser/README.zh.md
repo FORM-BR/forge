@@ -25,11 +25,11 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-Browser 在 Web profile 中默认禁用，在 Desktop 中默认启用。Web 用户可通过 profile patch 启用随附条目。可以从右侧 Sidebar guide 打开 **浏览器**并输入 HTTP(S) URL。Chat 的[链接偏好](../ui-chat/README.zh.md)选择**应用内侧边栏**时，HTTP(S) 链接会在此打开。不带 scheme 的主机名会补全为 HTTPS。公共目标与 loopback 目标使用相同的默认 sandbox。每次 guide 操作或委托到此的消息链接操作都会创建一个新的 Browser tab。
+Browser 在 Web profile 中默认禁用，在 Desktop 中默认启用。Web 用户可通过 profile patch 启用随附条目。可以从右侧 Sidebar guide 打开 **浏览器**并输入 HTTP(S) URL 或工作区文件路径。Chat 的[链接偏好](../ui-chat/README.zh.md)选择**应用内侧边栏**时，HTTP(S) 链接会在此打开。不带 scheme 的主机名会补全为 HTTPS。公共目标与 loopback 目标使用相同的默认 sandbox。每次 guide 操作或委托到此的消息链接操作都会创建一个新的 Browser tab。
 
 ### 何时选择
 
-当 Web 页面需要保留在当前 Session 旁时，选择 Browser。本地文件使用 [Document Preview](../ui-sidebar-documentpreview/README.zh.md)；站点拒绝 iframe 嵌入或需要本包不授予的浏览器 capability 时，使用明确的外部浏览器操作。
+当 Web 页面需要保留在当前 Session 旁时，选择 Browser。同一个地址栏也接受明确无歧义的本地文件路径——绝对路径（POSIX、Windows 盘符或 UNC）或显式相对路径（`./`、`../`）——并会在 [Document Preview](../ui-sidebar-documentpreview/README.zh.md) 中打开，而不是导航；普通的 `name` 或 `dir/name` 仍与主机名存在歧义，会按地址解析。站点拒绝 iframe 嵌入或需要本包不授予的浏览器 capability 时，使用明确的外部浏览器操作。
 
 ### 最小配置
 
@@ -57,6 +57,8 @@ Client 插件可以调用 `ctx.sidebarRight.openTab('browser', { params: { url }
 ### 协议策略
 
 地址解析器接受 HTTP 与 HTTPS，包括 loopback 目标。`file:` URL、脚本/data/blob 输入、内嵌凭据、DSH 应用自身 origin 和畸形地址会被拒绝。本地文件由 Document Preview 负责渲染。
+
+在该解析器运行之前，地址栏和 typed-open 请求会先检测该值是否属于明确无歧义的本地文件路径：POSIX 或 Windows 绝对路径、Windows UNC 共享路径，或显式的 `./`/`../` 相对前缀。命中时会通过所属 tab 的 `openResource` 动作打开该 Session 作用域下的文件地址，而不是导航；Browser tab 本身不受影响。其余形式——包括同样可能是裸主机名的普通 `name.ext` 或 `dir/name.ext`——都交给上面的 HTTP(S) 解析器处理，因此普通主机名仍会按 Web 地址解析。
 
 ### Iframe 载体
 

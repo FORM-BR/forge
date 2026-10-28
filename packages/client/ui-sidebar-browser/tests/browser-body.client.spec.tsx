@@ -38,7 +38,7 @@ const absentState = {
 }
 
 function mountBrowser(navigation?: { readonly url?: string },
-  options: { initial?: BrowserTabState; createPage?: BrowserPageFactory; refreshShortcut?: ReturnType<BrowserBodyProps['useTabInfo']>['tab']['refreshShortcut'] } = {}) {
+  options: { initial?: BrowserTabState; createPage?: BrowserPageFactory; cwd?: string; refreshShortcut?: ReturnType<BrowserBodyProps['useTabInfo']>['tab']['refreshShortcut'] } = {}) {
   const store = createBrowserStore().create(`browser-body-test-${String(++mountSequence)}`)
   if (options.initial !== undefined) store.actions.replace(TAB, options.initial)
   const lifetime = new AbortController()
@@ -47,9 +47,10 @@ function mountBrowser(navigation?: { readonly url?: string },
   controllers.push(injected)
   const { keyedHooks, ...commands } = injected
   const tabActions = { bindCommands: vi.fn<ReturnType<BrowserBodyProps['useTabInfo']>['tab']['actions']['bindCommands']>(() => vi.fn()), openResource: vi.fn(), openTab: vi.fn(), close: vi.fn() }
-  const props: Pick<BrowserBodyProps, 'sessionId' | 'useTabInfo' | 'useStore' | 'actions' | 't' | 'useBrowserState'>
+  const props: Pick<BrowserBodyProps, 'sessionId' | 'useSessions' | 'useTabInfo' | 'useStore' | 'actions' | 't' | 'useBrowserState'>
     & Omit<BrowserInjected, 'keyedHooks'> = {
       sessionId: SESSION,
+      useSessions: select => select({ ids: [SESSION], byId: { [SESSION]: { id: SESSION, displayTitle: 'Workspace', cwd: options.cwd, running: false, retainedBy: {}, blank: false, updatedAt: 0 } }, phase: 'ready', projectionsBySession: {} } as never),
       useTabInfo: () => ({
         sidebar: { expanded: true, fullscreen: false }, panel: { id: 'pane' as PaneId },
         tab: {
@@ -137,6 +138,20 @@ describe('BrowserBody', () => {
     fireEvent.change(input, { target: { value: 'file:///work/index.html' } })
     fireEvent.submit(input.closest('form')!)
     expect(mounted.view.getByRole('alert').textContent).toBe(zh['error.protocol'])
+  })
+
+  it('routes an unambiguous local file path to the right Sidebar instead of navigating', async () => {
+    const mounted = mountBrowser(undefined, { cwd: '/work' })
+    const input = mounted.view.getByRole('textbox')
+    fireEvent.change(input, { target: { value: './notes.md' } })
+    fireEvent.submit(input.closest('form')!)
+    await waitFor(() => { expect(mounted.tabActions.openResource).toHaveBeenCalledExactlyOnceWith('dsh-resource://file/session/session/notes.md') })
+    expect(mounted.view.container.querySelector('iframe')).toBeNull()
+    expect(mounted.view.queryByRole('alert')).toBeNull()
+    fireEvent.change(input, { target: { value: '/work/deep/plan.html' } })
+    fireEvent.submit(input.closest('form')!)
+    await waitFor(() => { expect(mounted.tabActions.openResource).toHaveBeenCalledTimes(2) })
+    expect(mounted.tabActions.openResource).toHaveBeenLastCalledWith('dsh-resource://file/session/session/deep/plan.html')
   })
 
   it('renders HTTPS in the fixed sandbox and follows controller history', async () => {

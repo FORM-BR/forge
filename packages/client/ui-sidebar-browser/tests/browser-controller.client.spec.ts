@@ -34,7 +34,7 @@ function harness() {
   document.body.append(host)
   const mount = (signal: AbortSignal): (() => void) => face.mount({
     tabId: TAB, signal, viewportId: id, applicationOrigin: APP,
-    initial: store.getSnapshot().byTab[TAB], initialUrl: undefined, openTab: vi.fn(),
+    initial: store.getSnapshot().byTab[TAB], initialUrl: undefined, openTab: vi.fn(), openFilePath: vi.fn(() => false),
   })
   const iframe = (): HTMLIFrameElement => {
     const element = host.querySelector('iframe')
@@ -92,11 +92,11 @@ describe('BrowserController', () => {
     document.body.append(secondHost)
     hosts.push(secondHost)
     h.face.mount({ tabId: TAB, signal: tabLifetime.signal, viewportId: secondHost.id,
-      applicationOrigin: APP, initial: undefined, initialUrl: undefined, openTab: vi.fn() })
+      applicationOrigin: APP, initial: undefined, initialUrl: undefined, openTab: vi.fn(), openFilePath: vi.fn(() => false) })
     oldMount()
     expect(secondHost.querySelector('iframe')?.src).toBe('https://saved.example/')
     expect(() => h.face.mount({ tabId: TAB, signal: tabLifetime.signal, viewportId: 'missing-browser-host',
-      applicationOrigin: APP, initial: undefined, initialUrl: undefined, openTab: vi.fn() })).toThrow('not mounted')
+      applicationOrigin: APP, initial: undefined, initialUrl: undefined, openTab: vi.fn(), openFilePath: vi.fn(() => false) })).toThrow('not mounted')
   })
 
   it('validates provider open requests and ignores late provider callbacks after disposal', async () => {
@@ -116,12 +116,18 @@ describe('BrowserController', () => {
     }
     const store = createBrowserStore().create('provider-callbacks')
     const openTab = vi.fn()
+    const openFilePath = vi.fn((value: string) => value === './notes.md')
     const controller = new BrowserController({ tabId: TAB, signal: lifetime().signal, applicationOrigin: APP,
-      actions: store.actions, initial: saved, createPage: pageFactory, openTab })
+      actions: store.actions, initial: saved, createPage: pageFactory, openTab, openFilePath })
     disposables.push(controller)
     const provider = callbacks[0]!
     provider.openRequested('file:/secret')
     expect(controller.getSnapshot().addressFailure).toBe('protocol')
+    expect(openFilePath).not.toHaveBeenCalled()
+    // An unambiguous local file path that the callback claims never navigates.
+    provider.openRequested('./notes.md')
+    expect(openFilePath).toHaveBeenCalledExactlyOnceWith('./notes.md')
+    expect(openTab).not.toHaveBeenCalled()
     provider.openRequested('https://new.example/path')
     expect(openTab).toHaveBeenCalledExactlyOnceWith('https://new.example/path')
     controller.setSandbox(false)
@@ -144,7 +150,7 @@ describe('BrowserController', () => {
     const tabLifetime = lifetime()
     const controller = new BrowserController({
       tabId: TAB, signal: tabLifetime.signal, applicationOrigin: APP, actions: store.actions,
-      initial: undefined, createPage: createIframePage, openTab: vi.fn(),
+      initial: undefined, createPage: createIframePage, openTab: vi.fn(), openFilePath: vi.fn(() => false),
     })
     disposables.push(controller)
     tabLifetime.abort()
@@ -244,6 +250,25 @@ describe('BrowserController', () => {
       target: { url: 'http://localhost:5173/app' },
     })
     expect(store.getSnapshot().byTab[TAB]?.request?.revision).toBe(beforeToggle + 2)
+  })
+
+  it('routes an unambiguous local file path to Document Preview instead of navigating', () => {
+    const opened: string[] = []
+    const store = createBrowserStore().create('file-routing-controller')
+    const openFilePath = vi.fn((value: string) => { opened.push(value); return true })
+    const controller = new BrowserController({
+      tabId: TAB, signal: lifetime().signal, applicationOrigin: APP, actions: store.actions,
+      initial: undefined, createPage: createIframePage, openTab: vi.fn(), openFilePath,
+    })
+    disposables.push(controller)
+    controller.loadUrl('./notes.md')
+    expect(openFilePath).toHaveBeenCalledExactlyOnceWith('./notes.md')
+    expect(opened).toEqual(['./notes.md'])
+    expect(controller.getSnapshot().frame.target).toBeUndefined()
+    expect(controller.getSnapshot().addressFailure).toBeUndefined()
+    // A hostname-ambiguous value never reaches the file callback.
+    controller.loadUrl('notes.md')
+    expect(openFilePath).toHaveBeenCalledOnce()
   })
 
   it('loads public HTTP without changing the sandbox policy', () => {

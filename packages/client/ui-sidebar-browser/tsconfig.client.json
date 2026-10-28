@@ -22,6 +22,7 @@
     { "path": "../ui-renderer" },
     { "path": "../ui-session" },
     { "path": "../ui-sidebar-right" },
-    { "path": "../ui-slots" }
+    { "path": "../ui-slots" },
+    { "path": "../../util/workspace-path" }
   ]
 }

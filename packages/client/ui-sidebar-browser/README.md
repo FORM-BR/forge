@@ -25,11 +25,11 @@ Browse HTTP(S) pages, including loopback services, inside independent right-Side
 <a id="use-this-package"></a>
 ## Use this package
 
-Browser is disabled by default in Web profiles and enabled on Desktop. Enable the shipped entry through the Web profile patch to use it. Open **Browser** from the right-Sidebar guide and enter an HTTP(S) URL. Chat HTTP(S) links open here when the [link preference](../ui-chat/README.md) selects **In-App Sidebar**. A host name without a scheme becomes HTTPS. Public and loopback targets use the same default sandbox. Each guide action or delegated message-link activation creates another Browser tab.
+Browser is disabled by default in Web profiles and enabled on Desktop. Enable the shipped entry through the Web profile patch to use it. Open **Browser** from the right-Sidebar guide and enter an HTTP(S) URL or a workspace file path. Chat HTTP(S) links open here when the [link preference](../ui-chat/README.md) selects **In-App Sidebar**. A host name without a scheme becomes HTTPS. Public and loopback targets use the same default sandbox. Each guide action or delegated message-link activation creates another Browser tab.
 
 ### When to choose it
 
-Choose Browser for a Web page that should remain beside the current Session. Choose [Document Preview](../ui-sidebar-documentpreview/README.md) for local files, and use the explicit external-browser action when a site refuses iframe embedding or needs browser capabilities this package withholds.
+Choose Browser for a Web page that should remain beside the current Session. The same address field also accepts an unambiguous local file path — absolute (POSIX, Windows drive, or UNC) or explicitly relative (`./`, `../`) — and opens it in [Document Preview](../ui-sidebar-documentpreview/README.md) instead of navigating; a plain name or `dir/name` stays ambiguous with a hostname and is parsed as an address. Use the explicit external-browser action when a site refuses iframe embedding or needs browser capabilities this package withholds.
 
 ### Minimal configuration
 
@@ -57,6 +57,8 @@ The toolbar provides Back, Forward, Reload, Go, and Open in system browser. Web 
 ### Protocol policy
 
 The address parser accepts HTTP and HTTPS, including loopback targets. It rejects `file:` URLs, script/data/blob input, embedded credentials, the DSH application origin, and malformed addresses. Document Preview owns local-file rendering.
+
+Before that parser runs, the address field and typed-open requests check the value against an unambiguous local-file test: a POSIX or Windows absolute path, a Windows UNC share, or an explicit `./`/`../` relative prefix. A match opens the Session-scoped file address through the owning tab's `openResource` action instead of navigating; the Browser tab itself is unaffected. Every other form, including a plain `name.ext` or `dir/name.ext` that could also be a bare hostname, is left to the HTTP(S) parser above, so an ordinary host name still resolves as a Web address.
 
 ### Iframe carrier
 
