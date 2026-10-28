@@ -154,6 +154,42 @@ describe('BrowserBody', () => {
     expect(mounted.tabActions.openResource).toHaveBeenLastCalledWith('dsh-resource://file/session/session/deep/plan.html')
   })
 
+  it('asks inline before opening a path outside the workspace, then opens or cancels', async () => {
+    const mounted = mountBrowser(undefined, { cwd: '/work' })
+    const input = mounted.view.getByRole('textbox')
+    for (const outside of ['/etc/hosts', '../secret.md', '/work/../etc/hosts']) {
+      fireEvent.change(input, { target: { value: outside } })
+      fireEvent.submit(input.closest('form')!)
+      await waitFor(() => { expect(mounted.view.getByRole('group', { name: zh['outside.title'] })).toBeDefined() })
+      expect(mounted.view.getByText(outside)).toBeDefined()
+      expect(mounted.tabActions.openResource).not.toHaveBeenCalled()
+    }
+    expect(mounted.view.getAllByRole('group')).toHaveLength(1)
+
+    fireEvent.click(mounted.view.getByRole('button', { name: zh['outside.cancel'] }))
+    expect(mounted.view.queryByRole('group')).toBeNull()
+    expect(mounted.tabActions.openResource).not.toHaveBeenCalled()
+
+    fireEvent.change(input, { target: { value: '../secret.md' } })
+    fireEvent.submit(input.closest('form')!)
+    await waitFor(() => { expect(mounted.view.getByRole('group')).toBeDefined() })
+    fireEvent.click(mounted.view.getByRole('button', { name: zh['outside.open'] }))
+    expect(mounted.tabActions.openResource).toHaveBeenCalledExactlyOnceWith('dsh-resource://file/session/session/../secret.md')
+    expect(mounted.view.queryByRole('group')).toBeNull()
+  })
+
+  it('dismisses the outside-workspace prompt when another address is submitted', async () => {
+    const mounted = mountBrowser(undefined, { cwd: '/work' })
+    const input = mounted.view.getByRole('textbox')
+    fireEvent.change(input, { target: { value: '/etc/hosts' } })
+    fireEvent.submit(input.closest('form')!)
+    await waitFor(() => { expect(mounted.view.getByRole('group')).toBeDefined() })
+    fireEvent.change(input, { target: { value: '/work/inside.md' } })
+    fireEvent.submit(input.closest('form')!)
+    expect(mounted.view.queryByRole('group')).toBeNull()
+    await waitFor(() => { expect(mounted.tabActions.openResource).toHaveBeenCalledExactlyOnceWith('dsh-resource://file/session/session/inside.md') })
+  })
+
   it('renders HTTPS in the fixed sandbox and follows controller history', async () => {
     const mounted = mountBrowser()
     const input = mounted.view.getByRole('textbox')

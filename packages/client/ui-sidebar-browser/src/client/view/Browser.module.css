@@ -221,6 +221,41 @@
   background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);
 }
 
+/* Explicit surface and text tokens keep the prompt legible in both themes. */
+.confirm {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: center;
+  padding: 8px 12px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-layer-1);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l3);
+}
+
+.confirmText {
+  margin: 0;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xxs-12);
+  font-weight: 500;
+}
+
+.confirmPath {
+  flex: 1 1 100%;
+  order: 3;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxxs-11);
+}
+
+.confirmActions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
 .sandboxWarning {
   flex: 0 0 auto;
   padding: 6px 12px;

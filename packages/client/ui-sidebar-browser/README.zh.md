@@ -29,7 +29,7 @@ Browser 在 Web profile 中默认禁用，在 Desktop 中默认启用。Web 用�
 
 ### 何时选择
 
-当 Web 页面需要保留在当前 Session 旁时，选择 Browser。同一个地址栏也接受明确无歧义的本地文件路径——绝对路径（POSIX、Windows 盘符或 UNC）或显式相对路径（`./`、`../`）——并会在 [Document Preview](../ui-sidebar-documentpreview/README.zh.md) 中打开，而不是导航；普通的 `name` 或 `dir/name` 仍与主机名存在歧义，会按地址解析。站点拒绝 iframe 嵌入或需要本包不授予的浏览器 capability 时，使用明确的外部浏览器操作。
+当 Web 页面需要保留在当前 Session 旁时，选择 Browser。同一个地址栏也接受明确无歧义的本地文件路径——绝对路径（POSIX、Windows 盘符或 UNC）或显式相对路径（`./`、`../`）——并会在 [Document Preview](../ui-sidebar-documentpreview/README.zh.md) 中打开，而不是导航；普通的 `name` 或 `dir/name` 仍与主机名存在歧义，会按地址解析。解析后落在 Session 工作区之外的路径（先规范化分隔符与 `..`，Windows 写法不区分大小写）不会直接打开，面板内会先显示内联确认，提供“打开”和“取消”。站点拒绝 iframe 嵌入或需要本包不授予的浏览器 capability 时，使用明确的外部浏览器操作。
 
 ### 最小配置
 

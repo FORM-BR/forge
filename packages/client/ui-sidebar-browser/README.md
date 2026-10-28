@@ -29,7 +29,7 @@ Browser is disabled by default in Web profiles and enabled on Desktop. Enable th
 
 ### When to choose it
 
-Choose Browser for a Web page that should remain beside the current Session. The same address field also accepts an unambiguous local file path — absolute (POSIX, Windows drive, or UNC) or explicitly relative (`./`, `../`) — and opens it in [Document Preview](../ui-sidebar-documentpreview/README.md) instead of navigating; a plain name or `dir/name` stays ambiguous with a hostname and is parsed as an address. Use the explicit external-browser action when a site refuses iframe embedding or needs browser capabilities this package withholds.
+Choose Browser for a Web page that should remain beside the current Session. The same address field also accepts an unambiguous local file path — absolute (POSIX, Windows drive, or UNC) or explicitly relative (`./`, `../`) — and opens it in [Document Preview](../ui-sidebar-documentpreview/README.md) instead of navigating; a plain name or `dir/name` stays ambiguous with a hostname and is parsed as an address. A path that resolves outside the Session's workspace (compared after normalizing separators and `..`, ignoring case for Windows spellings) is not opened directly: an inline prompt in the panel asks for confirmation first, with Open and Cancel. Use the explicit external-browser action when a site refuses iframe embedding or needs browser capabilities this package withholds.
 
 ### Minimal configuration
 

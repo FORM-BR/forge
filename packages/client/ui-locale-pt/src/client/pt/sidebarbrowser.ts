@@ -26,4 +26,7 @@ export const pt: Record<string, string> = {
   'load.failed': 'A página não pôde ser carregada; recarregue ou abra-a no navegador do sistema.',
   'load.failed.detail': 'Falha ao carregar a página ({code}): {description}',
   'address.unknown': 'A página navegou; este contêiner não consegue ler a nova URL.',
+  'outside.title': 'Abrir arquivo fora do workspace?',
+  'outside.open': 'Abrir',
+  'outside.cancel': 'Cancelar',
 }

@@ -17,6 +17,7 @@ import type { BrowserInjected } from '../browser/BrowserController.ts'
 import { emptyBrowserFrame } from '../browser/BrowserFrame.ts'
 import { currentBrowserTarget } from '../browser/BrowserPersistence.ts'
 import type { BrowserStore } from '../browser/store.ts'
+import { isInsideWorkspace } from '../browser/workspace-scope.ts'
 import css from './Browser.module.css'
 
 const EMPTY_FRAME = emptyBrowserFrame()
@@ -65,6 +66,7 @@ export function BrowserBody(props: BrowserBodyProps): ReactNode {
   // A ref keeps the mount effect's closure stable while still reading the
   // latest workspace root: the Session's cwd can change independently of the
   // tab lifecycle and must not force a page remount.
+  const [outside, setOutside] = useState<{ readonly path: string; readonly address: string }>()
   const cwd = useSessions(list => list.byId[sessionId]?.cwd)
   const openResource = useCallback((address: string) => { tab.actions.openResource(address) }, [tab.actions])
   const latestFileOpen = useRef({ cwd, openResource })
@@ -76,7 +78,12 @@ export function BrowserBody(props: BrowserBodyProps): ReactNode {
       initial: initial.current, initialUrl: initialUrl.current,
       openTab: (url) => { tab.actions.openTab('browser', { params: { url }, revealIfOpened: false }) },
       openFilePath: (value) => {
-        latestFileOpen.current.openResource(fileAddressFor(sessionId, latestFileOpen.current.cwd, value.trim()))
+        const { cwd: root, openResource: open } = latestFileOpen.current
+        const path = value.trim()
+        const address = fileAddressFor(sessionId, root, path)
+        // A path outside the workspace waits for an inline confirmation.
+        if (isInsideWorkspace(root, path)) open(address)
+        else setOutside({ path, address })
         return true
       },
     })
@@ -89,7 +96,7 @@ export function BrowserBody(props: BrowserBodyProps): ReactNode {
   const sandboxed = frame.sandboxEnabled
   const failure = state?.addressFailure
   const error = frame.error
-  const submit = (event: FormEvent): void => { event.preventDefault(); loadUrl(tab.id, draft) }
+  const submit = (event: FormEvent): void => { event.preventDefault(); setOutside(undefined); loadUrl(tab.id, draft) }
 
   return (
     <div className={css.root}>
@@ -128,6 +135,14 @@ export function BrowserBody(props: BrowserBodyProps): ReactNode {
         ? t('load.failed.detail', { code: String(error.code), description: error.description })
         : t('load.failed')}</div>}
       {failure !== undefined && <div className={css.failure} role="alert">{t(`error.${failure}`)}</div>}
+      {outside !== undefined && <div className={css.confirm} role="group" aria-label={t('outside.title')}>
+        <p className={css.confirmText}>{t('outside.title')}</p>
+        <p className={css.confirmPath}>{outside.path}</p>
+        <div className={css.confirmActions}>
+          <Button variant="primary" size="sm" onClick={() => { openResource(outside.address); setOutside(undefined) }}>{t('outside.open')}</Button>
+          <Button variant="outline" size="sm" onClick={() => { setOutside(undefined) }}>{t('outside.cancel')}</Button>
+        </div>
+      </div>}
       <div className={css.content} aria-busy={frame.loading}>
         <div id={viewportId} className={css.viewport} aria-label={t('type.label')} />
         {restoreTarget !== undefined && <section className={css.restore} aria-label={t('restore.previous')}>
