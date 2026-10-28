@@ -252,7 +252,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-api-settings-controller`
 
-- `source`: [`packages/api/settings-controller/src/index.ts:37`](../packages/api/settings-controller/src/index.ts)
+- `source`: [`packages/api/settings-controller/src/index.ts:39`](../packages/api/settings-controller/src/index.ts)
 
 ```ts config-catalog
 /** Host integrations replaceable by direct unit tests. */
@@ -315,7 +315,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-api-workspace-controller`
 
 - `inject`: `typert` · `workspaceRegistry`
-- `source`: [`packages/api/workspace-controller/src/index.ts:38`](../packages/api/workspace-controller/src/index.ts)
+- `source`: [`packages/api/workspace-controller/src/index.ts:40`](../packages/api/workspace-controller/src/index.ts)
 
 ```ts config-catalog
 /** First-use directory policy for the Host account. */
@@ -680,10 +680,42 @@ export interface Config {
   preference: Volatile<ThemePreference>
   /** Browser font size in pixels. */
   fontSize: Volatile<number>
+  /** Color theme choice. */
+  palette: Volatile<ThemeLook['palette']>
+  /** Accent color choice. */
+  accent: Volatile<ThemeLook['accent']>
+  /** Conversation backdrop choice. */
+  backdrop: Volatile<ThemeLook['backdrop']>
+  /** New Session background choice. */
+  hero: Volatile<ThemeLook['hero']>
+  /** Running-Turn mark choice. */
+  working: Volatile<ThemeLook['working']>
+  /** Decorative animation level. */
+  motion: Volatile<ThemeLook['motion']>
+  /** FORM signature visibility. */
+  signature: Volatile<ThemeLook['signature']>
 }
 
 /** Theme preference persisted by the product Appearance row. */
 export type ThemePreference = typeof THEME_PREFERENCES[number]
+
+/** Visual style choices persisted by the Style row and published on `body` as `data-dsh-<field>`. */
+export interface ThemeLook {
+  /** Color theme. */
+  palette: typeof THEME_LOOK_CHOICES.palette[number]
+  /** Accent color. */
+  accent: typeof THEME_LOOK_CHOICES.accent[number]
+  /** Conversation texture. */
+  backdrop: typeof THEME_LOOK_CHOICES.backdrop[number]
+  /** New Session background. */
+  hero: typeof THEME_LOOK_CHOICES.hero[number]
+  /** Running-Turn mark. */
+  working: typeof THEME_LOOK_CHOICES.working[number]
+  /** Decorative animation level. */
+  motion: typeof THEME_LOOK_CHOICES.motion[number]
+  /** FORM signature visibility. */
+  signature: typeof THEME_LOOK_CHOICES.signature[number]
+}
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-client-ui-theme -->
 
@@ -1648,7 +1680,7 @@ export interface Config extends ProtocolConfig {
 
 - `inject`: `llm`
 - `refs`: `Api` (`@earendil-works/pi-ai`) · `CacheRetention` (`@earendil-works/pi-ai`) · `Model` (`@earendil-works/pi-ai`) · `ModelThinkingLevel` (`@earendil-works/pi-ai`) · `OpenAICompletionsCompat` (`@earendil-works/pi-ai`) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · `ThinkingBudgets` (`@earendil-works/pi-ai`) · `Transport` (`@earendil-works/pi-ai`) · `Volatile` (`@deepseek-ai/cordis`)
-- `source`: [`packages/llm/llm-pi-ai/src/config.ts:246`](../packages/llm/llm-pi-ai/src/config.ts)
+- `source`: [`packages/llm/llm-pi-ai/src/config.ts:236`](../packages/llm/llm-pi-ai/src/config.ts)
 
 ```ts config-catalog
 /** Plugin configuration: the provider routes this instance owns. */

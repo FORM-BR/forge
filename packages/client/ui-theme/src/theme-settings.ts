@@ -54,7 +54,22 @@ export const THEME_LOOK_CHOICES = {
 export type ThemeLookField = keyof typeof THEME_LOOK_CHOICES
 
 /** Visual style choices persisted by the Style row and published on `body` as `data-dsh-<field>`. */
-export type ThemeLook = { [F in ThemeLookField]: typeof THEME_LOOK_CHOICES[F][number] }
+export interface ThemeLook {
+  /** Color theme. */
+  palette: typeof THEME_LOOK_CHOICES.palette[number]
+  /** Accent color. */
+  accent: typeof THEME_LOOK_CHOICES.accent[number]
+  /** Conversation texture. */
+  backdrop: typeof THEME_LOOK_CHOICES.backdrop[number]
+  /** New Session background. */
+  hero: typeof THEME_LOOK_CHOICES.hero[number]
+  /** Running-Turn mark. */
+  working: typeof THEME_LOOK_CHOICES.working[number]
+  /** Decorative animation level. */
+  motion: typeof THEME_LOOK_CHOICES.motion[number]
+  /** FORM signature visibility. */
+  signature: typeof THEME_LOOK_CHOICES.signature[number]
+}
 
 /** Look field names in Style-row order. */
 export const THEME_LOOK_FIELDS = Object.keys(THEME_LOOK_CHOICES) as ThemeLookField[]
