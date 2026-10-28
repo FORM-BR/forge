@@ -299,7 +299,11 @@ Apple 工具使用 macOS 当前活动网络服务的 HTTP/HTTPS 代理。配置�
 pnpm run package:desktop:win:x64:unsigned
 ```
 
-该命令要求设置 `DSH_DESKTOP_APP_ID` 并具备常规构建依赖，包括编译原生模块所需的 Python 和 Visual C++ 构建工具。Python 不在 `PATH` 中时，将 `PYTHON` 设置为其可执行文件路径。命令将安装包写入 `.desktop-build/targets/win-x64/unsigned-artifacts/`，省略自动更新配置，清除签名凭据，且不生成发布完成记录。它不需要 EV 凭据或更新源地址。签名打包和上传命令仍遵循正式发布要求。
+该命令要求设置 `DSH_DESKTOP_APP_ID` 并具备常规构建依赖，包括编译原生模块所需的 Python 和 Visual C++ 构建工具。Python 不在 `PATH` 中时，将 `PYTHON` 设置为其可执行文件路径。命令将安装包写入 `.desktop-build/targets/win-x64/unsigned-artifacts/`，清除签名凭据，且不生成发布完成记录。它不需要 EV 凭据或更新源地址。签名打包和上传命令仍遵循正式发布要求。
+
+未签名构建默认省略自动更新配置（`publish: null`）。同时设置 `DSH_DESKTOP_GITHUB_OWNER` 和 `DSH_DESKTOP_GITHUB_REPO` 会改为使用 electron-builder 的 `github` 提供方，指向该仓库——即便是未签名构建；分发未签名安装包的分支版本仍需要 `latest.yml`，这样 Desktop 的更新提示和脱离 Electron 的更新检查器才能把已安装版本与该仓库的 GitHub Releases 做比较。这两个变量必须同时设置或同时省略；只设置其中一个会被拒绝。
+
+另外三个可选变量让分支版本无需 fork macOS 打包与验收脚本里每一处写死的 `DeepSeek Harness` 路径即可重新命名安装包：`DSH_DESKTOP_PRODUCT_NAME` 覆盖安装包、开始菜单和窗口标题里显示的产品名（默认 `DeepSeek Harness`）；`DSH_DESKTOP_WINDOWS_ICON` 覆盖 Windows 安装包/应用图标 PNG 的绝对路径（默认 `resources/icon-windows.png`）。这四个变量均由 [`desktop-release-environment.mjs`](scripts/desktop-release-environment.mjs) 读取。
 
 ### Windows 安装界面
 

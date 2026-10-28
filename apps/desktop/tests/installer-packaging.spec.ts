@@ -75,6 +75,24 @@ describe('installer preparation preserves application dependencies', () => {
       DSH_DESKTOP_UNSIGNED: '1',
     }, 'win32', 'x64')
     expect(config.artifactName).toBe('deepseek-harness-${version}-${os}-${arch}-unsigned.${ext}')
+    expect(config.publish).toBeNull()
+  })
+
+  it('publishes through the GitHub provider when a fork configures its own repository, even unsigned', async () => {
+    const { createElectronBuilderConfig } = await import('../scripts/electron-builder-config.mjs')
+    const config = createElectronBuilderConfig({
+      DSH_DESKTOP_APP_ID: 'com.formbr.forge',
+      DSH_DESKTOP_PRODUCT_NAME: 'FORGE',
+      DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN: 'https://policy.example.com',
+      DSH_DESKTOP_MANDATORY_UPDATE_CONFIG: JSON.stringify({ allowedAuthOrigins: ['https://login.example.com'] }),
+      DSH_DESKTOP_TARGET_PLATFORM: 'win32',
+      DSH_DESKTOP_TARGET_ARCH: 'x64',
+      DSH_DESKTOP_UNSIGNED: '1',
+      DSH_DESKTOP_GITHUB_OWNER: 'FORM-BR',
+      DSH_DESKTOP_GITHUB_REPO: 'forge',
+    }, 'win32', 'x64')
+    expect(config.productName).toBe('FORGE')
+    expect(config.publish).toEqual([{ provider: 'github', owner: 'FORM-BR', repo: 'forge' }])
   })
 
   it('packages every preload entry point the shell loads', async () => {

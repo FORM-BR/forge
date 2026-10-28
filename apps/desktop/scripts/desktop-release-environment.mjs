@@ -3,6 +3,22 @@
 /** Environment variable that supplies the Electron application identifier. */
 export const DESKTOP_APP_ID_ENV = 'DSH_DESKTOP_APP_ID'
 
+/** Environment variable that overrides the packaged product name shown to the installer and OS; defaults to 'DeepSeek Harness'. */
+export const DESKTOP_PRODUCT_NAME_ENV = 'DSH_DESKTOP_PRODUCT_NAME'
+
+const DEFAULT_PRODUCT_NAME = 'DeepSeek Harness'
+
+/** Environment variable that overrides the Windows installer/app icon path (PNG); defaults to resources/icon-windows.png. */
+export const DESKTOP_WINDOWS_ICON_ENV = 'DSH_DESKTOP_WINDOWS_ICON'
+
+/** Environment variable naming the GitHub repository owner electron-updater checks for releases. */
+export const DESKTOP_GITHUB_OWNER_ENV = 'DSH_DESKTOP_GITHUB_OWNER'
+
+/** Environment variable naming the GitHub repository electron-updater checks for releases. */
+export const DESKTOP_GITHUB_REPO_ENV = 'DSH_DESKTOP_GITHUB_REPO'
+
+const GITHUB_OWNER_REPO_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/u
+
 /** Environment variable that supplies electron-builder's macOS certificate qualifier. */
 export const MACOS_SIGNING_IDENTITY_ENV = 'DSH_DESKTOP_MACOS_SIGNING_IDENTITY'
 
@@ -66,6 +82,54 @@ export function resolveDesktopAppId(env) {
     throw new Error(`desktop release environment: ${DESKTOP_APP_ID_ENV} must be a reverse-DNS identifier`)
   }
   return appId
+}
+
+/**
+ * Resolve the packaged product name shown in the installer, Start Menu, and window title.
+ * A fork distributing its own build sets this to rebrand the installer without forking
+ * every hardcoded 'DeepSeek Harness' path used by macOS packaging and qualification scripts.
+ * @param {NodeJS.ProcessEnv} env - Packaging environment.
+ * @returns {string} Trimmed product name; 'DeepSeek Harness' unless overridden.
+ */
+export function resolveDesktopProductName(env) {
+  const configured = env[DESKTOP_PRODUCT_NAME_ENV]?.trim() ?? ''
+  return configured === '' ? DEFAULT_PRODUCT_NAME : configured
+}
+
+/**
+ * Resolve an absolute override path for the Windows installer/app icon.
+ * @param {NodeJS.ProcessEnv} env - Packaging environment.
+ * @returns {string | undefined} Absolute PNG path, or undefined to keep the bundled default icon.
+ */
+export function resolveDesktopWindowsIconOverride(env) {
+  const configured = env[DESKTOP_WINDOWS_ICON_ENV]?.trim() ?? ''
+  return configured === '' ? undefined : configured
+}
+
+/**
+ * Resolve a GitHub-provider auto-update publish target, when configured.
+ * A build that sets both DSH_DESKTOP_GITHUB_OWNER and DSH_DESKTOP_GITHUB_REPO publishes
+ * electron-updater metadata (latest.yml) against that repository's GitHub Releases instead
+ * of the DeepSeek-owned Tencent COS deployment selected by DSH_DESKTOP_AUTO_UPDATE_ENV. This
+ * lets a fork distributing its own installer point its users at its own release feed without
+ * hardcoding an owner/repo in source (see the AGENTS.md rule against hardcoded tunables).
+ * @param {NodeJS.ProcessEnv} env - Packaging environment.
+ * @returns {{ owner: string, repo: string } | undefined} GitHub coordinates, or undefined to keep the default deployment.
+ */
+export function resolveDesktopGitHubPublishTarget(env) {
+  const owner = env[DESKTOP_GITHUB_OWNER_ENV]?.trim() ?? ''
+  const repo = env[DESKTOP_GITHUB_REPO_ENV]?.trim() ?? ''
+  if (owner === '' && repo === '') return undefined
+  if (owner === '' || repo === '') {
+    throw new Error(`desktop release environment: ${DESKTOP_GITHUB_OWNER_ENV} and ${DESKTOP_GITHUB_REPO_ENV} must both be set or both omitted`)
+  }
+  if (!GITHUB_OWNER_REPO_PATTERN.test(owner)) {
+    throw new Error(`desktop release environment: ${DESKTOP_GITHUB_OWNER_ENV} must be a valid GitHub owner name`)
+  }
+  if (!GITHUB_OWNER_REPO_PATTERN.test(repo)) {
+    throw new Error(`desktop release environment: ${DESKTOP_GITHUB_REPO_ENV} must be a valid GitHub repository name`)
+  }
+  return { owner, repo }
 }
 
 /**

@@ -297,7 +297,11 @@ On Windows x64, use the complete unsigned packaging command for local installati
 pnpm run package:desktop:win:x64:unsigned
 ```
 
-The command requires `DSH_DESKTOP_APP_ID` and the normal build dependencies, including Python and Visual C++ build tools for native modules. Set `PYTHON` to the Python executable when it is absent from `PATH`. It writes the installer to `.desktop-build/targets/win-x64/unsigned-artifacts/`, omits automatic-update configuration, strips signing credentials, and creates no release completion record. It does not require EV credentials or an update origin. The signed packaging and upload commands retain their release requirements.
+The command requires `DSH_DESKTOP_APP_ID` and the normal build dependencies, including Python and Visual C++ build tools for native modules. Set `PYTHON` to the Python executable when it is absent from `PATH`. It writes the installer to `.desktop-build/targets/win-x64/unsigned-artifacts/`, strips signing credentials, and creates no release completion record. It does not require EV credentials or an update origin. The signed packaging and upload commands retain their release requirements.
+
+By default an unsigned build omits automatic-update configuration (`publish: null`). Setting both `DSH_DESKTOP_GITHUB_OWNER` and `DSH_DESKTOP_GITHUB_REPO` switches `publish` to electron-builder's `github` provider against that repository instead, even for an unsigned build — a fork distributing its own unsigned installer still needs `latest.yml` so the Desktop update indicator and an out-of-Electron update checker can compare the installed version against that repository's GitHub Releases. Those two variables must both be set or both omitted; either alone is rejected.
+
+Three more optional variables let a fork rebrand the installer without forking every hardcoded `DeepSeek Harness` path the macOS packaging and qualification scripts use: `DSH_DESKTOP_PRODUCT_NAME` overrides the packaged product name shown in the installer, Start Menu, and window title (defaults to `DeepSeek Harness`); `DSH_DESKTOP_WINDOWS_ICON` overrides the absolute path to the Windows installer/app icon PNG (defaults to `resources/icon-windows.png`). All four variables are read by [`desktop-release-environment.mjs`](scripts/desktop-release-environment.mjs).
 
 ### Windows installer interface
 
