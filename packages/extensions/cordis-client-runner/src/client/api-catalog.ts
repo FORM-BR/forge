@@ -1005,11 +1005,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ThemeLook',
-    declaration: 'export type ThemeLook = {\n    [F in ThemeLookField]: typeof THEME_LOOK_CHOICES[F][number];\n};',
-  },
-  {
-    name: 'ThemeLookField',
-    declaration: 'export type ThemeLookField = keyof typeof THEME_LOOK_CHOICES;',
+    declaration: 'export interface ThemeLook {\n    palette: typeof THEME_LOOK_CHOICES.palette[number];\n    accent: typeof THEME_LOOK_CHOICES.accent[number];\n    backdrop: typeof THEME_LOOK_CHOICES.backdrop[number];\n    hero: typeof THEME_LOOK_CHOICES.hero[number];\n    working: typeof THEME_LOOK_CHOICES.working[number];\n    motion: typeof THEME_LOOK_CHOICES.motion[number];\n    signature: typeof THEME_LOOK_CHOICES.signature[number];\n}',
   },
   {
     name: 'ThemePreference',

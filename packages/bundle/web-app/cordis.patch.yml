@@ -151,10 +151,13 @@
     # Checks the configured GitHub repository's latest release on boot and on
     # an interval, for a Web/source install that has no electron-updater of
     # its own (the Desktop app's update indicator is separate). The controller
-    # itself stays idle until "config.repository" (owner/repo) is set.
+    # itself stays idle until "config.repository" (owner/repo) is set. While the
+    # repository is private GitHub answers 404: the check ends as "failed",
+    # which the client treats as silence.
     - id: update-check
       name: '@deepseek-ai/dsh-api-settings-controller/update-check'
       config:
+        repository: FORM-BR/forge
         intervalHours: 6
 
     # SQLite cost-history aggregates over Typert Remote for the costs Sidebar

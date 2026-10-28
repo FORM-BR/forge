@@ -193,6 +193,12 @@ describe('fetchGitHubLatestRelease', () => {
     expect(await fetchGitHubLatestRelease('FORM-BR', 'forge', undefined, new AbortController().signal)).toEqual({ kind: 'unavailable' })
   })
 
+  it('reports a private repository (HTTP 404) as a failed, release-less status', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{"message":"Not Found"}', { status: 404 })))
+    const { controller } = boot(fetchGitHubLatestRelease)
+    await vi.waitFor(() => { expect(controller.status()).toEqual({ enabled: true, checking: false, current: '1.0.0', failed: true }) })
+  })
+
   it('reports unavailable when fetch itself throws (network error, DNS failure, abort)', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network down') }))
     expect(await fetchGitHubLatestRelease('FORM-BR', 'forge', undefined, new AbortController().signal)).toEqual({ kind: 'unavailable' })

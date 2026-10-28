@@ -38,6 +38,8 @@ export const remoteDefaultResponses: RemoteTable = {
     'remoteAccess/status': ok({ state: 'off' }),
     'remoteAccess/enable': ok({ state: 'off' }),
     'remoteAccess/disable': ok({ state: 'off' }),
+    // ui-settings-general update notice: the Host reports its check as off.
+    'updateCheck/status': ok({ enabled: false }),
     // ui-permission-presets `PermissionCatalogDirectory` on its first read for a connection generation.
     'permissionPresets/catalog': ok({ options: [] }),
     // ui-settings-account refreshes details after a stored-grant snapshot.
