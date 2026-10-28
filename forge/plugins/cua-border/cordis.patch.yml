@@ -4,5 +4,5 @@
 # o pacote (@forge/cua-border) e use o nome do pacote.
 - insert:
     - id: experimental-cua-screen-border
-      name: 'C:/Users/Felipe/Dev/<checkout>/forge/plugins/cua-border/index.js'
+      name: 'C:/caminho/para/<checkout>/forge/plugins/cua-border/index.js'
       config: {}

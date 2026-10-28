@@ -25,9 +25,7 @@ só o registro no log.
 ## Como ligar num perfil
 
 No `cordis.patch.yml` do perfil, o `name` do insert pode apontar direto para o
-`index.js` (caminho absoluto; o loader reescreve para `file://` e importa) —
-é assim que o protótipo roda na porta 3082 (perfil `forge-dev` de
-`dsh-dev-home-3082`):
+`index.js` (caminho absoluto; o loader reescreve para `file://` e importa):
 
 ```yaml
 - insert:
