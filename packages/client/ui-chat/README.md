@@ -21,6 +21,7 @@ File-mention providers receive the viewed Session ID with the closing-turn owner
 - [Command and failure rows](#command-and-failure-rows)
 - [Turn token usage](#turn-token-usage)
 - [Completed-turn footer](#completed-turn-footer)
+- [Per-message branch and rewind](#per-message-branch-and-rewind)
 - [Turn Process Folding](#turn-process-folding)
 - [Grouped rendering](#grouped-rendering)
 - [Scroll ownership](#scroll-ownership)
@@ -70,6 +71,15 @@ Preference menus restore focus to their trigger without scrolling before publish
 Artifact extensions can subscribe to one Turn and Node kind through `ChatNodeStore.turnDataSource`. The source includes hidden Nodes and exposes their business data in anchor order. Membership updates incrementally; only observed collections materialize ordered arrays, and unrelated Turns or kinds do not notify them.
 
 The completed-turn action footer follows the recorded Turn end. Its action row starts 20px below preceding prose or extension content. Actions remain visible only on the latest Turn when its final visible content is a reply; other endings and historical Turns reveal actions on hover or keyboard focus. Devices without hover keep actions visible.
+
+-----
+
+<a id="per-message-branch-and-rewind"></a>
+## Per-message branch and rewind
+
+Every durable user, admitted-steering, and completed-turn message exposes Branch and Rewind actions, independent of its position in the transcript. Branch forks the source Session at the exact event preceding the message (or the exact `turn/end` for a completed-turn footer) and opens the child, keeping the source untouched and its inherited title incremented. Rewind forks the same cut point without incrementing the title, restores the message's text into the child's composer draft, archives the source Session, and opens the child under the source's original title — the visible effect of discarding the message and everything after it, implemented as fork-plus-archive rather than a log mutation (Session logs remain append-only; see [Known Limitations](#known-limitations-and-deferred-work)). Rewinding a Session's first message creates a blank sibling Session instead of forking, since there is no earlier event to cut at.
+
+Both actions resolve their cut point from the already-materialized Chat order (`branchPointBefore`); neither rescans the event window. Rewind asks for confirmation through a lightweight popover only when more than one later Turn is already loaded (`rewindNeedsConfirmation`); Branch never asks. Both actions render visible but inert, with a dedicated reason, while the Session's current turn is running.
 
 -----
 
@@ -164,6 +174,8 @@ None; Chat presentation does not assemble or mutate provider requests.
 
 - **The transcript reflects the loaded Session window** — older transcript nodes become available only after Session Controller loads the preceding event page. Turn navigation is wider than the window: the rail merges the loaded Turns with the host `turnOutline` projection, so every started Turn gets a fixed-pitch mark (10px apart; a ladder taller than the frame scrolls inside it with gradient fades), and activating an unloaded mark pages history through the Turn's `turn/start` seq before landing on its row. Without the projection (assemblies not mounting `dsh-session-turn-outline`) the rail falls back to loaded Turns only.
 - **Rail previews are card-sized** — one prompt line (50 characters) and up to three response lines (120), on loaded and unloaded Turns alike; an unloaded Turn's response arrives from the outline only once the Turn settled, so an open Turn previews its prompt (or just the Turn number) until then.
+
+- **Rewind is fork-plus-archive, not a log marker** — an append-only `session/rewind` event on the original Session (instead of forking into a new one and archiving the original) was considered and rejected for this iteration. It would require a new `SessionEventMap` member, a model-context-assembly change to skip rewound history, new snapshot and replay coverage, and matching TypeScript and Python SDK projections — out of proportion to the current per-message action. The current approach reuses the existing fork path unchanged and keeps the discarded history recoverable from Archived.
 
 
 <a id="dev-note"></a>

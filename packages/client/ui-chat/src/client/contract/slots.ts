@@ -52,6 +52,32 @@ export interface TurnTailOwnerProps {
   openFile: (path: string) => void
 }
 
+/**
+ * Per-message action: fork preserves the source Session; rewind additionally
+ * archives it and reopens the child under the same title.
+ */
+export type MessageBranchMode = 'branch' | 'rewind'
+
+/**
+ * Exact cut point for a per-message branch or rewind.
+ * - `after`: the inclusive event seq to fork from (a completed Turn's end,
+ *   or the event immediately preceding a user message).
+ * - `empty`: the cut precedes the Session's first message; the Host creates
+ *   a blank sibling Session instead of forking.
+ */
+export type MessageBranchPoint = { readonly kind: 'after'; readonly seq: number } | { readonly kind: 'empty' }
+
+/** One per-message branch or rewind request. */
+export interface MessageBranchRequest {
+  readonly point: MessageBranchPoint
+  readonly mode: MessageBranchMode
+  /** Text restored to the new Session's composer; empty for an assistant-message cut. */
+  readonly draftText: string
+  /** Stable identity of the message the action is anchored to, for analytics. */
+  readonly messageId?: MessageId
+  readonly clickPosition: 'message' | 'footer'
+}
+
 /** Owner currency of finalized-assistant actions. */
 export interface AssistantActionOwnerProps {
   messageId: MessageId
@@ -173,7 +199,7 @@ export interface ChatNodeOwnerProps {
   openSkill: (name: string) => void
   openFile: (path: string, options?: OpenFileOptions) => void
   inspectCall: ((callId: ToolCallId) => void) | undefined
-  forkAt: (seq: number) => void
+  branchAt: (request: MessageBranchRequest) => void
   /**
    * Session-authorized image loader, down-threaded from the Chat view so a
    * chat-node renderer can render the attachment presentation slot directly
@@ -265,7 +291,7 @@ export interface ChatViewInjected {
     save: (position: ChatScrollPosition | null) => void
     read: () => ChatScrollPosition | null
   }
-  forkAt: (seq: number) => void
+  branchAt: (request: MessageBranchRequest) => void
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
 }
 

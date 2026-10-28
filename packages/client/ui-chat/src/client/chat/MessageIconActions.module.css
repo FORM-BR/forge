@@ -110,3 +110,24 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+.confirmPopover {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  width: 240px;
+}
+
+.confirmText {
+  margin: 0;
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: 1.4;
+  color: var(--dsw-alias-label-primary);
+}
+
+.confirmButtons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

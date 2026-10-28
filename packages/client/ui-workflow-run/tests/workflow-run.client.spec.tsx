@@ -340,7 +340,7 @@ function panelProps(data: WorkflowRunChatData, sessions = listState(), openSessi
     openSkill: vi.fn(),
     openFile: () => {},
     inspectCall: () => {},
-    forkAt: () => {},
+    branchAt: () => {},
     loadImage: () => Promise.reject(new Error('not used')),
     renderMessageImages: () => null,
     fileMentions: () => undefined,

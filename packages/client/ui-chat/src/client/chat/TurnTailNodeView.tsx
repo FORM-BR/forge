@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import type { InjectFace, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ChatNodeViewProps, PerformanceUsageInjected, TurnTailOwnerProps } from '../contract/slots.ts'
+import { rewindNeedsConfirmation } from './branch-point.ts'
 import { MessageIconActions } from './MessageIconActions.tsx'
 import { TurnUsagePanel } from './TurnUsagePanel.tsx'
 import { assistantText } from './turn-assistant.ts'
@@ -26,10 +27,12 @@ function lastContent(snapshot: ChatSnapshot, turn: number, skipWarning: boolean)
 
 /** Turn-local actions and feature tail over the Location index, independent of Assistant placement. */
 export const TurnTailNodeView = memo(function TurnTailNodeView({
-  node, openFile, forkAt, renderSlot, t, useChat, usePerformanceUsage,
+  node, openFile, branchAt, renderSlot, t, useChat, useSession, usePerformanceUsage,
 }: TurnTailNodeViewProps) {
   const detailed = usePerformanceUsage(mode => mode) === 'detailed'
   const data = node.data
+  const running = useSession(s => s.running)
+  const confirmRequired = useChat(snapshot => rewindNeedsConfirmation(snapshot, data.turn))
   const hasLaterChatNode = useChat(snapshot =>
     (lastContent(snapshot, data.turn, true)?.anchorSeq ?? -1) > (data.closing?.finalNode.seq ?? data.seq))
   const endsWithResponse = useChat((snapshot) => {
@@ -64,10 +67,29 @@ export const TurnTailNodeView = memo(function TurnTailNodeView({
         text={assistantText(closing.blocks)}
         time={closing.time}
         clock="end"
-        // The branch action owns boundary resolution: it sends the real
-        // turn/end seq it already has, and the Host cuts exactly there.
-        onBranch={() => { forkAt(data.seq) }}
-        branchUnavailable={data.branchUnavailable || hasLaterChatNode}
+        // Both actions own the same boundary resolution: they send the real
+        // turn/end seq already at hand, and the Host cuts exactly there.
+        onRewind={() => {
+          branchAt({
+            point: { kind: 'after', seq: data.seq },
+            mode: 'rewind',
+            draftText: '',
+            ...closing.finalNode.messageId === undefined ? {} : { messageId: closing.finalNode.messageId },
+            clickPosition: 'message',
+          })
+        }}
+        onBranch={() => {
+          branchAt({
+            point: { kind: 'after', seq: data.seq },
+            mode: 'branch',
+            draftText: '',
+            ...closing.finalNode.messageId === undefined ? {} : { messageId: closing.finalNode.messageId },
+            clickPosition: 'footer',
+          })
+        }}
+        unavailable={data.branchUnavailable || hasLaterChatNode}
+        disabledWhileRunning={running}
+        rewindConfirmRequired={confirmRequired}
         className={css.actions}
         extraActions={assistantActions}
         usageAction={detailed && data.tokenUsage !== undefined

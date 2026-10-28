@@ -1,0 +1,43 @@
+/**
+ * Resolve the exact fork/rewind cut point that precedes a given Chat Node,
+ * from the already-materialized order index — never by rescanning the event window.
+ */
+import type { ChatSnapshot } from '../contract/snapshot.ts'
+import type { MessageBranchPoint } from '../contract/slots.ts'
+
+/**
+ * The cut point immediately before one Chat Node's own key, in display order.
+ * @param snapshot - current Chat snapshot.
+ * @param nodeKey - stable key of the Node to cut before (a user or steering message).
+ * @returns `{ kind: 'empty' }` when the Node is the first in the loaded order
+ * (the Session's first message); otherwise the predecessor's durable event seq.
+ */
+export function branchPointBefore(snapshot: ChatSnapshot, nodeKey: string): MessageBranchPoint {
+  const index = snapshot.order.indexOf(nodeKey)
+  if (index === -1) throw new Error(`ui-chat: node "${nodeKey}" is not in the current Chat order`)
+  if (index === 0) return { kind: 'empty' }
+  // `index > 0` guarantees the predecessor slot exists in the same ordered array.
+  const predecessor = snapshot.nodes.get(snapshot.order[index - 1] as string)
+  if (predecessor === undefined) {
+    throw new Error(`ui-chat: predecessor of node "${nodeKey}" is missing from the Chat node store`)
+  }
+  // `anchorSeq` is a sort position, not an event seq: Chat places follow-up
+  // Nodes at fractional offsets around their event (a turn-tail at
+  // `turn/end + 0.1`). The Host's fork accepts only an existing integer event
+  // seq, so round down to the durable event the position belongs to.
+  return { kind: 'after', seq: Math.floor(predecessor.anchorSeq) }
+}
+
+/**
+ * Whether rewinding at `turn` requires confirmation: more than one Turn
+ * follows it in the loaded timeline. A cut inside or at the end of the last
+ * or second-to-last Turn needs no confirmation.
+ * @param snapshot - current Chat snapshot.
+ * @param turn - Turn number the cut point falls in or immediately before.
+ * @returns whether more than one later Turn is loaded.
+ */
+export function rewindNeedsConfirmation(snapshot: ChatSnapshot, turn: number): boolean {
+  const index = snapshot.timeline.turnOrder.indexOf(turn)
+  if (index === -1) return snapshot.timeline.turnOrder.length > 1
+  return snapshot.timeline.turnOrder.length - index - 1 > 1
+}

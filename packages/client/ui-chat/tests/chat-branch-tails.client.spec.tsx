@@ -32,10 +32,25 @@ const t: ChatNodeViewProps['t'] = makeTranslate(zh, commonZh)
 const renderMessageImages: AssistantMarkdownProps['renderMessageImages'] = () => null
 const RETRY_ID = 'retry-fixture' as Extract<ConversationNode, { kind: 'model-retry' }>['retryId']
 
-// Recency scans the whole transcript; a detached fixture is its own latest row.
-const useDetachedChat: ChatNodeViewProps['useChat'] = bindSnapshotSelector({
+/**
+ * Recency scans the whole transcript; a detached fixture is its own latest
+ * row and its own sole predecessor (no evidence before it, so a rewind/branch
+ * resolves to the Session's empty-cut point — exactly a first-message fixture).
+ */
+function detachedChatSelector(viewNode: ChatConversationViewNode): ChatNodeViewProps['useChat'] {
+  return bindSnapshotSelector({
+    subscribe: () => () => {},
+    getSnapshot: () => ({
+      order: [viewNode.key],
+      nodes: new Map([[viewNode.key, viewNode]]),
+      timeline: { turnOrder: [], turns: new Map() },
+    }),
+  } as never)
+}
+
+const useIdleSession: ChatNodeViewProps['useSession'] = bindSnapshotSelector({
   subscribe: () => () => {},
-  getSnapshot: () => ({ order: [], nodes: new Map() }),
+  getSnapshot: () => ({ running: false }),
 } as never)
 
 interface MessageItemProps {
@@ -67,7 +82,8 @@ function MessageItem({ node, t: translate, referenceLabels, skillNames }: Messag
         : node,
   }
   const props = {
-    node: viewNode, t: translate, renderMessageImages, openFile: vi.fn(), openSkill: vi.fn(), useChat: useDetachedChat,
+    node: viewNode, t: translate, renderMessageImages, openFile: vi.fn(), openSkill: vi.fn(),
+    useChat: detachedChatSelector(viewNode), useSession: useIdleSession, branchAt: vi.fn(),
   } as unknown as ChatNodeViewProps
   switch (node.kind) {
     case 'user':
@@ -158,7 +174,7 @@ describe('MessageItem arms', () => {
     expect(resolved.container.textContent).toContain('/123 then ')
   })
 
-  it('user bubbles expose clock / copy and neither branch nor edit; copy writes the text', () => {
+  it('user bubbles expose clock / copy / rewind / branch but no edit; copy writes the text', () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -177,7 +193,8 @@ describe('MessageItem arms', () => {
     )
     expect(screen.getByText('14:24')).toBeTruthy()
     expect(screen.getByRole('button', { name: '复制' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: '在新对话中分支' })).toBeNull()
+    expect(screen.getByRole('button', { name: '在新对话中分支' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '退回到这里' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '编辑' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '复制' }))
     expect(writeText).toHaveBeenCalledWith('hello bubble')
@@ -324,7 +341,7 @@ describe('MessageItem arms', () => {
     expect(view.getByText(/附加内容块/)).toBeTruthy()
     fireEvent.click(view.getByRole('button', { name: '复制' }))
     expect(writeText).toHaveBeenCalledWith('steer!')
-    expect(view.queryByRole('button', { name: '在新对话中分支' })).toBeNull()
+    expect(view.getByRole('button', { name: '在新对话中分支' })).toBeTruthy()
   })
 
   it('context uses the Tool calls disclosure chrome and keeps its body collapsed by default', () => {

@@ -33,7 +33,9 @@ export interface ProductEventMap {
     session_id: SessionId
     parent_session_id: SessionId
     parent_message_id?: MessageId
-    click_position: 'footer' | 'sidebar'
+    click_position: 'footer' | 'sidebar' | 'message'
+    /** Omitted for the pre-existing turn-tail footer branch; present for the per-message actions. */
+    action?: 'branch' | 'rewind'
   }
   sidebar_menu_click: { menu_name: 'plugin' | 'cron' }
   plugin_toggle: { plugin_name: string; plugin_type: 'plugin' | 'bundle'; is_enabled: boolean; is_builtin: boolean }

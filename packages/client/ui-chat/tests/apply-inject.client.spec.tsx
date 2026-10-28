@@ -78,13 +78,20 @@ async function bench(initialSettings?: ChatSettings, withBrowserRegistry = true,
     () => Promise.resolve({ ok: true, value: { opened: true } }),
   )
   runtime.remote.provideNamespaces({ session: { openWorkspacePath } })
-  const openSession = vi.fn<(id: SessionId) => void>()
+  // Mirrors ui-workspace's real replaceMain: retains the target (source
+  // 'mainView') synchronously, before the caller's own reference releases, so
+  // a handoff between the two never passes through a zero-reference drop.
+  const openSession = vi.fn<(id: SessionId) => void>((id) => {
+    runtime.sessions.retain(id, { source: 'mainView' })
+  })
+  const archiveSession = vi.fn<(id: SessionId) => Promise<void>>(() => Promise.resolve())
   runtime.ctx.provide('uiWorkspace', {
     openWorkspace: vi.fn(async (_workspaceId: WorkspaceId, beforeOpen: (id: SessionId) => void) => {
       beforeOpen(ROOT)
       openSession(ROOT)
     }),
     openSession,
+    archiveSession,
   } as never)
   const session = sessionFakeFor()
   await runtime.sessions.add({
@@ -126,6 +133,7 @@ async function bench(initialSettings?: ChatSettings, withBrowserRegistry = true,
     },
     runtime, chat, chatSettings, browserAvailable,
     layout, openWorkspacePath, sidebarRight, sidebarRightTabs, session, chatViewApi, rootReference, openSession,
+    archiveSession,
   }
 }
 
@@ -173,9 +181,12 @@ describe('Chat inject API', () => {
 
     const track = vi.fn()
     b.runtime.ctx.provide('productAnalytics', { track } as never)
-    const forkCreated = vi.spyOn(b.runtime.sessions, 'fork').mockImplementation(async (input) => { input.onCreated?.(ROOT); return ROOT })
-    injected.forkAt(17)
-    expect(track).toHaveBeenCalledWith('branch_session_click', { session_id: ROOT, parent_session_id: ROOT, click_position: 'footer' })
+    injected.branchAt({ point: { kind: 'after', seq: 17 }, mode: 'branch', draftText: '', clickPosition: 'footer' })
+    await vi.waitFor(() => {
+      expect(track).toHaveBeenCalledWith('branch_session_click', {
+        session_id: ROOT, parent_session_id: ROOT, click_position: 'footer', action: 'branch',
+      })
+    })
     await b.runtime.sessions.replaceEvents(ROOT, [
       { type: 'event', event: { type: 'turn/start', seq: SessionSeq(10), time: 10, data: { turn: 1 } } },
       { type: 'event', event: { type: 'step/start', seq: SessionSeq(11), time: 11, data: { turn: 1, step: 1 } } },
@@ -184,23 +195,145 @@ describe('Chat inject API', () => {
       } } },
       { type: 'event', event: { type: 'turn/end', seq: SessionSeq(17), time: 17, data: { turn: 1, reason: { kind: 'completed' } } } },
     ])
-    injected.forkAt(17)
-    expect(track).toHaveBeenLastCalledWith('branch_session_click', { session_id: ROOT, parent_session_id: ROOT, parent_message_id: 'reply', click_position: 'footer' })
-    forkCreated.mockRestore()
-    injected.forkAt(17)
+    injected.branchAt({
+      point: { kind: 'after', seq: 17 }, mode: 'branch', draftText: '', messageId: MessageId('reply'), clickPosition: 'footer',
+    })
+    await vi.waitFor(() => {
+      expect(track).toHaveBeenLastCalledWith('branch_session_click', {
+        session_id: ROOT, parent_session_id: ROOT, parent_message_id: 'reply', click_position: 'footer', action: 'branch',
+      })
+    })
     await vi.waitFor(() => {
       expect(b.openSession).toHaveBeenCalledWith(ROOT)
     })
     expect(b.runtime.sessions.calls).toContainEqual({
-      method: 'fork', args: [{ sessionId: ROOT, atSeq: 17, increaseTitle: true, onCreated: expect.any(Function) as (childId: SessionId) => void }],
+      method: 'fork', args: [{ sessionId: ROOT, atSeq: 17, increaseTitle: true }],
     })
 
     const fork = vi.spyOn(b.runtime.sessions, 'fork').mockRejectedValueOnce(new Error('fork failed'))
-    injected.forkAt(18)
+    injected.branchAt({ point: { kind: 'after', seq: 18 }, mode: 'branch', draftText: '', clickPosition: 'footer' })
     await vi.waitFor(() => {
-      expect(fork).toHaveBeenCalledWith({
-        sessionId: ROOT, atSeq: 18, increaseTitle: true, onCreated: expect.any(Function) as (childId: SessionId) => void,
-      })
+      expect(fork).toHaveBeenCalledWith({ sessionId: ROOT, atSeq: 18, increaseTitle: true })
+    })
+    await b.runtime.dispose()
+  })
+
+  it('rewinds at the exact cut point: archives the source, restores the draft, and opens the child without a title bump', async () => {
+    const b = await bench()
+    const CHILD = 'root-child' as SessionId
+    await b.runtime.sessions.add({
+      id: CHILD,
+      summary: { title: 'R', displayTitle: 'R', cwd: '/proj' },
+      session: sessionFakeFor(),
+    })
+    const fork = vi.spyOn(b.runtime.sessions, 'fork').mockResolvedValue(CHILD)
+    const { injected } = b.chatViewApi(b.rootReference)
+    injected.branchAt({
+      point: { kind: 'after', seq: 9 }, mode: 'rewind', draftText: 'continue from here', clickPosition: 'message',
+    })
+    await vi.waitFor(() => {
+      // The exact inclusive Host boundary rewinds call sent, never incremented
+      // (increaseTitle is branch-only; rewind keeps the source title verbatim).
+      expect(fork).toHaveBeenCalledWith({ sessionId: ROOT, atSeq: 9, increaseTitle: false })
+    })
+    await vi.waitFor(() => {
+      const childReference = b.runtime.sessions.retain(CHILD)
+      try {
+        expect(b.runtime.ctx.conversation.input.for(childReference.binding.ctx).state.getSnapshot().draft)
+          .toBe('continue from here')
+      } finally {
+        childReference.release()
+      }
+    })
+    await vi.waitFor(() => {
+      expect(b.archiveSession).toHaveBeenCalledWith(ROOT)
+    })
+    await vi.waitFor(() => {
+      expect(b.openSession).toHaveBeenCalledWith(CHILD)
+    })
+    await b.runtime.dispose()
+  })
+
+  it('rewinds the first message of a Session into a new blank sibling instead of forking', async () => {
+    const b = await bench()
+    const BLANK = 'root-blank' as SessionId
+    await b.runtime.sessions.add({
+      id: BLANK,
+      summary: { title: 'B', displayTitle: 'B', cwd: '/proj' },
+      session: sessionFakeFor(),
+    })
+    b.runtime.sessions.stubCreate(() => Promise.resolve(BLANK))
+    const fork = vi.spyOn(b.runtime.sessions, 'fork')
+    const { injected } = b.chatViewApi(b.rootReference)
+    injected.branchAt({ point: { kind: 'empty' }, mode: 'rewind', draftText: 'first draft', clickPosition: 'message' })
+    await vi.waitFor(() => {
+      expect(b.runtime.sessions.calls).toContainEqual({ method: 'create', args: [{ cwd: '/proj' }] })
+    })
+    expect(fork).not.toHaveBeenCalled()
+    await vi.waitFor(() => {
+      const childReference = b.runtime.sessions.retain(BLANK)
+      try {
+        expect(b.runtime.ctx.conversation.input.for(childReference.binding.ctx).state.getSnapshot().draft)
+          .toBe('first draft')
+      } finally {
+        childReference.release()
+      }
+    })
+    await vi.waitFor(() => {
+      expect(b.archiveSession).toHaveBeenCalledWith(ROOT)
+      expect(b.openSession).toHaveBeenCalledWith(BLANK)
+    })
+    await b.runtime.dispose()
+  })
+
+  it('creates the blank sibling without a cwd when the source Session has none', async () => {
+    const b = await bench()
+    const NO_CWD = 'root-nocwd' as SessionId
+    const BLANK = 'root-blank2' as SessionId
+    await b.runtime.sessions.add({ id: NO_CWD, summary: { title: 'N', displayTitle: 'N' }, session: sessionFakeFor() })
+    await b.runtime.sessions.add({ id: BLANK, summary: { title: 'B', displayTitle: 'B' }, session: sessionFakeFor() })
+    b.runtime.sessions.stubCreate(() => Promise.resolve(BLANK))
+    using reference = b.runtime.sessions.retain(NO_CWD)
+    const { injected } = b.chatViewApi(reference)
+    injected.branchAt({ point: { kind: 'empty' }, mode: 'rewind', draftText: '', clickPosition: 'message' })
+    await vi.waitFor(() => {
+      expect(b.runtime.sessions.calls).toContainEqual({ method: 'create', args: [{}] })
+    })
+    await b.runtime.dispose()
+  })
+
+  it('still opens the child when archiving the source fails, and skips the draft write when empty', async () => {
+    const b = await bench()
+    const CHILD = 'root-child2' as SessionId
+    await b.runtime.sessions.add({ id: CHILD, summary: { title: 'R', displayTitle: 'R', cwd: '/proj' }, session: sessionFakeFor() })
+    vi.spyOn(b.runtime.sessions, 'fork').mockResolvedValue(CHILD)
+    b.archiveSession.mockRejectedValueOnce(new Error('archive refused'))
+    const setDraft = vi.spyOn(b.runtime.ctx.conversation.input, 'for')
+    const { injected } = b.chatViewApi(b.rootReference)
+    injected.branchAt({ point: { kind: 'after', seq: 4 }, mode: 'rewind', draftText: '', clickPosition: 'message' })
+    await vi.waitFor(() => {
+      // The refused archive is reported but never blocks navigation to the child.
+      expect(b.openSession).toHaveBeenCalledWith(CHILD)
+    })
+    // An empty draft performs no composer write at all.
+    expect(setDraft).not.toHaveBeenCalled()
+    await b.runtime.dispose()
+  })
+
+  it('opens the child even when its own initial open fails', async () => {
+    const b = await bench()
+    const CHILD = 'root-child3' as SessionId
+    await b.runtime.sessions.add({
+      id: CHILD,
+      summary: { title: 'R', displayTitle: 'R', cwd: '/proj' },
+      session: sessionFakeFor(),
+      initialOpen: () => Promise.reject(new Error('child open failed')),
+    })
+    vi.spyOn(b.runtime.sessions, 'fork').mockResolvedValue(CHILD)
+    const { injected } = b.chatViewApi(b.rootReference)
+    injected.branchAt({ point: { kind: 'after', seq: 6 }, mode: 'branch', draftText: 'x', clickPosition: 'message' })
+    await vi.waitFor(() => {
+      expect(b.openSession).toHaveBeenCalledWith(CHILD)
     })
     await b.runtime.dispose()
   })

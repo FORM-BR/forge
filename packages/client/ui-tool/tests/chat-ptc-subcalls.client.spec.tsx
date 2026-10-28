@@ -112,6 +112,12 @@ async function bench(snapshot: ChatSnapshot) {
     groups: { register: () => () => {} },
     binding: () => ({ target: () => chat, snapshot: conversation }),
   } as never)
+  // Only input.for's shape matters here: this suite never exercises
+  // rewind/branch draft restoration, but ui-chat's apply() now declares
+  // 'conversation' as a required inject and reads it eagerly.
+  ctx.provide('conversation', {
+    input: { for: () => { throw new Error('conversation.input.for: not used by this suite') } },
+  } as never)
   ctx.uiSession.provide({
     hooks: ['conversation'],
     resolve: () => ({ hooks: { conversation } }),
