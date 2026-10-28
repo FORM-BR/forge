@@ -17,6 +17,20 @@ export type BrowserAddressResult =
   | { readonly ok: false; readonly reason: BrowserAddressFailure }
 
 /**
+ * Whether an address-bar value is unambiguously a local file path rather than
+ * an HTTP(S) host. Only forms that can never parse as a bare hostname count:
+ * a POSIX or Windows absolute path, a Windows UNC share, or an explicit
+ * relative prefix (`./`, `../`, or their backslash spelling). A plain
+ * `name.ext` or `dir/name.ext` remains ambiguous with a hostname and is left
+ * to the HTTP(S) parser.
+ * @param input - trimmed address-bar value.
+ * @returns `true` when the value can only be a file path.
+ */
+export function looksLikeWorkspacePath(input: string): boolean {
+  return /^(?:\/|[A-Za-z]:[/\\]|\\\\|\.\.?[/\\])/u.test(input)
+}
+
+/**
  * Parse one address-bar value into the fixed protocol allowlist.
  * @param input - user or typed-open input.
  * @param applicationOrigin - current DSH document origin, blocked for HTTPS.

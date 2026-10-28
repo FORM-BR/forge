@@ -6,7 +6,7 @@ import type { BrowserFrameState } from './BrowserFrame.ts'
 import type { BrowserPage, BrowserPageFactory } from './BrowserPage.ts'
 import { currentBrowserTarget, type BrowserTabState } from './BrowserPersistence.ts'
 import type { BrowserStore } from './store.ts'
-import { parseBrowserAddress, type BrowserAddressFailure, type BrowserTarget } from './url.ts'
+import { looksLikeWorkspacePath, parseBrowserAddress, type BrowserAddressFailure, type BrowserTarget } from './url.ts'
 
 /** Live tab state; navigation comes from its provider and draft validation stays local. */
 export interface BrowserControllerState {
@@ -26,6 +26,11 @@ export interface BrowserControllerOptions {
   readonly actions: BoundActions<BrowserStore>
   readonly createPage: BrowserPageFactory
   readonly openTab: (url: string) => void
+  /**
+   * Route an address-bar value that is unambiguously a local file path to the
+   * Document Preview instead of navigating. @returns `true` when handled.
+   */
+  readonly openFilePath: (value: string) => boolean
 }
 
 /** Owns input validation and page lifetime without inspecting the carrier type. */
@@ -53,6 +58,7 @@ export class BrowserController implements HostObservable<BrowserControllerState>
       },
       openRequested: (value) => {
         if (this.disposed) return
+        if (looksLikeWorkspacePath(value.trim()) && options.openFilePath(value)) return
         const result = parseBrowserAddress(value, options.applicationOrigin)
         if (!result.ok) { this.addressFailed(result.reason); return }
         options.openTab(result.target.url)
@@ -105,10 +111,12 @@ export class BrowserController implements HostObservable<BrowserControllerState>
 
   /**
    * Validate an address before navigation, publishing invalid input for correction.
+   * An unambiguous local file path routes to the Document Preview instead.
    * @param value - address-bar or typed-open input.
    */
   loadUrl(value: string): void {
     if (this.disposed) return
+    if (looksLikeWorkspacePath(value.trim()) && this.options.openFilePath(value)) return
     const parsed = parseBrowserAddress(value, this.options.applicationOrigin)
     if (!parsed.ok) { this.addressFailed(parsed.reason); return }
     this.command(() => { this.page.frame.loadUrl(parsed.target) })
@@ -177,6 +185,8 @@ export interface BrowserMountRequest {
   readonly initial: BrowserTabState | undefined
   readonly initialUrl: string | undefined
   readonly openTab: (url: string) => void
+  /** See `BrowserControllerOptions.openFilePath`. */
+  readonly openFilePath: (value: string) => boolean
 }
 
 /** Plain Slot callbacks and a framework-bound state source, not a desktop protocol. */

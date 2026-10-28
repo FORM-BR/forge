@@ -38,7 +38,7 @@ const absentState = {
 }
 
 function mountBrowser(navigation?: { readonly url?: string },
-  options: { initial?: BrowserTabState; createPage?: BrowserPageFactory; refreshShortcut?: ReturnType<BrowserBodyProps['useTabInfo']>['tab']['refreshShortcut'] } = {}) {
+  options: { initial?: BrowserTabState; createPage?: BrowserPageFactory; cwd?: string; refreshShortcut?: ReturnType<BrowserBodyProps['useTabInfo']>['tab']['refreshShortcut'] } = {}) {
   const store = createBrowserStore().create(`browser-body-test-${String(++mountSequence)}`)
   if (options.initial !== undefined) store.actions.replace(TAB, options.initial)
   const lifetime = new AbortController()
@@ -47,9 +47,10 @@ function mountBrowser(navigation?: { readonly url?: string },
   controllers.push(injected)
   const { keyedHooks, ...commands } = injected
   const tabActions = { bindCommands: vi.fn<ReturnType<BrowserBodyProps['useTabInfo']>['tab']['actions']['bindCommands']>(() => vi.fn()), openResource: vi.fn(), openTab: vi.fn(), close: vi.fn() }
-  const props: Pick<BrowserBodyProps, 'sessionId' | 'useTabInfo' | 'useStore' | 'actions' | 't' | 'useBrowserState'>
+  const props: Pick<BrowserBodyProps, 'sessionId' | 'useSessions' | 'useTabInfo' | 'useStore' | 'actions' | 't' | 'useBrowserState'>
     & Omit<BrowserInjected, 'keyedHooks'> = {
       sessionId: SESSION,
+      useSessions: select => select({ ids: [SESSION], byId: { [SESSION]: { id: SESSION, displayTitle: 'Workspace', cwd: options.cwd, running: false, retainedBy: {}, blank: false, updatedAt: 0 } }, phase: 'ready', projectionsBySession: {} } as never),
       useTabInfo: () => ({
         sidebar: { expanded: true, fullscreen: false }, panel: { id: 'pane' as PaneId },
         tab: {
@@ -137,6 +138,56 @@ describe('BrowserBody', () => {
     fireEvent.change(input, { target: { value: 'file:///work/index.html' } })
     fireEvent.submit(input.closest('form')!)
     expect(mounted.view.getByRole('alert').textContent).toBe(zh['error.protocol'])
+  })
+
+  it('routes an unambiguous local file path to the right Sidebar instead of navigating', async () => {
+    const mounted = mountBrowser(undefined, { cwd: '/work' })
+    const input = mounted.view.getByRole('textbox')
+    fireEvent.change(input, { target: { value: './notes.md' } })
+    fireEvent.submit(input.closest('form')!)
+    await waitFor(() => { expect(mounted.tabActions.openResource).toHaveBeenCalledExactlyOnceWith('dsh-resource://file/session/session/notes.md') })
+    expect(mounted.view.container.querySelector('iframe')).toBeNull()
+    expect(mounted.view.queryByRole('alert')).toBeNull()
+    fireEvent.change(input, { target: { value: '/work/deep/plan.html' } })
+    fireEvent.submit(input.closest('form')!)
+    await waitFor(() => { expect(mounted.tabActions.openResource).toHaveBeenCalledTimes(2) })
+    expect(mounted.tabActions.openResource).toHaveBeenLastCalledWith('dsh-resource://file/session/session/deep/plan.html')
+  })
+
+  it('asks inline before opening a path outside the workspace, then opens or cancels', async () => {
+    const mounted = mountBrowser(undefined, { cwd: '/work' })
+    const input = mounted.view.getByRole('textbox')
+    for (const outside of ['/etc/hosts', '../secret.md', '/work/../etc/hosts']) {
+      fireEvent.change(input, { target: { value: outside } })
+      fireEvent.submit(input.closest('form')!)
+      await waitFor(() => { expect(mounted.view.getByRole('group', { name: zh['outside.title'] })).toBeDefined() })
+      expect(mounted.view.getByText(outside)).toBeDefined()
+      expect(mounted.tabActions.openResource).not.toHaveBeenCalled()
+    }
+    expect(mounted.view.getAllByRole('group')).toHaveLength(1)
+
+    fireEvent.click(mounted.view.getByRole('button', { name: zh['outside.cancel'] }))
+    expect(mounted.view.queryByRole('group')).toBeNull()
+    expect(mounted.tabActions.openResource).not.toHaveBeenCalled()
+
+    fireEvent.change(input, { target: { value: '../secret.md' } })
+    fireEvent.submit(input.closest('form')!)
+    await waitFor(() => { expect(mounted.view.getByRole('group')).toBeDefined() })
+    fireEvent.click(mounted.view.getByRole('button', { name: zh['outside.open'] }))
+    expect(mounted.tabActions.openResource).toHaveBeenCalledExactlyOnceWith('dsh-resource://file/session/session/../secret.md')
+    expect(mounted.view.queryByRole('group')).toBeNull()
+  })
+
+  it('dismisses the outside-workspace prompt when another address is submitted', async () => {
+    const mounted = mountBrowser(undefined, { cwd: '/work' })
+    const input = mounted.view.getByRole('textbox')
+    fireEvent.change(input, { target: { value: '/etc/hosts' } })
+    fireEvent.submit(input.closest('form')!)
+    await waitFor(() => { expect(mounted.view.getByRole('group')).toBeDefined() })
+    fireEvent.change(input, { target: { value: '/work/inside.md' } })
+    fireEvent.submit(input.closest('form')!)
+    expect(mounted.view.queryByRole('group')).toBeNull()
+    await waitFor(() => { expect(mounted.tabActions.openResource).toHaveBeenCalledExactlyOnceWith('dsh-resource://file/session/session/inside.md') })
   })
 
   it('renders HTTPS in the fixed sandbox and follows controller history', async () => {
@@ -245,6 +296,16 @@ describe('BrowserBody', () => {
     fireEvent.click(mounted.view.getByRole('button', { name: zh['sandbox.enable'] }))
     await waitFor(() => { expect(mounted.view.container.querySelector('iframe')?.getAttribute('sandbox')).toBe(WEB_BROWSER_SANDBOX) })
     expect(mounted.view.container.querySelector('iframe')?.getAttribute('src')).toBe('http://localhost:5173/')
+  })
+
+  it('keeps the system-browser button disabled and inert until a URL is loaded', () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+    const mounted = mountBrowser()
+    const button = mounted.view.getByRole('button', { name: zh.external })
+    expect(button).toHaveProperty('disabled', true)
+    expect(button.getAttribute('title')).toBe(zh.external)
+    fireEvent.click(button)
+    expect(open).not.toHaveBeenCalled()
   })
 
   it('opens known Web targets externally and consumes an initial typed navigation', async () => {

@@ -25,11 +25,11 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-Browser 在 Web profile 中默认禁用，在 Desktop 中默认启用。Web 用户可通过 profile patch 启用随附条目。可以从右侧 Sidebar guide 打开 **浏览器**并输入 HTTP(S) URL。Chat 的[链接偏好](../ui-chat/README.zh.md)选择**应用内侧边栏**时，HTTP(S) 链接会在此打开。不带 scheme 的主机名会补全为 HTTPS。公共目标与 loopback 目标使用相同的默认 sandbox。每次 guide 操作或委托到此的消息链接操作都会创建一个新的 Browser tab。
+Browser 在 Web profile 中默认禁用，在 Desktop 中默认启用。Web 用户可通过 profile patch 启用随附条目。可以从右侧 Sidebar guide 打开 **浏览器**并输入 HTTP(S) URL 或工作区文件路径。Chat 的[链接偏好](../ui-chat/README.zh.md)选择**应用内侧边栏**时，HTTP(S) 链接会在此打开。不带 scheme 的主机名会补全为 HTTPS。公共目标与 loopback 目标使用相同的默认 sandbox。每次 guide 操作或委托到此的消息链接操作都会创建一个新的 Browser tab。
 
 ### 何时选择
 
-当 Web 页面需要保留在当前 Session 旁时，选择 Browser。本地文件使用 [Document Preview](../ui-sidebar-documentpreview/README.zh.md)；站点拒绝 iframe 嵌入或需要本包不授予的浏览器 capability 时，使用明确的外部浏览器操作。
+当 Web 页面需要保留在当前 Session 旁时，选择 Browser。同一个地址栏也接受明确无歧义的本地文件路径——绝对路径（POSIX、Windows 盘符或 UNC）或显式相对路径（`./`、`../`）——并会在 [Document Preview](../ui-sidebar-documentpreview/README.zh.md) 中打开，而不是导航；普通的 `name` 或 `dir/name` 仍与主机名存在歧义，会按地址解析。解析后落在 Session 工作区之外的路径（先规范化分隔符与 `..`，Windows 写法不区分大小写）不会直接打开，面板内会先显示内联确认，提供“打开”和“取消”。站点拒绝 iframe 嵌入或需要本包不授予的浏览器 capability 时，使用明确的外部浏览器操作。
 
 ### 最小配置
 
@@ -44,7 +44,7 @@ Client 插件可以调用 `ctx.sidebarRight.openTab('browser', { params: { url }
 
 命令 `browser.new` 在焦点停靠分栏打开独立浏览器页，替换开始页并保留已有内容页。从聊天区或浮动内容页触发时，使用活动停靠分栏。桌面默认键在 macOS 上为 Cmd+T，在 Windows 上为 Ctrl+T；Windows 和 macOS Web 使用[快捷键服务的平台默认值](../shortcuts/README.zh.md)；Linux Web 默认不绑定此命令。开始页按钮使用蓝色地球图标，并在按钮内显示有效快捷键，不额外弹出重复提示。
 
-工具栏提供后退、前进、刷新、前往和在系统浏览器中打开。Web 还提供逐 tab sandbox 开关；关闭它是临时选择，并会显示灰字、琥珀色底的警告。Desktop 显示观察到的页面标题。重启后，Browser 展示保存的标题和 URL；只有点击恢复或刷新才打开该地址。
+预览在可调整大小的右侧 Sidebar 中打开（最宽可达窗口的 70%），也可展开为全屏，这就是与对话并排查看的受支持方式。工具栏提供后退、前进、刷新、前往和在系统浏览器中打开；最后一项在 Web 与 Desktop 中始终存在，加载 URL 前处于禁用状态，并在应用之外打开当前 URL，这是拒绝 iframe 嵌入的站点的出路（Web 无法可靠检测 `X-Frame-Options`）。Web 还提供逐 tab sandbox 开关；关闭它是临时选择，并会显示灰字、琥珀色底的警告。Desktop 显示观察到的页面标题。重启后，Browser 展示保存的标题和 URL；只有点击恢复或刷新才打开该地址。
 
 -----
 
@@ -57,6 +57,8 @@ Client 插件可以调用 `ctx.sidebarRight.openTab('browser', { params: { url }
 ### 协议策略
 
 地址解析器接受 HTTP 与 HTTPS，包括 loopback 目标。`file:` URL、脚本/data/blob 输入、内嵌凭据、DSH 应用自身 origin 和畸形地址会被拒绝。本地文件由 Document Preview 负责渲染。
+
+在该解析器运行之前，地址栏和 typed-open 请求会先检测该值是否属于明确无歧义的本地文件路径：POSIX 或 Windows 绝对路径、Windows UNC 共享路径，或显式的 `./`/`../` 相对前缀。命中时会通过所属 tab 的 `openResource` 动作打开该 Session 作用域下的文件地址，而不是导航；Browser tab 本身不受影响。其余形式——包括同样可能是裸主机名的普通 `name.ext` 或 `dir/name.ext`——都交给上面的 HTTP(S) 解析器处理，因此普通主机名仍会按 Web 地址解析。
 
 ### Iframe 载体
 

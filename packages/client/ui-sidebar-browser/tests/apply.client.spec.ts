@@ -93,7 +93,7 @@ describe('ui-sidebar-browser apply', () => {
     const tabId = 'apply-tab' as TabId
     try {
       controller.mount({ tabId, signal: signal.signal, viewportId: host.id, applicationOrigin: 'https://dsh.example',
-        initial: undefined, initialUrl: 'https://example.test/', openTab: vi.fn() })
+        initial: undefined, initialUrl: 'https://example.test/', openTab: vi.fn(), openFilePath: vi.fn(() => false) })
       expect(replacementStore.getSnapshot().byTab[tabId]).toBeDefined()
       expect(firstStore.getSnapshot().byTab[tabId]).toBeUndefined()
       if (protocolVersion === 1) await vi.waitFor(() => { expect(acquire).toHaveBeenCalledWith('session:session') })
@@ -103,13 +103,13 @@ describe('ui-sidebar-browser apply', () => {
       expect(replacementStore.getSnapshot().byTab[tabId]).toBeUndefined()
       const reopened = new AbortController()
       controller.mount({ tabId, signal: reopened.signal, viewportId: host.id, applicationOrigin: 'https://dsh.example',
-        initial: undefined, initialUrl: 'https://retained.example/', openTab: vi.fn() })
+        initial: undefined, initialUrl: 'https://retained.example/', openTab: vi.fn(), openFilePath: vi.fn(() => false) })
       h.openTabs.set([{ sessionId: 'session', tabId }])
       reopened.abort()
       expect(replacementStore.getSnapshot().byTab[tabId]).toBeDefined()
       const active = new AbortController()
       controller.mount({ tabId, signal: active.signal, viewportId: host.id, applicationOrigin: 'https://dsh.example',
-        initial: undefined, initialUrl: undefined, openTab: vi.fn() })
+        initial: undefined, initialUrl: undefined, openTab: vi.fn(), openFilePath: vi.fn(() => false) })
       await h.fiber.dispose()
       expect(controller.keyedHooks.browserState(tabId)).toBeUndefined()
     } finally {
