@@ -282,9 +282,7 @@ export class ThemeRuntime {
   private adopt(): void {
     const section = this.host.getSnapshot().value
     if (section === undefined) return
-    const look = Object.freeze(Object.fromEntries(
-      THEME_LOOK_FIELDS.map(field => [field, section[field]]),
-    ) as ThemeLook)
+    const look = lookOf(field => section[field])
     if (this.preference === section.preference && this.fontSize === section.fontSize
       && THEME_LOOK_FIELDS.every(field => this.look[field] === look[field])) return
     this.preference = section.preference
@@ -413,10 +411,27 @@ function bootstrapFontSize(): number {
 function bootstrapLook(): ThemeLook {
   /* v8 ignore next -- needs a documentless run (node e2e booting the client tree), not constructible under jsdom */
   if (typeof document === 'undefined') return DEFAULT_LOOK
-  return Object.freeze(Object.fromEntries(THEME_LOOK_FIELDS.map((field) => {
+  return lookOf((field) => {
     const raw = document.body.getAttribute(`data-dsh-${field}`)
-    return [field, isLookChoice(field, raw) ? raw : DEFAULT_LOOK[field]]
-  })) as ThemeLook)
+    return isLookChoice(field, raw) ? raw : DEFAULT_LOOK[field]
+  })
+}
+
+/**
+ * Build a frozen Look by reading each field once.
+ * @param read - value source for one field.
+ * @returns the Look with every field filled.
+ */
+function lookOf(read: <F extends ThemeLookField>(field: F) => ThemeLook[F]): ThemeLook {
+  return Object.freeze({
+    palette: read('palette'),
+    accent: read('accent'),
+    backdrop: read('backdrop'),
+    hero: read('hero'),
+    working: read('working'),
+    motion: read('motion'),
+    signature: read('signature'),
+  })
 }
 
 /**
