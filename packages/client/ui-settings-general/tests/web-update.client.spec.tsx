@@ -5,7 +5,7 @@ import type { GlobalStandardProps, PropsLocale } from '@deepseek-ai/dsh-client-u
 import { DesktopUpdateBadge } from '../src/client/DesktopUpdateIndicator.tsx'
 import { WebUpdateNotice } from '../src/client/WebUpdateNotice.tsx'
 import { WebUpdateRow } from '../src/client/WebUpdateRow.tsx'
-import { en, pt, zh } from './dictionaries.ts'
+import { en, pt, zh } from './dictionaries.client.ts'
 import type { WebUpdateView } from '../src/types.ts'
 
 afterEach(() => { cleanup() })
