@@ -24,6 +24,8 @@ import type { SettingsDocumentOpenValue } from './types.ts'
 
 export { CredentialsController } from './credentials.ts'
 export { RemoteAccessController } from './remote-access.ts'
+export { UpdateCheckController, fetchGitHubLatestRelease, isNewerVersion } from './update-check.ts'
+export type { Config as UpdateCheckConfig, GitHubLatestRelease, GitHubLatestReleaseCheck, GitHubLatestReleaseFetcher } from './update-check.ts'
 export type * from './types.ts'
 
 const settingsNamespaceRequestSchema = z.object({ ns: z.string().min(1) })

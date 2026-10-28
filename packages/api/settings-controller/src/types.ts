@@ -60,3 +60,19 @@ export interface RemoteAccessStatus {
   /** Short diagnostic for `failed`. */
   detail?: string
 }
+
+/** What a settings page shows for the GitHub release update check. */
+export interface UpdateCheckStatus {
+  /** Whether a repository is configured and the user preference has it on. */
+  enabled: boolean
+  /** A check is in flight or has never completed yet (only meaningful when `enabled`). */
+  checking?: boolean
+  /** The running build's version, for comparison display (only present when `enabled`). */
+  current?: string
+  /** The most recent check failed (network, timeout, or unparseable response); never an error shown as a hard failure. */
+  failed?: boolean
+  /** The latest GitHub release's version, present only when it is newer than `current`. */
+  newerVersion?: string
+  /** Release page to open for "See what's new", present only alongside `newerVersion`. */
+  releaseUrl?: string
+}

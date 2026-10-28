@@ -167,6 +167,22 @@ Host service backing the generated `ctx.remote.settings` namespace. Every remote
 
 Source: [`packages/api/settings-controller/src/index.ts`](../../packages/api/settings-controller/src/index.ts)
 
+<a id="ctxupdatecheckcontroller--updatecheckcontroller"></a>
+
+### `ctx.updateCheckController` — `UpdateCheckController`
+
+Host service backing the generated `ctx.remote.updateCheck` namespace. Polls `GET https://api.github.com/repos/<owner>/<repo>/releases/latest` once at boot and every `intervalHours` after that, and answers the last known result to any caller without triggering a new request.
+
+```ts cordis-catalog
+/**
+ * Read the last known result without triggering a new check.
+ * @returns whether checking is on, the current and latest versions, and the release page URL when a newer version is known.
+ */
+@Remote status(): UpdateCheckStatus
+```
+
+Source: [`packages/api/settings-controller/src/update-check.ts`](../../packages/api/settings-controller/src/update-check.ts)
+
 <a id="settings-events"></a>
 
 ### `settings/*` events
