@@ -19,7 +19,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 /** One resolved theme snapshot per scheme; the slot's theme hook serves these in the application. */
 const themeOf = (colorScheme: 'light' | 'dark'): ThemeSnapshot => ({
   preference: colorScheme, fontSize: 14,
-  active: { id: colorScheme, colorScheme, tokens: {} }, themes: [], revision: 0,
+  active: { id: colorScheme, colorScheme, tokens: {} }, themes: [], revision: 0, look: { palette: 'forge', accent: 'graphite', backdrop: 'plain', hero: 'constellation', working: 'anvil', motion: 'full', signature: 'on' },
 })
 
 function operationsOf(state: Omit<AccountView, 'links'>, details?: Partial<AccountDetails>, pages?: PlatformPages): AccountSectionInjected {

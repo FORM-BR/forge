@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import { workspaceDisplayTitle } from '@deepseek-ai/dsh-api-workspace-controller/default-workspace'
+import { ConstellationCanvas } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ConversationContentProps, ConversationViewsProps, InputZone } from '../contract/slots.ts'
 import { HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
 import css from './ConversationRoot.module.css'
@@ -199,12 +200,13 @@ export function ConversationContent(props: ConversationContentProps) {
   return (
     <div
       ref={setBody}
-      className={clsx(css.body, props.variant === 'embedded' && css.embeddedBody)}
+      className={clsx(css.body, props.variant === 'embedded' && css.embeddedBody, hero && css.heroBody)}
       data-conversation-content=""
       data-conversation-session={sessionId}
       data-conversation-region="chat"
       data-content-phase={phase}
     >
+      {hero && <ConstellationCanvas className={css.heroCanvas} />}
       {notice === null ? null : <div className={css.noticeSeat} data-conversation-region="notice">{notice}</div>}
       <div className={css.scrollBody} data-conversation-scroll="">
         {sessionId === undefined ? null : <Views />}

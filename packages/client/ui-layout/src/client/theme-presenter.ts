@@ -3,8 +3,10 @@
  * document — `html { color-scheme }` for native UA chrome (scrollbars, form
  * controls), `body[data-ds-dark-theme]` for the token palette, the active
  * theme's alias-token overrides as inline CSS variables on body, the content
- * font-size axis (`--dsh-content-font-size`), `html[data-ds-theme-source]`
- * for native-chrome mirroring, and one presenter-owned
+ * font-size axis (`--dsh-content-font-size`), one `body[data-dsh-<field>]`
+ * attribute per Look choice (accent, backdrop, hero, working, motion,
+ * signature) read by the stylesheets of the other client packages,
+ * `html[data-ds-theme-source]` for native-chrome mirroring, and one presenter-owned
  * `meta[name="theme-color"]` for surrounding browser UI. Pure DOM writes, no
  * React involvement; the presenter only ever retracts what it wrote itself,
  * so foreign attributes, metadata, and inline styles survive.
@@ -25,6 +27,9 @@ export const DARK_ATTRIBUTE = 'data-ds-dark-theme'
  */
 export const THEME_SOURCE_ATTRIBUTE = 'data-ds-theme-source'
 
+/** Body attribute prefix for the Look choices: `data-dsh-<field>="<value>"`. */
+export const LOOK_ATTRIBUTE_PREFIX = 'data-dsh-'
+
 /** Body variable carrying the user's content font size in px. */
 export const CONTENT_FONT_SIZE_VARIABLE = '--dsh-content-font-size'
 
@@ -32,6 +37,8 @@ export const CONTENT_FONT_SIZE_VARIABLE = '--dsh-content-font-size'
 export class ThemePresenter {
   /** Token names this presenter wrote in the last apply (its retraction set). */
   private appliedTokens: string[] = []
+  /** Look attribute names this presenter wrote in the last apply. */
+  private appliedLookAttributes: string[] = []
   /** The single metadata node this presenter inserts and removes. */
   private readonly themeColorMeta: HTMLMetaElement
 
@@ -45,7 +52,8 @@ export class ThemePresenter {
    * Project a snapshot onto the document: set root `color-scheme` and the body
    * palette attribute from `active.colorScheme` (never the id — `system` is
    * resolved upstream), publish the content font-size axis, then replace the
-   * previously applied token variables with `active.tokens`. Browser
+   * previously applied token variables with `active.tokens`, and mirror every
+   * `snapshot.look` choice onto a `body[data-dsh-<field>]` attribute. Browser
    * theme-color metadata follows the computed body background after those
    * writes, so the rendered palette remains the color authority.
    * @param snapshot - resolved theme snapshot from ctx.theme.
@@ -65,13 +73,21 @@ export class ThemePresenter {
       body.style.setProperty(name, value)
       this.appliedTokens.push(name)
     }
+    for (const name of this.appliedLookAttributes) body.removeAttribute(name)
+    this.appliedLookAttributes = []
+    for (const [field, value] of Object.entries(snapshot.look)) {
+      const name = `${LOOK_ATTRIBUTE_PREFIX}${field}`
+      body.setAttribute(name, value)
+      this.appliedLookAttributes.push(name)
+    }
     this.themeColorMeta.content = getComputedStyle(body).backgroundColor
     if (!this.themeColorMeta.isConnected) document.head.append(this.themeColorMeta)
   }
 
   /**
    * Retract root color-scheme, the theme-source attribute, the palette
-   * attribute, token variables, the font-size axis, and the owned metadata node.
+   * attribute, token variables, the font-size axis, the Look attributes, and
+   * the owned metadata node.
    */
   dispose(): void {
     document.documentElement.style.removeProperty('color-scheme')
@@ -81,6 +97,8 @@ export class ThemePresenter {
     body.style.removeProperty(CONTENT_FONT_SIZE_VARIABLE)
     for (const name of this.appliedTokens) body.style.removeProperty(name)
     this.appliedTokens = []
+    for (const name of this.appliedLookAttributes) body.removeAttribute(name)
+    this.appliedLookAttributes = []
     this.themeColorMeta.remove()
   }
 }

@@ -25,7 +25,7 @@ import { ConversationHeader } from '../src/client/skeleton/ConversationHeader.ts
 import { ConversationMainPanel } from '../src/client/skeleton/ConversationMainPanel.tsx'
 import { ConversationSession, ConversationSessionHeader } from '../src/client/skeleton/ConversationSession.tsx'
 import { conversationPhase } from '../src/client/contract/snapshot.ts'
-import { HeroShell } from '../src/client/skeleton/EmptyHero.tsx'
+import { HeroShell, workspaceLabel } from '../src/client/skeleton/EmptyHero.tsx'
 import type { HeroShellProps } from '../src/client/skeleton/EmptyHero.tsx'
 import './control-row-dom.ts'
 import { InputBar } from '../src/client/skeleton/InputBar.tsx'
@@ -404,6 +404,20 @@ describe('Hero chrome', () => {
     expect(brandMarkOwner.className).toBeTypeOf('string')
     expect(renderSlot.mock.calls[0]?.[2]?.fallback).toBeTruthy()
   })
+
+  it('labels the workspace chip by directory basename, echoing separator-only paths', () => {
+    expect(workspaceLabel('/home/dev/project')).toBe('project')
+    expect(workspaceLabel('/')).toBe('/')
+  })
+
+  it('renders the FORM signature under the headline', () => {
+    const en$ = render(<HeroShell t={makeTranslate(en, commonEn)} renderSlot={() => null} />)
+    expect(en$.getByText('Forged by FORM')).toBeTruthy()
+    expect(en$.container.querySelector('canvas')).toBeNull()
+    cleanup()
+    const zh$ = render(<HeroShell t={makeTranslate(zh, commonZh)} renderSlot={() => null} />)
+    expect(zh$.getByText('由 FORM 锻造')).toBeTruthy()
+  })
 })
 
 describe('ConversationRoot resident composer', () => {
@@ -523,6 +537,10 @@ describe('ConversationRoot resident composer', () => {
     expect(host?.contains(header)).toBe(false)
     expect(host?.contains(seat)).toBe(true)
     expect(seat?.contains(textarea)).toBe(true)
+    // No constellation and no hero-only stacking context outside the hero phase.
+    const content = b.view.container.querySelector('[data-conversation-content]')
+    expect(content?.querySelector('canvas')).toBeNull()
+    expect(content?.className).not.toContain('heroBody')
     expect(b.slotCalls).toContain('conversation.session.header.lineage')
     expect(b.slotCalls).toContain('conversation.header.leading')
     expect(b.slotCalls).toContain('conversation.session.header.actions')
@@ -557,6 +575,12 @@ describe('ConversationRoot resident composer', () => {
         { ...workspace('second'), title: 'Selected Folder' },
       ],
     )
+    // The constellation canvas is the content body's first child, aria-hidden, in the hero phase only.
+    const content = b.view.container.querySelector('[data-conversation-content]')
+    const canvas = content?.firstElementChild
+    expect(canvas?.tagName).toBe('CANVAS')
+    expect(canvas?.getAttribute('aria-hidden')).toBe('true')
+    expect(content?.className).toContain('heroBody')
     // Hero chrome is present and the selected View slot remains absent.
     const host = b.view.container.querySelector('[data-conversation-scroll]')
     const header = b.view.container.querySelector('header')

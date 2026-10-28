@@ -1,0 +1,20 @@
+/* About lines: two small secondary-tone lines closing the General section. */
+
+.about {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.link {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.link:hover {
+  color: var(--dsw-alias-label-primary);
+}

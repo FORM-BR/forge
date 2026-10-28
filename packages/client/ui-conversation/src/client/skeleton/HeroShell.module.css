@@ -44,6 +44,41 @@
   color: var(--dsw-alias-label-primary);
 }
 
+/* Quiet FORM signature under the headline; the Look can switch it off. */
+.signature {
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+:global(body[data-dsh-signature='off']) .signature {
+  display: none;
+}
+
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :global(body[data-dsh-motion='full']) .headline {
+    animation: hero-rise 220ms ease-out both;
+  }
+
+  :global(body[data-dsh-motion='full']) .signature {
+    animation: hero-rise 220ms ease-out 80ms both;
+  }
+}
+
 /* Title text + badge as one wrap unit so the title never breaks mid-text with
    the badge stranded beside a fragment. When the badge no longer fits beside
    the title it wraps to its own centered line below; while both fit, the group

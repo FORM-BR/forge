@@ -1,0 +1,31 @@
+/* The canvas paints in the owner's box; the owner's class sets position and
+   stacking. `color` is the line ink (the Look's second accent, else the
+   product accent) and `caret-color` the dust tone; the script reads both. */
+.canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  color: var(--dsh-accent-2, var(--dsw-alias-state-business-primary));
+  caret-color: var(--dsw-alias-label-tertiary);
+  /* Two soft static halos in the ink tone give the field depth at no per-frame cost. */
+  background:
+    radial-gradient(ellipse 55% 45% at 30% 28%, color-mix(in srgb, currentColor 9%, transparent), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 74% 72%, color-mix(in srgb, currentColor 7%, transparent), transparent 70%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :global(body[data-dsh-motion='full']) .canvas {
+    animation: constellation-in 700ms ease-out both;
+  }
+}
+
+@keyframes constellation-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}

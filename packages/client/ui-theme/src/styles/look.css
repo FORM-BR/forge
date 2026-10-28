@@ -1,0 +1,561 @@
+/* Look tokens: palettes, accents, and textures published as CSS variables.
+ * Selectors key on the body[data-dsh-*] attributes the Host boot script and
+ * ui-layout maintain. The default Look (forge palette, theme accent, plain
+ * texture) defines none of --dsh-accent*, --dsh-palette-* or --dsh-backdrop-*,
+ * so consumers read them with fallbacks. This sheet is the only place literal
+ * Look colors live; boot-theme.ts mirrors each palette base for first paint. */
+
+/* Sample tokens: always defined, so the Style row can preview inactive choices. */
+body {
+  --dsh-swatch-product: var(--dsw-static-deepseek-500);
+  --dsh-swatch-p-forge-bg: var(--dsw-static-neutral-bluish-00);
+  --dsh-swatch-p-forge-fg: var(--dsw-static-neutral-bluish-1000);
+  --dsh-swatch-p-forge-accent: var(--dsh-swatch-product);
+  --dsh-swatch-p-inform-bg: #f3f4f6;
+  --dsh-swatch-p-inform-fg: #1a1d23;
+  --dsh-swatch-p-inform-accent: #0f766e;
+  --dsh-swatch-p-ocean-bg: #eef3f8;
+  --dsh-swatch-p-ocean-fg: #14202b;
+  --dsh-swatch-p-ocean-accent: #0b6aa2;
+  --dsh-swatch-p-forest-bg: #eff4f0;
+  --dsh-swatch-p-forest-fg: #17231b;
+  --dsh-swatch-p-forest-accent: #1d7a45;
+  --dsh-swatch-p-coffee-bg: #f3f1ef;
+  --dsh-swatch-p-coffee-fg: #231c16;
+  --dsh-swatch-p-coffee-accent: #8a4513;
+  --dsh-swatch-p-tokyo-night-bg: #e1e2e7;
+  --dsh-swatch-p-tokyo-night-fg: #343b58;
+  --dsh-swatch-p-tokyo-night-accent: #2e7de9;
+  --dsh-swatch-p-catppuccin-bg: #eff1f5;
+  --dsh-swatch-p-catppuccin-fg: #4c4f69;
+  --dsh-swatch-p-catppuccin-accent: #1e66f5;
+  --dsh-swatch-p-nord-bg: #eceff4;
+  --dsh-swatch-p-nord-fg: #2e3440;
+  --dsh-swatch-p-nord-accent: #5e81ac;
+  --dsh-swatch-p-gruvbox-bg: #fbf1c7;
+  --dsh-swatch-p-gruvbox-fg: #3c3836;
+  --dsh-swatch-p-gruvbox-accent: #af3a03;
+  --dsh-swatch-p-rose-pine-bg: #faf4ed;
+  --dsh-swatch-p-rose-pine-fg: #463f69;
+  --dsh-swatch-p-rose-pine-accent: #b4637a;
+  --dsh-swatch-p-dracula-bg: #fffbeb;
+  --dsh-swatch-p-dracula-fg: #1f1f1f;
+  --dsh-swatch-p-dracula-accent: #644ac9;
+  --dsh-swatch-p-solarized-bg: #fdf6e3;
+  --dsh-swatch-p-solarized-fg: #073642;
+  --dsh-swatch-p-solarized-accent: #268bd2;
+  --dsh-swatch-a-graphite: #1f2329;
+  --dsh-swatch-a-graphite-2: #6b7280;
+  --dsh-swatch-a-forge: #b45309;
+  --dsh-swatch-a-forge-2: #d97706;
+  --dsh-swatch-a-inform: #14305a;
+  --dsh-swatch-a-inform-2: #0d9488;
+  --dsh-swatch-a-violet: #6d28d9;
+  --dsh-swatch-a-violet-2: #7c3aed;
+  --dsh-swatch-a-rose: #be185d;
+  --dsh-swatch-a-rose-2: #db2777;
+  --dsh-swatch-a-green: #15803d;
+  --dsh-swatch-a-green-2: #16a34a;
+  --dsh-swatch-a-cyan: #0e7490;
+  --dsh-swatch-a-cyan-2: #0891b2;
+  --dsh-tile-dots: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Ccircle cx='11' cy='11' r='1.5'/%3E%3C/svg%3E");
+  --dsh-tile-dots-size: 22px 22px;
+  --dsh-tile-grid: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M32 0H0V32' stroke='black' fill='none' stroke-width='1'/%3E%3C/svg%3E");
+  --dsh-tile-grid-size: 32px 32px;
+  --dsh-tile-waves: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='28'%3E%3Cpath d='M0 14Q30 2 60 14T120 14' stroke='black' fill='none' stroke-width='1.4'/%3E%3C/svg%3E");
+  --dsh-tile-waves-size: 120px 28px;
+  --dsh-tile-contour: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cpath d='M136,120L135,123L133,126L132,128L130,130L128,131L125,132L123,133L120,133L117,133L115,133L112,132L109,131L107,129L106,126L107,123L108,120L108,118L108,115L108,112L110,110L112,108L114,106L117,105L120,105L123,106L126,107L128,109L129,111L130,113L132,115L135,117L136,120Z M152,120L150,126L147,131L143,136L140,140L135,143L130,144L125,146L120,147L115,146L109,145L104,144L98,142L93,138L93,131L95,125L96,120L95,115L95,110L97,105L100,100L104,96L109,92L114,91L120,91L126,92L131,94L135,98L137,103L140,107L145,110L150,114L152,120Z M168,120L164,129L159,136L155,143L150,150L143,154L135,156L128,158L120,160L112,160L104,159L95,157L86,154L80,146L80,136L83,127L84,120L82,112L82,104L85,97L90,90L96,84L103,79L111,76L120,76L128,78L136,81L142,87L146,94L150,100L158,104L165,111L168,120Z M183,120L178,132L172,141L166,151L160,160L150,165L140,168L130,171L120,173L109,174L98,173L86,171L75,165L68,155L69,141L72,130L71,120L68,110L68,99L73,89L80,80L88,72L97,65L108,61L120,61L131,64L141,69L148,77L154,86L161,93L172,98L182,108L183,120Z M199,120L192,134L184,147L178,159L169,169L157,176L145,180L133,183L120,187L106,188L92,187L77,184L63,177L56,163L57,146L60,132L59,120L54,107L55,93L62,81L70,70L80,60L91,50L105,46L120,47L134,51L146,58L155,68L162,78L173,85L187,92L198,105L199,120Z M14,0L13,3L13,5L12,8L9,9L7,10L5,12L3,14L0,15L-3,15L-6,14L-8,12L-10,10L-11,7L-11,5L-13,3L-14,0L-14,-3L-13,-5L-12,-8L-10,-10L-9,-13L-6,-14L-3,-14L0,-13L2,-12L5,-12L7,-11L10,-10L13,-8L15,-6L15,-3L14,0Z M28,0L27,5L26,11L23,16L18,18L14,20L10,24L6,28L0,31L-6,31L-12,28L-16,24L-19,19L-21,14L-23,9L-26,5L-28,0L-28,-6L-26,-11L-23,-16L-21,-21L-18,-26L-12,-28L-5,-27L0,-25L5,-24L10,-24L15,-22L20,-20L25,-17L29,-12L29,-6L28,0Z M41,0L40,8L39,16L35,23L27,27L20,30L15,36L9,43L0,47L-9,46L-17,42L-24,36L-29,29L-32,21L-35,14L-39,8L-43,0L-42,-8L-38,-16L-35,-24L-32,-32L-26,-39L-17,-42L-8,-40L0,-37L7,-36L15,-36L23,-34L31,-31L38,-26L43,-18L43,-9L41,0Z M55,0L54,11L52,22L46,31L36,36L27,40L20,49L12,58L0,63L-12,61L-23,55L-32,47L-38,38L-42,28L-47,19L-53,10L-57,0L-56,-11L-51,-21L-47,-32L-43,-43L-35,-53L-23,-55L-10,-52L0,-49L10,-49L20,-48L31,-46L41,-41L51,-34L57,-24L57,-11L55,0Z M254,0L253,3L253,5L252,8L249,9L247,10L245,12L243,14L240,15L237,15L234,14L232,12L230,10L229,7L229,5L227,3L226,0L226,-3L227,-5L228,-8L230,-10L231,-13L234,-14L237,-14L240,-13L242,-12L245,-12L247,-11L250,-10L253,-8L255,-6L255,-3L254,0Z M268,0L267,5L266,11L263,16L258,18L254,20L250,24L246,28L240,31L234,31L228,28L224,24L221,19L219,14L217,9L214,5L212,0L212,-6L214,-11L217,-16L219,-21L222,-26L228,-28L235,-27L240,-25L245,-24L250,-24L255,-22L260,-20L265,-17L269,-12L269,-6L268,0Z M281,0L280,8L279,16L275,23L267,27L260,30L255,36L249,43L240,47L231,46L223,42L216,36L211,29L208,21L205,14L201,8L197,0L198,-8L202,-16L205,-24L208,-32L214,-39L223,-42L232,-40L240,-37L247,-36L255,-36L263,-34L271,-31L278,-26L283,-18L283,-9L281,0Z M295,0L294,11L292,22L286,31L276,36L267,40L260,49L252,58L240,63L228,61L217,55L208,47L202,38L198,28L193,19L187,10L183,0L184,-11L189,-21L193,-32L197,-43L205,-53L217,-55L230,-52L240,-49L250,-49L260,-48L271,-46L281,-41L291,-34L297,-24L297,-11L295,0Z M14,240L13,243L13,245L12,248L9,249L7,250L5,252L3,254L0,255L-3,255L-6,254L-8,252L-10,250L-11,247L-11,245L-13,243L-14,240L-14,237L-13,235L-12,232L-10,230L-9,227L-6,226L-3,226L0,227L2,228L5,228L7,229L10,230L13,232L15,234L15,237L14,240Z M28,240L27,245L26,251L23,256L18,258L14,260L10,264L6,268L0,271L-6,271L-12,268L-16,264L-19,259L-21,254L-23,249L-26,245L-28,240L-28,234L-26,229L-23,224L-21,219L-18,214L-12,212L-5,213L0,215L5,216L10,216L15,218L20,220L25,223L29,228L29,234L28,240Z M41,240L40,248L39,256L35,263L27,267L20,270L15,276L9,283L0,287L-9,286L-17,282L-24,276L-29,269L-32,261L-35,254L-39,248L-43,240L-42,232L-38,224L-35,216L-32,208L-26,201L-17,198L-8,200L0,203L7,204L15,204L23,206L31,209L38,214L43,222L43,231L41,240Z M55,240L54,251L52,262L46,271L36,276L27,280L20,289L12,298L0,303L-12,301L-23,295L-32,287L-38,278L-42,268L-47,259L-53,250L-57,240L-56,229L-51,219L-47,208L-43,197L-35,187L-23,185L-10,188L0,191L10,191L20,192L31,194L41,199L51,206L57,216L57,229L55,240Z M254,240L253,243L253,245L252,248L249,249L247,250L245,252L243,254L240,255L237,255L234,254L232,252L230,250L229,247L229,245L227,243L226,240L226,237L227,235L228,232L230,230L231,227L234,226L237,226L240,227L242,228L245,228L247,229L250,230L253,232L255,234L255,237L254,240Z M268,240L267,245L266,251L263,256L258,258L254,260L250,264L246,268L240,271L234,271L228,268L224,264L221,259L219,254L217,249L214,245L212,240L212,234L214,229L217,224L219,219L222,214L228,212L235,213L240,215L245,216L250,216L255,218L260,220L265,223L269,228L269,234L268,240Z M281,240L280,248L279,256L275,263L267,267L260,270L255,276L249,283L240,287L231,286L223,282L216,276L211,269L208,261L205,254L201,248L197,240L198,232L202,224L205,216L208,208L214,201L223,198L232,200L240,203L247,204L255,204L263,206L271,209L278,214L283,222L283,231L281,240Z M295,240L294,251L292,262L286,271L276,276L267,280L260,289L252,298L240,303L228,301L217,295L208,287L202,278L198,268L193,259L187,250L183,240L184,229L189,219L193,208L197,197L205,187L217,185L230,188L240,191L250,191L260,192L271,194L281,199L291,206L297,216L297,229L295,240Z' stroke='black' fill='none' stroke-width='1.1'/%3E%3C/svg%3E");
+  --dsh-tile-contour-size: 240px 240px;
+  --dsh-tile-hex: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='100'%3E%3Cpath d='M28 66L0 50L0 16L28 0L56 16L56 50L28 66L28 100' stroke='black' fill='none' stroke-width='1.2'/%3E%3Cpath d='M28 0L28 34L0 50L0 84L28 100L56 84L56 50L28 34' stroke='black' fill='none' stroke-width='1.2'/%3E%3C/svg%3E");
+  --dsh-tile-hex-size: 56px 100px;
+}
+
+body[data-ds-dark-theme] {
+  --dsh-swatch-product: var(--dsw-static-deepseek-400);
+  --dsh-swatch-p-forge-bg: var(--dsw-static-neutral-bluish-950);
+  --dsh-swatch-p-forge-fg: var(--dsw-static-neutral-bluish-50);
+  --dsh-swatch-p-forge-accent: var(--dsh-swatch-product);
+  --dsh-swatch-p-inform-bg: #101215;
+  --dsh-swatch-p-inform-fg: #e6e8ec;
+  --dsh-swatch-p-inform-accent: #3fbfae;
+  --dsh-swatch-p-ocean-bg: #0b141c;
+  --dsh-swatch-p-ocean-fg: #e3edf5;
+  --dsh-swatch-p-ocean-accent: #5aa9db;
+  --dsh-swatch-p-forest-bg: #0d1410;
+  --dsh-swatch-p-forest-fg: #e4efe7;
+  --dsh-swatch-p-forest-accent: #6cc08b;
+  --dsh-swatch-p-coffee-bg: #16120f;
+  --dsh-swatch-p-coffee-fg: #efe6dd;
+  --dsh-swatch-p-coffee-accent: #d6a072;
+  --dsh-swatch-p-tokyo-night-bg: #1a1b26;
+  --dsh-swatch-p-tokyo-night-fg: #c0caf5;
+  --dsh-swatch-p-tokyo-night-accent: #7aa2f7;
+  --dsh-swatch-p-catppuccin-bg: #1e1e2e;
+  --dsh-swatch-p-catppuccin-fg: #cdd6f4;
+  --dsh-swatch-p-catppuccin-accent: #89b4fa;
+  --dsh-swatch-p-nord-bg: #2e3440;
+  --dsh-swatch-p-nord-fg: #eceff4;
+  --dsh-swatch-p-nord-accent: #88c0d0;
+  --dsh-swatch-p-gruvbox-bg: #282828;
+  --dsh-swatch-p-gruvbox-fg: #ebdbb2;
+  --dsh-swatch-p-gruvbox-accent: #fe8019;
+  --dsh-swatch-p-rose-pine-bg: #191724;
+  --dsh-swatch-p-rose-pine-fg: #e0def4;
+  --dsh-swatch-p-rose-pine-accent: #ebbcba;
+  --dsh-swatch-p-dracula-bg: #282a36;
+  --dsh-swatch-p-dracula-fg: #f8f8f2;
+  --dsh-swatch-p-dracula-accent: #bd93f9;
+  --dsh-swatch-p-solarized-bg: #002b36;
+  --dsh-swatch-p-solarized-fg: #eee8d5;
+  --dsh-swatch-p-solarized-accent: #268bd2;
+  --dsh-swatch-a-graphite: #e8eaed;
+  --dsh-swatch-a-graphite-2: #9aa0a6;
+  --dsh-swatch-a-forge: #f0a24b;
+  --dsh-swatch-a-forge-2: #fbbf24;
+  --dsh-swatch-a-inform: #f4f7fa;
+  --dsh-swatch-a-inform-2: #2dd4bf;
+  --dsh-swatch-a-violet: #a78bfa;
+  --dsh-swatch-a-violet-2: #c4b5fd;
+  --dsh-swatch-a-rose: #f472b6;
+  --dsh-swatch-a-rose-2: #f9a8d4;
+  --dsh-swatch-a-green: #4ade80;
+  --dsh-swatch-a-green-2: #86efac;
+  --dsh-swatch-a-cyan: #22d3ee;
+  --dsh-swatch-a-cyan-2: #67e8f9;
+}
+
+/* Palettes: surfaces, text, and the accent the "theme" accent follows. */
+body[data-dsh-palette='inform'] {
+  --dsw-alias-bg-base: #f3f4f6;
+  --dsw-alias-bg-layer-1: #eef1f4;
+  --dsw-alias-bg-layer-2: #eceef3;
+  --dsw-alias-bg-layer-3: #e2e4e9;
+  --dsw-alias-bg-overlay: #fafafb;
+  --dsw-alias-bg-module-platform: #e2e3e5;
+  --dsw-specific-sidebar-fill: #eaebee;
+  --dsw-alias-label-primary: #1a1d23;
+  --dsw-alias-label-secondary: #4b5260;
+  --dsw-alias-label-tertiary: #6b7280;
+  --dsh-palette-accent: #0f766e;
+  --dsh-palette-accent-2: #5f52c2;
+}
+
+body[data-dsh-palette='inform'][data-ds-dark-theme] {
+  --dsw-alias-bg-base: #101215;
+  --dsw-alias-bg-layer-1: #121519;
+  --dsw-alias-bg-layer-2: #14161c;
+  --dsw-alias-bg-layer-3: #212328;
+  --dsw-alias-bg-overlay: #2e3033;
+  --dsw-alias-bg-module-platform: #2a2c2f;
+  --dsw-specific-sidebar-fill: #1b1d20;
+  --dsw-alias-label-primary: #e6e8ec;
+  --dsw-alias-label-secondary: #a3a9b5;
+  --dsw-alias-label-tertiary: #7d8491;
+  --dsh-palette-accent: #3fbfae;
+  --dsh-palette-accent-2: #b0a5ea;
+}
+
+body[data-dsh-palette='ocean'] {
+  --dsw-alias-bg-base: #eef3f8;
+  --dsw-alias-bg-layer-1: #e8f0f6;
+  --dsw-alias-bg-layer-2: #eaf3f4;
+  --dsw-alias-bg-layer-3: #dfe8ea;
+  --dsw-alias-bg-overlay: #f7fafc;
+  --dsw-alias-bg-module-platform: #dde2e8;
+  --dsw-specific-sidebar-fill: #e5ebf0;
+  --dsw-alias-label-primary: #14202b;
+  --dsw-alias-label-secondary: #43566a;
+  --dsw-alias-label-tertiary: #64788c;
+  --dsh-palette-accent: #0b6aa2;
+  --dsh-palette-accent-2: #0e7490;
+}
+
+body[data-dsh-palette='ocean'][data-ds-dark-theme] {
+  --dsw-alias-bg-base: #0b141c;
+  --dsw-alias-bg-layer-1: #0d1924;
+  --dsw-alias-bg-layer-2: #0c1a1e;
+  --dsw-alias-bg-layer-3: #19272b;
+  --dsw-alias-bg-overlay: #29323a;
+  --dsw-alias-bg-module-platform: #252e36;
+  --dsw-specific-sidebar-fill: #161f27;
+  --dsw-alias-label-primary: #e3edf5;
+  --dsw-alias-label-secondary: #9db3c6;
+  --dsw-alias-label-tertiary: #7690a6;
+  --dsh-palette-accent: #5aa9db;
+  --dsh-palette-accent-2: #5cc0b9;
+}
+
+body[data-dsh-palette='forest'] {
+  --dsw-alias-bg-base: #eff4f0;
+  --dsw-alias-bg-layer-1: #e9f1eb;
+  --dsw-alias-bg-layer-2: #eef1ea;
+  --dsw-alias-bg-layer-3: #e3e7e0;
+  --dsw-alias-bg-overlay: #f8faf8;
+  --dsw-alias-bg-module-platform: #dee3df;
+  --dsw-specific-sidebar-fill: #e6ece7;
+  --dsw-alias-label-primary: #17231b;
+  --dsw-alias-label-secondary: #455a4b;
+  --dsw-alias-label-tertiary: #647a6a;
+  --dsh-palette-accent: #1d7a45;
+  --dsh-palette-accent-2: #9a6a12;
+}
+
+body[data-dsh-palette='forest'][data-ds-dark-theme] {
+  --dsw-alias-bg-base: #0d1410;
+  --dsw-alias-bg-layer-1: #0f1913;
+  --dsw-alias-bg-layer-2: #131711;
+  --dsw-alias-bg-layer-3: #20241e;
+  --dsw-alias-bg-overlay: #2b332e;
+  --dsw-alias-bg-module-platform: #272e2a;
+  --dsw-specific-sidebar-fill: #181f1b;
+  --dsw-alias-label-primary: #e4efe7;
+  --dsw-alias-label-secondary: #a1b8a8;
+  --dsw-alias-label-tertiary: #789182;
+  --dsh-palette-accent: #6cc08b;
+  --dsh-palette-accent-2: #d4ae5c;
+}
+
+body[data-dsh-palette='coffee'] {
+  --dsw-alias-bg-base: #f3f1ef;
+  --dsw-alias-bg-layer-1: #efecea;
+  --dsw-alias-bg-layer-2: #f1edea;
+  --dsw-alias-bg-layer-3: #e7e3df;
+  --dsw-alias-bg-overlay: #faf9f8;
+  --dsw-alias-bg-module-platform: #e2e0de;
+  --dsw-specific-sidebar-fill: #ebe8e6;
+  --dsw-alias-label-primary: #231c16;
+  --dsw-alias-label-secondary: #5a4d42;
+  --dsw-alias-label-tertiary: #7a6b5f;
+  --dsh-palette-accent: #8a4513;
+  --dsh-palette-accent-2: #0f766e;
+}
+
+body[data-dsh-palette='coffee'][data-ds-dark-theme] {
+  --dsw-alias-bg-base: #16120f;
+  --dsw-alias-bg-layer-1: #1e1813;
+  --dsw-alias-bg-layer-2: #18130f;
+  --dsw-alias-bg-layer-3: #25201b;
+  --dsw-alias-bg-overlay: #34302c;
+  --dsw-alias-bg-module-platform: #302b28;
+  --dsw-specific-sidebar-fill: #211d19;
+  --dsw-alias-label-primary: #efe6dd;
+  --dsw-alias-label-secondary: #b9ab9c;
+  --dsw-alias-label-tertiary: #8f8173;
+  --dsh-palette-accent: #d6a072;
+  --dsh-palette-accent-2: #6cc4b7;
+}
+
+body[data-dsh-palette='tokyo-night'] {
+  --dsw-alias-bg-base: #e1e2e7;
+  --dsw-alias-bg-layer-1: #edeef1;
+  --dsw-alias-bg-layer-2: #d8dae0;
+  --dsw-alias-bg-layer-3: #d0d2d9;
+  --dsw-alias-bg-overlay: #f2f2f4;
+  --dsw-alias-bg-module-platform: #d3d5dc;
+  --dsw-specific-sidebar-fill: #dadbe1;
+  --dsw-alias-label-primary: #343b58;
+  --dsw-alias-label-secondary: #4c5279;
+  --dsw-alias-label-tertiary: #6f769c;
+  --dsh-palette-accent: #2e7de9;
+  --dsh-palette-accent-2: #9854f1;
+}
+
+body[data-dsh-palette='tokyo-night'][data-ds-dark-theme] {
+  --dsw-alias-bg-base: #1a1b26;
+  --dsw-alias-bg-layer-1: #1f2335;
+  --dsw-alias-bg-layer-2: #24283b;
+  --dsw-alias-bg-layer-3: #2d3246;
+  --dsw-alias-bg-overlay: #313443;
+  --dsw-alias-bg-module-platform: #2e303f;
+  --dsw-specific-sidebar-fill: #16161e;
+  --dsw-alias-label-primary: #c0caf5;
+  --dsw-alias-label-secondary: #a9b1d6;
+  --dsw-alias-label-tertiary: #7982a9;
+  --dsh-palette-accent: #7aa2f7;
+  --dsh-palette-accent-2: #bb9af7;
+}
+
+body[data-dsh-palette='catppuccin'] {
+  --dsw-alias-bg-base: #eff1f5;
+  --dsw-alias-bg-layer-1: #f5f6f9;
+  --dsw-alias-bg-layer-2: #e6e9ef;
+  --dsw-alias-bg-layer-3: #dee1e8;
+  --dsw-alias-bg-overlay: #f8f9fb;
+  --dsw-alias-bg-module-platform: #e2e4ea;
+  --dsw-specific-sidebar-fill: #e6e9ef;
+  --dsw-alias-label-primary: #4c4f69;
+  --dsw-alias-label-secondary: #5c5f77;
+  --dsw-alias-label-tertiary: #7c7f93;
+  --dsh-palette-accent: #1e66f5;
+  --dsh-palette-accent-2: #8839ef;
+}
+
+body[data-dsh-palette='catppuccin'][data-ds-dark-theme] {
+  --dsw-alias-bg-base: #1e1e2e;
+  --dsw-alias-bg-layer-1: #242435;
+  --dsw-alias-bg-layer-2: #313244;
+  --dsw-alias-bg-layer-3: #3a3c4f;
+  --dsw-alias-bg-overlay: #37384a;
+  --dsw-alias-bg-module-platform: #333446;
+  --dsw-specific-sidebar-fill: #181825;
+  --dsw-alias-label-primary: #cdd6f4;
+  --dsw-alias-label-secondary: #bac2de;
+  --dsw-alias-label-tertiary: #8c91ab;
+  --dsh-palette-accent: #89b4fa;
+  --dsh-palette-accent-2: #cba6f7;
+}
+
+body[data-dsh-palette='nord'] {
+  --dsw-alias-bg-base: #eceff4;
+  --dsw-alias-bg-layer-1: #f3f5f9;
+  --dsw-alias-bg-layer-2: #e5e9f0;
+  --dsw-alias-bg-layer-3: #dce0e7;
+  --dsw-alias-bg-overlay: #f6f8fa;
+  --dsw-alias-bg-module-platform: #dde0e6;
+  --dsw-specific-sidebar-fill: #e5e9f0;
+  --dsw-alias-label-primary: #2e3440;
+  --dsw-alias-label-secondary: #434c5e;
+  --dsw-alias-label-tertiary: #68738b;
+  --dsh-palette-accent: #5e81ac;
+  --dsh-palette-accent-2: #81a1c1;
+}
+
+body[data-dsh-palette='nord'][data-ds-dark-theme] {
+  --dsw-alias-bg-base: #2e3440;
+  --dsw-alias-bg-layer-1: #3b4252;
+  --dsw-alias-bg-layer-2: #434c5e;
+  --dsw-alias-bg-layer-3: #4d5667;
+  --dsw-alias-bg-overlay: #494e59;
+  --dsw-alias-bg-module-platform: #454a56;
+  --dsw-specific-sidebar-fill: #2a303b;
+  --dsw-alias-label-primary: #eceff4;
+  --dsw-alias-label-secondary: #d8dee9;
+  --dsw-alias-label-tertiary: #a2adc2;
+  --dsh-palette-accent: #88c0d0;
+  --dsh-palette-accent-2: #81a1c1;
+}
+
+body[data-dsh-palette='gruvbox'] {
+  --dsw-alias-bg-base: #fbf1c7;
+  --dsw-alias-bg-layer-1: #f9f5d7;
+  --dsw-alias-bg-layer-2: #ebdbb2;
+  --dsw-alias-bg-layer-3: #e2d3ac;
+  --dsw-alias-bg-overlay: #fdf9e6;
+  --dsw-alias-bg-module-platform: #ece2bb;
+  --dsw-specific-sidebar-fill: #f2e5bc;
+  --dsw-alias-label-primary: #3c3836;
+  --dsw-alias-label-secondary: #504945;
+  --dsw-alias-label-tertiary: #7c6f64;
+  --dsh-palette-accent: #af3a03;
+  --dsh-palette-accent-2: #b57614;
+}
+
+body[data-dsh-palette='gruvbox'][data-ds-dark-theme] {
+  --dsw-alias-bg-base: #282828;
+  --dsw-alias-bg-layer-1: #32302f;
+  --dsw-alias-bg-layer-2: #3c3836;
+  --dsw-alias-bg-layer-3: #47423d;
+  --dsw-alias-bg-overlay: #43413b;
+  --dsw-alias-bg-module-platform: #3f3d39;
+  --dsw-specific-sidebar-fill: #1d2021;
+  --dsw-alias-label-primary: #ebdbb2;
+  --dsw-alias-label-secondary: #d5c4a1;
+  --dsw-alias-label-tertiary: #a89984;
+  --dsh-palette-accent: #fe8019;
+  --dsh-palette-accent-2: #fabd2f;
+}
+
+body[data-dsh-palette='rose-pine'] {
+  --dsw-alias-bg-base: #faf4ed;
+  --dsw-alias-bg-layer-1: #fffaf3;
+  --dsw-alias-bg-layer-2: #f2e9e1;
+  --dsw-alias-bg-layer-3: #e9e1db;
+  --dsw-alias-bg-overlay: #fdfaf7;
+  --dsw-alias-bg-module-platform: #ece6e2;
+  --dsw-specific-sidebar-fill: #f4ede8;
+  --dsw-alias-label-primary: #463f69;
+  --dsw-alias-label-secondary: #625c83;
+  --dsw-alias-label-tertiary: #837e9c;
+  --dsh-palette-accent: #b4637a;
+  --dsh-palette-accent-2: #907aa9;
+}
+
+body[data-dsh-palette='rose-pine'][data-ds-dark-theme] {
+  --dsw-alias-bg-base: #191724;
+  --dsw-alias-bg-layer-1: #1f1d2e;
+  --dsw-alias-bg-layer-2: #26233a;
+  --dsw-alias-bg-layer-3: #312e45;
+  --dsw-alias-bg-overlay: #353341;
+  --dsw-alias-bg-module-platform: #312f3d;
+  --dsw-specific-sidebar-fill: #16141f;
+  --dsw-alias-label-primary: #e0def4;
+  --dsw-alias-label-secondary: #b3b0cf;
+  --dsw-alias-label-tertiary: #8683a1;
+  --dsh-palette-accent: #ebbcba;
+  --dsh-palette-accent-2: #c4a7e7;
+}
+
+body[data-dsh-palette='dracula'] {
+  --dsw-alias-bg-base: #fffbeb;
+  --dsw-alias-bg-layer-1: #fffdf4;
+  --dsw-alias-bg-layer-2: #f3efdc;
+  --dsw-alias-bg-layer-3: #e8e5d3;
+  --dsw-alias-bg-overlay: #fffdf6;
+  --dsw-alias-bg-module-platform: #ede9db;
+  --dsw-specific-sidebar-fill: #f6f2e0;
+  --dsw-alias-label-primary: #1f1f1f;
+  --dsw-alias-label-secondary: #4a4636;
+  --dsw-alias-label-tertiary: #6c664b;
+  --dsh-palette-accent: #644ac9;
+  --dsh-palette-accent-2: #a3144d;
+}
+
+body[data-dsh-palette='dracula'][data-ds-dark-theme] {
+  --dsw-alias-bg-base: #282a36;
+  --dsw-alias-bg-layer-1: #2f3140;
+  --dsw-alias-bg-layer-2: #363948;
+  --dsw-alias-bg-layer-3: #424452;
+  --dsw-alias-bg-overlay: #454750;
+  --dsw-alias-bg-module-platform: #41434d;
+  --dsw-specific-sidebar-fill: #21222c;
+  --dsw-alias-label-primary: #f8f8f2;
+  --dsw-alias-label-secondary: #c6c8d8;
+  --dsw-alias-label-tertiary: #8e9bc7;
+  --dsh-palette-accent: #bd93f9;
+  --dsh-palette-accent-2: #ff79c6;
+}
+
+body[data-dsh-palette='solarized'] {
+  --dsw-alias-bg-base: #fdf6e3;
+  --dsw-alias-bg-layer-1: #fffbee;
+  --dsw-alias-bg-layer-2: #eee8d5;
+  --dsw-alias-bg-layer-3: #e2dfce;
+  --dsw-alias-bg-overlay: #fefbf2;
+  --dsw-alias-bg-module-platform: #e9e7d6;
+  --dsw-specific-sidebar-fill: #f5eed9;
+  --dsw-alias-label-primary: #073642;
+  --dsw-alias-label-secondary: #586e75;
+  --dsw-alias-label-tertiary: #657b83;
+  --dsh-palette-accent: #268bd2;
+  --dsh-palette-accent-2: #2aa198;
+}
+
+body[data-dsh-palette='solarized'][data-ds-dark-theme] {
+  --dsw-alias-bg-base: #002b36;
+  --dsw-alias-bg-layer-1: #05323d;
+  --dsw-alias-bg-layer-2: #073642;
+  --dsw-alias-bg-layer-3: #15414b;
+  --dsw-alias-bg-overlay: #21454c;
+  --dsw-alias-bg-module-platform: #1d4249;
+  --dsw-specific-sidebar-fill: #00232c;
+  --dsw-alias-label-primary: #eee8d5;
+  --dsw-alias-label-secondary: #93a1a1;
+  --dsw-alias-label-tertiary: #839496;
+  --dsh-palette-accent: #268bd2;
+  --dsh-palette-accent-2: #2aa198;
+}
+
+/* Explicit accents. */
+body[data-dsh-accent='graphite'] {
+  --dsh-accent: var(--dsh-swatch-a-graphite);
+  --dsh-accent-2: var(--dsh-swatch-a-graphite-2);
+}
+
+body[data-dsh-accent='forge'] {
+  --dsh-accent: var(--dsh-swatch-a-forge);
+  --dsh-accent-2: var(--dsh-swatch-a-forge-2);
+}
+
+body[data-dsh-accent='inform'] {
+  --dsh-accent: var(--dsh-swatch-a-inform);
+  --dsh-accent-2: var(--dsh-swatch-a-inform-2);
+}
+
+body[data-dsh-accent='violet'] {
+  --dsh-accent: var(--dsh-swatch-a-violet);
+  --dsh-accent-2: var(--dsh-swatch-a-violet-2);
+}
+
+body[data-dsh-accent='rose'] {
+  --dsh-accent: var(--dsh-swatch-a-rose);
+  --dsh-accent-2: var(--dsh-swatch-a-rose-2);
+}
+
+body[data-dsh-accent='green'] {
+  --dsh-accent: var(--dsh-swatch-a-green);
+  --dsh-accent-2: var(--dsh-swatch-a-green-2);
+}
+
+body[data-dsh-accent='cyan'] {
+  --dsh-accent: var(--dsh-swatch-a-cyan);
+  --dsh-accent-2: var(--dsh-swatch-a-cyan-2);
+}
+
+/* The theme accent follows the palette; with the forge palette both stay undefined. */
+body[data-dsh-accent='theme'] {
+  --dsh-accent: var(--dsh-palette-accent);
+  --dsh-accent-2: var(--dsh-palette-accent-2);
+}
+
+/* Visible accent: re-points the product tokens that paint the send button, links,
+ * the working label, and the preview badge. Never applies to the default Look,
+ * which keeps the product blue. */
+body[data-dsh-accent]:not([data-dsh-accent='theme']),
+body[data-dsh-accent='theme'][data-dsh-palette]:not([data-dsh-palette='forge']) {
+  --dsw-alias-brand-primary: var(--dsh-accent);
+  --dsw-alias-state-business-primary: var(--dsh-accent);
+  --dsw-alias-button-info-fill: var(--dsh-accent);
+  --dsw-alias-button-info-hover: color-mix(in srgb, var(--dsh-accent) 82%, white);
+  --dsw-alias-link: var(--dsh-accent);
+  --dsw-alias-brand-primary-new-colorprimary-new-color: var(--dsh-accent);
+  --dsw-alias-label-primary-bluish: var(--dsh-accent);
+  --dsw-alias-state-business-tertiary: color-mix(in srgb, var(--dsh-accent) 16%, var(--dsw-alias-bg-base));
+  --dsw-alias-label-deep-diving: color-mix(in srgb, var(--dsh-accent) 75%, var(--dsw-alias-label-primary));
+  --dsw-alias-label-deep-diving-shimmer: color-mix(in srgb, var(--dsh-accent-2) 45%, var(--dsw-alias-bg-base));
+}
+
+/* The send circle keeps a white glyph, so in dark mode its fill is the accent
+ * pulled toward black (light accents would swallow the glyph). */
+body[data-dsh-accent]:not([data-dsh-accent='theme'])[data-ds-dark-theme],
+body[data-dsh-accent='theme'][data-dsh-palette]:not([data-dsh-palette='forge'])[data-ds-dark-theme] {
+  --dsw-alias-button-info-fill: color-mix(in srgb, var(--dsh-accent) 60%, black);
+  --dsw-alias-button-info-hover: color-mix(in srgb, var(--dsh-accent) 76%, black);
+}
+
+body[data-dsh-accent]:not([data-dsh-accent='theme'])::selection,
+body[data-dsh-accent]:not([data-dsh-accent='theme']) ::selection,
+body[data-dsh-accent='theme'][data-dsh-palette]:not([data-dsh-palette='forge'])::selection,
+body[data-dsh-accent='theme'][data-dsh-palette]:not([data-dsh-palette='forge']) ::selection {
+  background: color-mix(in srgb, var(--dsh-accent-2) 28%, transparent);
+}
+
+/* Textures: the wash derives from the palette; the tile is a black-on-transparent mask. */
+body[data-dsh-backdrop]:not([data-dsh-backdrop='plain']) {
+  --dsh-backdrop-wash: linear-gradient(135deg, color-mix(in srgb, var(--dsh-accent-2, var(--dsw-alias-state-business-primary)) 8%, var(--dsw-alias-bg-base)), var(--dsw-alias-bg-base) 70%);
+  --dsh-backdrop-ink: color-mix(in srgb, var(--dsw-alias-label-primary) 7%, transparent);
+}
+
+body[data-dsh-backdrop='dots'] {
+  --dsh-backdrop-tile: var(--dsh-tile-dots);
+  --dsh-backdrop-size: var(--dsh-tile-dots-size);
+}
+
+body[data-dsh-backdrop='grid'] {
+  --dsh-backdrop-tile: var(--dsh-tile-grid);
+  --dsh-backdrop-size: var(--dsh-tile-grid-size);
+}
+
+body[data-dsh-backdrop='waves'] {
+  --dsh-backdrop-tile: var(--dsh-tile-waves);
+  --dsh-backdrop-size: var(--dsh-tile-waves-size);
+}
+
+body[data-dsh-backdrop='contour'] {
+  --dsh-backdrop-tile: var(--dsh-tile-contour);
+  --dsh-backdrop-size: var(--dsh-tile-contour-size);
+}
+
+body[data-dsh-backdrop='hex'] {
+  --dsh-backdrop-tile: var(--dsh-tile-hex);
+  --dsh-backdrop-size: var(--dsh-tile-hex-size);
+}

@@ -1,6 +1,7 @@
-/** Appearance and font-size row stores: snapshot-mirror actions and the revision guards. */
+/** Appearance, font-size, and Style row stores: snapshot-mirror actions and the revision guards. */
 import { describe, expect, it } from 'vitest'
-import { createAppearanceRowStore, createFontSizeRowStore } from '../src/client/settings-store.ts'
+import { createAppearanceRowStore, createFontSizeRowStore, createStyleRowStore } from '../src/client/settings-store.ts'
+import { DEFAULT_LOOK } from '../src/theme-settings.ts'
 
 describe('createAppearanceRowStore', () => {
   it('init shape: system preference with revision at -1', () => {
@@ -40,6 +41,24 @@ describe('createFontSizeRowStore', () => {
     store.actions.sync(12, 2)
     store.actions.sync(12, 3)
     expect(store.getSnapshot().fontSize).toBe(16)
+    expect(store.getSnapshot().revision).toBe(3)
+  })
+})
+
+describe('createStyleRowStore', () => {
+  it('init shape: default Look with revision at -1', () => {
+    const store = createStyleRowStore().create()
+    expect(store.getSnapshot()).toEqual({ look: DEFAULT_LOOK, revision: -1 })
+  })
+
+  it('sync mirrors the Look; the revision guard drops stale and duplicate writes', () => {
+    const store = createStyleRowStore().create()
+    const forge = { ...DEFAULT_LOOK, accent: 'forge' as const }
+    store.actions.sync(forge, 3)
+    expect(store.getSnapshot()).toEqual({ look: forge, revision: 3 })
+    store.actions.sync(DEFAULT_LOOK, 2)
+    store.actions.sync(DEFAULT_LOOK, 3)
+    expect(store.getSnapshot().look).toEqual(forge)
     expect(store.getSnapshot().revision).toBe(3)
   })
 })

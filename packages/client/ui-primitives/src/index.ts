@@ -111,3 +111,7 @@ export {
 export { GuideArtworkBrowser, GuideArtworkFiles } from './guide-artwork.tsx'
 export { ImageLightbox } from './ImageLightbox.tsx'
 export type { ImageLightboxLabels } from './ImageLightbox.tsx'
+export { ConstellationCanvas } from './constellation/ConstellationCanvas.tsx'
+export type { ConstellationCanvasProps } from './constellation/ConstellationCanvas.tsx'
+export { ForgeWorkingMark } from './ForgeWorkingMark.tsx'
+export type { ForgeWorkingMarkProps } from './ForgeWorkingMark.tsx'

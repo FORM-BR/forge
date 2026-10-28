@@ -124,6 +124,25 @@
   line-height: calc(22px + var(--dsh-content-font-delta, 0px));
 }
 
+/* Entrance only with the full motion Look and no system reduced-motion request. */
+@media (prefers-reduced-motion: no-preference) {
+  :global(body[data-dsh-motion='full']) .running {
+    animation: running-enter 160ms ease-out;
+  }
+}
+
+@keyframes running-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* The last visible row before the status must contain output, not an input.
    Hidden and empty seats do not separate a user message from the status. */
 .column > :nth-last-child(2 of :not([hidden]):not(.flowItem:is(:empty, :has(> [data-slot="conversation.chat.node"]:empty)))):is(

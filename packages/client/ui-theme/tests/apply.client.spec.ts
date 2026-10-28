@@ -8,11 +8,13 @@ import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply as settingsApply, inject as settingsInject } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { apply, inject, SETTINGS_NS } from '@deepseek-ai/dsh-client-ui-theme/client'
-import type { AppearanceRowInjected, FontSizeRowInjected, ThemeRuntime } from '@deepseek-ai/dsh-client-ui-theme/client'
-import { THEME_SETTINGS_NAMESPACE, ThemeSettingsSchema } from '../src/theme-settings.ts'
+import type { AppearanceRowInjected, FontSizeRowInjected, StyleRowInjected, ThemeRuntime } from '@deepseek-ai/dsh-client-ui-theme/client'
+import { DEFAULT_LOOK, THEME_SETTINGS_NAMESPACE, ThemeSettingsSchema } from '../src/theme-settings.ts'
+import { AboutRow } from '../src/client/AboutRow.tsx'
+import { StyleRow } from '../src/client/StyleRow.tsx'
 import { AppearanceRow } from '../src/client/AppearanceRow.tsx'
 import { FontSizeRow } from '../src/client/FontSizeRow.tsx'
-import type { createAppearanceRowStore, createFontSizeRowStore } from '../src/client/settings-store.ts'
+import type { createAppearanceRowStore, createFontSizeRowStore, createStyleRowStore } from '../src/client/settings-store.ts'
 
 // These specs assert the shipped Chinese copy. The lane has no jsdom `window`,
 // so browser-language detection never runs and a fresh LocaleRuntime opens on
@@ -32,7 +34,7 @@ async function bench(isLoopback = true) {
   const locale = new LocaleRuntime(ctx)
   locale.setLocale('zh')
   ctx.provide('locale', locale)
-  const section: Record<string, unknown> = { preference: 'system', fontSize: 14 }
+  const section: Record<string, unknown> = { preference: 'system', fontSize: 14, ...DEFAULT_LOOK }
   const namespace = () => ({
     ns: THEME_SETTINGS_NAMESPACE,
     schema: ThemeSettingsSchema.toJSON(),
@@ -86,6 +88,15 @@ function fontSizeFaceOf(slots: SlotRegistry) {
   return { entry, instance, face }
 }
 
+/** The same choreography for the Style row entry. */
+function styleFaceOf(slots: SlotRegistry) {
+  const entry = slots.entries(SLOT).find(e => e.component === StyleRow)!
+  const handle = entry.store as ReturnType<typeof createStyleRowStore>
+  const instance = handle.create()
+  const face = (entry.inject as unknown as (a: typeof instance.actions) => StyleRowInjected)(instance.actions)
+  return { entry, instance, face }
+}
+
 describe('ui-theme apply', () => {
   it('declares the slot and locale services', () => {
     expect(inject).toEqual(['slots', 'locale', 'remote', 'configForms'])
@@ -104,6 +115,15 @@ describe('ui-theme apply', () => {
     const fontEntry = before.slots.entries(SLOT).find(e => e.component === FontSizeRow)!
     expect(fontEntry.options).toMatchObject({ id: 'font-size', order: 11 })
     expect(fontEntry.locale).toBe(SETTINGS_NS)
+    const styleEntry = before.slots.entries(SLOT).find(e => e.component === StyleRow)!
+    expect(styleEntry.options).toMatchObject({ id: 'style', order: 12 })
+    expect(styleEntry.locale).toBe(SETTINGS_NS)
+    const aboutEntry = before.slots.entries(SLOT).find(e => e.component === AboutRow)!
+    expect(aboutEntry.options).toMatchObject({ id: 'about', order: 101 })
+    expect(aboutEntry.locale).toBe(SETTINGS_NS)
+    // The Style and About rows share one store declaration.
+    expect(aboutEntry.store).toBe(styleEntry.store)
+    expect(before.locale.bind(SETTINGS_NS)('style.title')).toBe('Forge style')
 
     const after = await bench()
     const fiber = after.ctx.plugin({ inject: [...inject], apply })
@@ -113,6 +133,8 @@ describe('ui-theme apply', () => {
     await Promise.resolve()
     expect(after.slots.entries(SLOT).some(e => e.component === AppearanceRow)).toBe(true)
     expect(after.slots.entries(SLOT).some(e => e.component === FontSizeRow)).toBe(true)
+    expect(after.slots.entries(SLOT).some(e => e.component === StyleRow)).toBe(true)
+    expect(after.slots.entries(SLOT).some(e => e.component === AboutRow)).toBe(true)
   })
 
   it('projects service snapshots into the row store and routes face writes back', async () => {
@@ -153,17 +175,41 @@ describe('ui-theme apply', () => {
     await vi.waitFor(() => { expect(b.mutate).toHaveBeenCalledTimes(2) })
   })
 
+  it('projects Look snapshots into its row store and routes face writes back through the settings scope', async () => {
+    const b = await bench()
+    declareItems(b.slots)
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const theme = b.ctx.get('theme') as ThemeRuntime
+    // An event ahead of any inject hits the unbound-actions arm.
+    theme.setLook('accent', 'forge')
+
+    const { instance, face } = styleFaceOf(b.slots)
+    // The inject-time re-sync sealed the init window: the mirror is current.
+    expect(instance.getSnapshot().look.accent).toBe('forge')
+
+    face.setLook('backdrop', 'waves')
+    expect(theme.getTheme().look).toMatchObject({ accent: 'forge', backdrop: 'waves' })
+    expect(instance.getSnapshot().look.backdrop).toBe('waves')
+    await vi.waitFor(() => { expect(b.mutate).toHaveBeenCalledTimes(2) })
+    const [ns, ops] = b.mutate.mock.calls.at(-1)!
+    expect(ns).toBe(THEME_SETTINGS_NAMESPACE)
+    expect(ops[0]).toMatchObject({ path: ['backdrop'], value: 'waves' })
+    expect(() => { face.setLook('motion', 'sideways' as never) }).toThrow('is not a choice')
+  })
+
   it('loads Host settings at boot, refreshes its namespace, and keeps remote browsers process-local', async () => {
     const b = await bench()
     // The shared mirror read once at bench time; a Host-side change reaches it
     // through the document invalidation, exactly as production announces one.
-    b.setHostSection({ preference: 'dark', fontSize: 17 })
+    b.setHostSection({ preference: 'dark', fontSize: 17, accent: 'inform', signature: 'off' })
     b.events.emit('settings/document-updated', [THEME_SETTINGS_NAMESPACE, 0])
     declareItems(b.slots)
     await b.ctx.plugin({ inject: [...inject], apply }).await()
     const theme = b.ctx.get('theme') as ThemeRuntime
     await vi.waitFor(() => { expect(theme.getTheme().preference).toBe('dark') })
     expect(theme.getTheme().fontSize).toBe(17)
+    // The Look arrives from the Host document the same way.
+    expect(theme.getTheme().look).toEqual({ ...DEFAULT_LOOK, accent: 'inform', signature: 'off' })
     // The mirror refreshes on every document commit (ns-agnostic); the scope's
     // derived value only moves when its own namespace changed.
     b.events.emit('settings/document-updated', ['unrelated', 0])
@@ -218,7 +264,7 @@ describe('ui-theme apply', () => {
     const b = await bench()
     const host = declareItems(b.slots)
     await b.ctx.plugin({ inject: [...inject], apply }).await()
-    expect(b.slots.entries(SLOT)).toHaveLength(2)
+    expect(b.slots.entries(SLOT)).toHaveLength(4)
 
     // Collapse: the declarer dies, the cascade removes our entries while the
     // apply closure still holds its (now stale) disposers.
@@ -229,6 +275,8 @@ describe('ui-theme apply', () => {
     await Promise.resolve()
     expect(b.slots.entries(SLOT).some(e => e.component === AppearanceRow)).toBe(true)
     expect(b.slots.entries(SLOT).some(e => e.component === FontSizeRow)).toBe(true)
+    expect(b.slots.entries(SLOT).some(e => e.component === StyleRow)).toBe(true)
+    expect(b.slots.entries(SLOT).some(e => e.component === AboutRow)).toBe(true)
   })
 
   it('teardown removes the rows and the dictionaries; teardown without a declaration is quiet', async () => {
@@ -236,7 +284,7 @@ describe('ui-theme apply', () => {
     declareItems(b.slots)
     const fiber = b.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    expect(b.slots.entries(SLOT)).toHaveLength(2)
+    expect(b.slots.entries(SLOT)).toHaveLength(4)
     await fiber.dispose()
     expect(b.slots.entries(SLOT)).toHaveLength(0)
     // Dictionary disposal: translation falls back to the bare key.

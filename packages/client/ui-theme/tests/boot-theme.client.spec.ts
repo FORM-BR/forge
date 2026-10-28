@@ -2,8 +2,8 @@
 /** The theme bootstrap injection row and the resulting pre-plugin browser theme. */
 import { runInNewContext } from 'node:vm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { bootThemeInjections } from '../src/boot-theme.ts'
-import type { ThemePreference } from '../src/theme-settings.ts'
+import { bootThemeInjections, PALETTE_BACKGROUNDS } from '../src/boot-theme.ts'
+import { DEFAULT_LOOK, THEME_LOOK_CHOICES, THEME_LOOK_FIELDS, type ThemePreference } from '../src/theme-settings.ts'
 
 const DARK_ATTRIBUTE = 'data-ds-dark-theme'
 
@@ -82,4 +82,41 @@ describe('theme bootstrap row', () => {
     executeBootstrap('light')
     expect(document.body.style.getPropertyValue('--dsh-content-font-size')).toBe('14px')
   })
+
+  it('publishes the durable Look as body attributes and defaults it before first paint', () => {
+    mockSystemDark(false)
+    executeBootstrap('light')
+    expect(document.body.getAttribute('data-dsh-accent')).toBe('theme')
+    expect(document.body.getAttribute('data-dsh-hero')).toBe('constellation')
+    expect(document.body.getAttribute('data-dsh-signature')).toBe('on')
+    const look = { ...DEFAULT_LOOK, accent: 'inform', backdrop: 'waves', motion: 'off' } as const
+    for (const row of bootThemeInjections('light', 14, look)) {
+      if (row.kind === 'script') runInNewContext(row.text, { document, matchMedia: globalThis.matchMedia })
+    }
+    expect(document.body.getAttribute('data-dsh-accent')).toBe('inform')
+    expect(document.body.getAttribute('data-dsh-backdrop')).toBe('waves')
+    expect(document.body.getAttribute('data-dsh-motion')).toBe('off')
+    for (const field of THEME_LOOK_FIELDS) document.body.removeAttribute(`data-dsh-${field}`)
+  })
+})
+
+describe('theme bootstrap palette canvas', () => {
+  it('colors the first paint with the palette base in both modes', () => {
+    for (const palette of THEME_LOOK_CHOICES.palette) {
+      const { light, dark } = PALETTE_BACKGROUNDS[palette]
+      const look = { ...DEFAULT_LOOK, palette }
+      const [lightHead] = bootThemeInjections('light', 14, look)
+      const [darkHead] = bootThemeInjections('dark', 14, look)
+      if (lightHead?.kind !== 'style' || darkHead?.kind !== 'style') throw new Error('expected style rows')
+      expect(lightHead.text).toBe(`:root{color-scheme:light}body{background-color:${light};--dsh-boot-bg:${light}}`)
+      expect(darkHead.text).toBe(`:root{color-scheme:dark}body{background-color:${dark};--dsh-boot-bg:${dark}}`)
+    }
+  })
+
+  it('keeps the product canvas for the forge palette and a distinct canvas for every other one', () => {
+    expect(PALETTE_BACKGROUNDS.forge).toEqual({ light: '#fff', dark: '#151517' })
+    const others = THEME_LOOK_CHOICES.palette.filter(palette => palette !== 'forge')
+    expect(new Set(others.map(palette => PALETTE_BACKGROUNDS[palette].dark)).size).toBe(others.length)
+  })
+
 })

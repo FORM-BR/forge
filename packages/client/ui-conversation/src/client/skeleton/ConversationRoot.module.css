@@ -7,6 +7,38 @@
   background: var(--dsw-alias-bg-base);
 }
 
+/* Look backdrop (ui-theme `data-dsh-backdrop`): a wash and a masked texture
+   painted behind the column's content. Only a non-plain backdrop establishes the
+   stacking context and the layers, so the default Look changes nothing. The
+   layers sit at z-index -1 inside the isolated root: above the root background,
+   below every in-flow child, so no child needs to be lifted. */
+:global(body[data-dsh-backdrop]:not([data-dsh-backdrop='plain'])) .root {
+  isolation: isolate;
+}
+
+:global(body[data-dsh-backdrop]:not([data-dsh-backdrop='plain'])) .root::before,
+:global(body[data-dsh-backdrop]:not([data-dsh-backdrop='plain'])) .root::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+:global(body[data-dsh-backdrop]:not([data-dsh-backdrop='plain'])) .root::before {
+  background-image: var(--dsh-backdrop-wash, none);
+}
+
+:global(body[data-dsh-backdrop]:not([data-dsh-backdrop='plain'])) .root::after {
+  background-color: var(--dsh-backdrop-ink, transparent);
+  mask-image: var(--dsh-backdrop-tile, none);
+  -webkit-mask-image: var(--dsh-backdrop-tile, none);
+  mask-size: var(--dsh-backdrop-size, auto);
+  -webkit-mask-size: var(--dsh-backdrop-size, auto);
+  mask-repeat: repeat;
+  -webkit-mask-repeat: repeat;
+}
+
 /* 76px with its rule: the height of the Sidebar's tab strip and header row
    (ui-dockkit `.tabStrip` 38px + the pane header's 38px), so the two rules
    meet at the column edge. The rows add up to it — 10px top inset, the 30px
@@ -417,6 +449,22 @@ button.crumb:hover {
   --dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + 32px);
   --dsh-composer-side-clearance: 16px;
   --dsh-composer-dock-inset: 8px;
+}
+
+/* Hero phase only: isolates the body so the constellation canvas (z-index -1)
+   paints above the column background and below everything in the body. */
+.heroBody {
+  isolation: isolate;
+}
+
+.heroCanvas {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+
+:global(body[data-dsh-hero='off']) .heroCanvas {
+  display: none;
 }
 
 .embeddedBody {

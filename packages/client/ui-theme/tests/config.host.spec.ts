@@ -5,7 +5,7 @@ import * as HostPlugin from '../src/index.ts'
 import { liveConfig, omitsGeneratedPage } from '../../../settings/settings/tests/live-config.ts'
 import { plainConfig } from '../../../settings/settings/src/schema.ts'
 import {
-  DEFAULT_PREFERENCE, Config, apply,
+  DEFAULT_LOOK, DEFAULT_PREFERENCE, Config, apply,
 } from '@deepseek-ai/dsh-client-ui-theme'
 
 
@@ -27,10 +27,14 @@ describe('ui-theme host', () => {
     const ctx = new Context()
     const configuration = await liveConfig(ctx, { Config, apply })
     const { fiber } = configuration
-    expect(plainConfig(configuration.fiber.config)).toEqual({ preference: DEFAULT_PREFERENCE, fontSize: 14 })
-    await configuration.update({ preference: 'dark', fontSize: 16 })
-    expect(plainConfig(configuration.fiber.config)).toEqual({ preference: 'dark', fontSize: 16 })
+    expect(plainConfig(configuration.fiber.config)).toEqual({ preference: DEFAULT_PREFERENCE, fontSize: 14, ...DEFAULT_LOOK })
+    await configuration.update({ preference: 'dark', fontSize: 16, palette: 'nord', accent: 'inform', working: 'bar' })
+    expect(plainConfig(configuration.fiber.config)).toEqual({
+      ...DEFAULT_LOOK, preference: 'dark', fontSize: 16, palette: 'nord', accent: 'inform', working: 'bar',
+    })
     await expect(configuration.update({ preference: 'sepia' })).rejects.toThrow()
+    await expect(configuration.update({ accent: 'neon' })).rejects.toThrow()
+    await expect(configuration.update({ palette: 'sepia' })).rejects.toThrow()
     await expect(configuration.update({ fontSize: 11 })).rejects.toThrow()
     await expect(configuration.update({ fontSize: 18 })).rejects.toThrow()
     await fiber.dispose()
@@ -55,6 +59,11 @@ describe('ui-theme host', () => {
     expect(rowText(collect(ctx)[0])).toContain('color-scheme:dark')
     expect(rowText(collect(ctx)[1])).toContain('const preference = "dark"')
     expect(rowText(collect(ctx)[1])).toContain('"17px"')
+    await configuration.update({ palette: 'dracula', backdrop: 'hex', signature: 'off' })
+    expect(rowText(collect(ctx)[0])).toContain('#282a36')
+    expect(rowText(collect(ctx)[1])).toContain('"palette":"dracula"')
+    expect(rowText(collect(ctx)[1])).toContain('"backdrop":"hex"')
+    expect(rowText(collect(ctx)[1])).toContain('"signature":"off"')
     await fiber.dispose()
     expect(collect(ctx)).toEqual([{ kind: 'script', placement: 'head', text: 'window.afterTheme=true' }])
   })

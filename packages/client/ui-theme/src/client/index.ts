@@ -4,8 +4,9 @@
  * `prefers-color-scheme`, and publishes immutable snapshots; it never touches
  * the DOM — ui-layout's presenter consumes the resolved snapshot. The Host
  * settings scope loads and stores the preference in the user-settings
- * document. The plugin also registers the Appearance preference row into the
- * settings General section — the theme feature owns its own settings surface.
+ * document. The plugin also registers the Appearance, font-size, Style, and
+ * About rows into the settings General section — the theme feature owns its
+ * own settings surface.
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
@@ -20,20 +21,25 @@ import type { AppearanceRowInjected } from './AppearanceRow.tsx'
 import { AppearanceRow } from './AppearanceRow.tsx'
 import type { FontSizeRowInjected } from './FontSizeRow.tsx'
 import { FontSizeRow } from './FontSizeRow.tsx'
-import { createAppearanceRowStore, createFontSizeRowStore } from './settings-store.ts'
+import { AboutRow } from './AboutRow.tsx'
+import type { StyleRowInjected } from './StyleRow.tsx'
+import { StyleRow } from './StyleRow.tsx'
+import { createAppearanceRowStore, createFontSizeRowStore, createStyleRowStore } from './settings-store.ts'
 import { installThemeStyles } from './styles.ts'
 import { en, zh, type ThemeKey } from './locales.ts'
 import {
-  DEFAULT_FONT_SIZE, DEFAULT_PREFERENCE, FONT_SIZE_FIELD, FONT_SIZE_MAX, FONT_SIZE_MIN,
-  isThemePreference, THEME_PREFERENCE_FIELD, THEME_SETTINGS_NAMESPACE,
-  type ThemePreference, type ThemeSettings,
+  DEFAULT_FONT_SIZE, DEFAULT_LOOK, DEFAULT_PREFERENCE, FONT_SIZE_FIELD, FONT_SIZE_MAX, FONT_SIZE_MIN,
+  isLookChoice, isThemePreference, THEME_LOOK_FIELDS, THEME_PREFERENCE_FIELD, THEME_SETTINGS_NAMESPACE,
+  type ThemeLook, type ThemeLookField, type ThemePreference, type ThemeSettings,
 } from '../theme-settings.ts'
 
 export type { AppearanceRowComponentProps, AppearanceRowInjected } from './AppearanceRow.tsx'
 export type { FontSizeRowComponentProps, FontSizeRowInjected } from './FontSizeRow.tsx'
-export type { AppearanceRowState, FontSizeRowState } from './settings-store.ts'
+export type { StyleRowComponentProps, StyleRowInjected } from './StyleRow.tsx'
+export type { AboutRowComponentProps } from './AboutRow.tsx'
+export type { AppearanceRowState, FontSizeRowState, StyleRowState } from './settings-store.ts'
 export type { ThemeKey } from './locales.ts'
-export type { ThemePreference, ThemeSettings } from '../theme-settings.ts'
+export type { ThemeLook, ThemeLookField, ThemePreference, ThemeSettings } from '../theme-settings.ts'
 
 /** Namespace owning this feature's settings-row copy. */
 export const SETTINGS_NS = 'settings.theme'
@@ -82,6 +88,8 @@ export interface ThemeSnapshot {
   preference: ThemePreference
   /** Conversation content font size in px (integer within FONT_SIZE_MIN..FONT_SIZE_MAX). */
   fontSize: number
+  /** Visual style choices; ui-layout publishes each as `body[data-dsh-<field>]`. */
+  look: ThemeLook
   /**
    * The resolved active theme (`system` resolved via prefers-color-scheme)
    * with override layers folded into its tokens (seq order, later layers win
@@ -162,6 +170,7 @@ export class ThemeRuntime {
   private themes: ThemeDefinition[] = [...BUILTIN_THEMES]
   private preference: ThemePreference
   private fontSize: number = bootstrapFontSize()
+  private look: ThemeLook = bootstrapLook()
   private revision = 0
   private snapshot: ThemeSnapshot
   private readonly media: MediaQueryList | undefined
@@ -255,13 +264,32 @@ export class ThemeRuntime {
     this.publish()
   }
 
+  /**
+   * Change one Look field — the only Look write entry. Accepted values are
+   * written through the settings scope and emit `theme/change`.
+   * @param field - Look field name.
+   * @param value - one of the field's {@link THEME_LOOK_CHOICES}; other values throw.
+   */
+  setLook<F extends ThemeLookField>(field: F, value: ThemeLook[F]): void {
+    if (!isLookChoice(field, value)) throw new Error(`look ${field} ${JSON.stringify(value)} is not a choice`)
+    if (this.look[field] === value) return
+    this.look = Object.freeze({ ...this.look, [field]: value })
+    void this.host.set(field, value)
+    this.publish()
+  }
+
   /** Adopt the scope's accepted durable preference without writing it back. */
   private adopt(): void {
     const section = this.host.getSnapshot().value
     if (section === undefined) return
-    if (this.preference === section.preference && this.fontSize === section.fontSize) return
+    const look = Object.freeze(Object.fromEntries(
+      THEME_LOOK_FIELDS.map(field => [field, section[field]]),
+    ) as ThemeLook)
+    if (this.preference === section.preference && this.fontSize === section.fontSize
+      && THEME_LOOK_FIELDS.every(field => this.look[field] === look[field])) return
     this.preference = section.preference
     this.fontSize = section.fontSize
+    this.look = look
     this.publish()
   }
 
@@ -329,6 +357,7 @@ export class ThemeRuntime {
     return Object.freeze({
       preference: this.preference,
       fontSize: this.fontSize,
+      look: this.look,
       active: this.composeActive(active),
       themes: Object.freeze([...this.themes]),
       revision: this.revision,
@@ -374,6 +403,20 @@ function bootstrapFontSize(): number {
   return Number.isInteger(parsed) && parsed >= FONT_SIZE_MIN && parsed <= FONT_SIZE_MAX
     ? parsed
     : DEFAULT_FONT_SIZE
+}
+
+/**
+ * Read the Look attributes the Host boot script wrote on `body`, so the
+ * initial snapshot keeps first paint's style while the settings read is in
+ * flight. Missing or unknown attributes fall back to {@link DEFAULT_LOOK}.
+ */
+function bootstrapLook(): ThemeLook {
+  /* v8 ignore next -- needs a documentless run (node e2e booting the client tree), not constructible under jsdom */
+  if (typeof document === 'undefined') return DEFAULT_LOOK
+  return Object.freeze(Object.fromEntries(THEME_LOOK_FIELDS.map((field) => {
+    const raw = document.body.getAttribute(`data-dsh-${field}`)
+    return [field, isLookChoice(field, raw) ? raw : DEFAULT_LOOK[field]]
+  })) as ThemeLook)
 }
 
 /**
@@ -438,9 +481,13 @@ export function apply(ctx: ClientContext): void {
   let bound: BoundActions<typeof store> | undefined
   const fontSizeStore = createFontSizeRowStore()
   let fontSizeBound: BoundActions<typeof fontSizeStore> | undefined
+  // One handle backs both Look-reading rows (Style, About): a root-scope store has one instance.
+  const styleStore = createStyleRowStore()
+  let styleBound: BoundActions<typeof styleStore> | undefined
   const sync = (snapshot: ThemeSnapshot): void => {
     bound?.sync(snapshot.preference, snapshot.revision)
     fontSizeBound?.sync(snapshot.fontSize, snapshot.revision)
+    styleBound?.sync(snapshot.look, snapshot.revision)
   }
   ctx.on('theme/change', sync)
   const injected = (actions: BoundActions<typeof store>): AppearanceRowInjected => {
@@ -476,4 +523,28 @@ export function apply(ctx: ClientContext): void {
     locale: SETTINGS_NS,
     inject: fontSizeInjected,
   }, FontSizeRow))
+
+  const styleInjected = (actions: BoundActions<typeof styleStore>): StyleRowInjected => {
+    styleBound = actions
+    sync(theme.getTheme())
+    return {
+      setLook: (field, value) => { theme.setLook(field, value) },
+    }
+  }
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'style',
+    order: 12,
+    store: styleStore,
+    locale: SETTINGS_NS,
+    inject: styleInjected,
+  }, StyleRow))
+
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'about',
+    order: 101,
+    store: styleStore,
+    locale: SETTINGS_NS,
+  }, AboutRow))
 }

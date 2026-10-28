@@ -1,0 +1,47 @@
+// @vitest-environment jsdom
+
+import { cleanup, render } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
+import { ForgeWorkingMark } from '../src/ForgeWorkingMark.tsx'
+
+afterEach(cleanup)
+
+describe('ForgeWorkingMark', () => {
+  it('draws the anvil, the FORGE logo hammer and the impact sparks', () => {
+    const view = render(<ForgeWorkingMark />)
+    expect(view.container.firstElementChild?.getAttribute('aria-hidden')).toBe('true')
+    expect(view.container.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 32 32')
+    expect(view.container.querySelector('[data-forge-anvil]')).not.toBeNull()
+    const hammer = view.container.querySelector('[data-forge-hammer]')
+    expect(hammer?.querySelectorAll('path')).toHaveLength(2)
+    expect(hammer?.querySelectorAll('polyline')).toHaveLength(2)
+    expect(hammer?.querySelector('polyline')?.getAttribute('points')).toBe('126.55,38 186.3,97.75 150.41,133.64')
+    expect(view.container.querySelectorAll('[data-forge-sparks] line')).toHaveLength(6)
+    expect(view.container.querySelectorAll('[data-forge-sparks] circle')).toHaveLength(2)
+  })
+
+  it('leaves the poses to the stylesheet instead of SMIL', () => {
+    const view = render(<ForgeWorkingMark />)
+    expect(view.container.querySelector('animate')).toBeNull()
+  })
+
+  it('offers the anvil, the sparks and the bar as hidden-from-AT sibling marks without text', () => {
+    const view = render(<ForgeWorkingMark />)
+    const icon = view.container.firstElementChild as HTMLElement
+    const marks = Array.from(icon.querySelectorAll('[data-forge-mark]'))
+    expect(marks.map(mark => mark.getAttribute('data-forge-mark'))).toEqual(['anvil', 'sparks', 'bar'])
+    expect(marks.every(mark => mark.parentElement === icon)).toBe(true)
+    expect(icon.getAttribute('aria-hidden')).toBe('true')
+    expect(icon.textContent).toBe('')
+    expect(icon.querySelectorAll('[data-forge-mark="sparks"] line')).toHaveLength(3)
+    expect(icon.querySelectorAll('circle')).toHaveLength(2)
+    expect(icon.querySelector('[data-forge-mark="bar"] circle')).toBeNull()
+  })
+
+  it('keeps the owner placement class beside its own', () => {
+    const view = render(<ForgeWorkingMark className="owner" />)
+    const icon = view.container.firstElementChild as HTMLElement
+    expect(icon.classList.contains('owner')).toBe(true)
+    expect(icon.classList.length).toBeGreaterThan(1)
+  })
+})

@@ -1,21 +1,26 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { ThemePreference, ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
-import { DARK_ATTRIBUTE, THEME_SOURCE_ATTRIBUTE, ThemePresenter } from '@deepseek-ai/dsh-client-ui-layout/src/client/theme-presenter.ts'
+import type { ThemeLook, ThemePreference, ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
+import { DARK_ATTRIBUTE, LOOK_ATTRIBUTE_PREFIX, THEME_SOURCE_ATTRIBUTE, ThemePresenter } from '@deepseek-ai/dsh-client-ui-layout/src/client/theme-presenter.ts'
 
 const LIGHT_THEME_COLOR = 'rgb(255, 255, 255)'
 const DARK_THEME_COLOR = 'rgb(21, 21, 23)'
+const LOOK: ThemeLook = {
+  palette: 'forge', accent: 'graphite', backdrop: 'plain', hero: 'constellation', working: 'anvil', motion: 'full', signature: 'on',
+}
+const LOOK_FIELDS = Object.keys(LOOK) as (keyof ThemeLook)[]
 
 function snapshot(
   colorScheme: 'light' | 'dark',
   tokens: Record<string, string> = {},
   fontSize = 14,
   preference: ThemePreference = colorScheme,
+  look: ThemeLook = LOOK,
 ): ThemeSnapshot {
   // The presenter must key off colorScheme, not the id — keep them distinct.
   const active = { id: `${colorScheme}-test`, colorScheme, tokens }
-  return { preference, fontSize, active, themes: [active], revision: 1 }
+  return { preference, fontSize, look, active, themes: [active], revision: 1 }
 }
 
 function clearThemePresentation(): void {
@@ -31,6 +36,7 @@ beforeEach(() => {
   document.documentElement.style.removeProperty('color-scheme')
   document.documentElement.removeAttribute(THEME_SOURCE_ATTRIBUTE)
   document.body.removeAttribute(DARK_ATTRIBUTE)
+  for (const field of LOOK_FIELDS) document.body.removeAttribute(`${LOOK_ATTRIBUTE_PREFIX}${field}`)
   document.body.removeAttribute('style')
   const style = document.createElement('style')
   style.dataset.themePresenterTest = ''
@@ -108,5 +114,31 @@ describe('ThemePresenter', () => {
     expect(document.body.style.getPropertyValue('--dsh-content-font-size')).toBe('')
     expect(document.body.style.getPropertyValue('--foreign')).toBe('kept')
     expect(meta?.isConnected).toBe(false)
+  })
+
+  it('writes one body[data-dsh-<field>] attribute per Look choice and follows changes', () => {
+    const presenter = new ThemePresenter()
+    presenter.apply(snapshot('light'))
+    for (const field of LOOK_FIELDS) {
+      expect(document.body.getAttribute(`data-dsh-${field}`)).toBe(LOOK[field])
+    }
+    presenter.apply(snapshot('light', {}, 14, 'light', { ...LOOK, accent: 'forge', motion: 'off' }))
+    expect(document.body.getAttribute('data-dsh-accent')).toBe('forge')
+    expect(document.body.getAttribute('data-dsh-motion')).toBe('off')
+    expect(document.body.getAttribute('data-dsh-hero')).toBe('constellation')
+  })
+
+  it('retracts a Look attribute that left the snapshot and dispose removes them all, sparing foreign attributes', () => {
+    document.body.setAttribute('data-dsh-foreign', 'kept')
+    const presenter = new ThemePresenter()
+    presenter.apply(snapshot('light'))
+    const { signature: _dropped, ...partial } = LOOK
+    presenter.apply(snapshot('light', {}, 14, 'light', partial as ThemeLook))
+    expect(document.body.hasAttribute('data-dsh-signature')).toBe(false)
+    expect(document.body.getAttribute('data-dsh-working')).toBe('anvil')
+    presenter.dispose()
+    for (const field of LOOK_FIELDS) expect(document.body.hasAttribute(`data-dsh-${field}`)).toBe(false)
+    expect(document.body.getAttribute('data-dsh-foreign')).toBe('kept')
+    document.body.removeAttribute('data-dsh-foreign')
   })
 })

@@ -69,6 +69,7 @@ export const pt: Record<string, string> = {
   'hero.headline': 'Rumo ao desconhecido',
   'hero.preview': 'Prévia',
   'hero.chooseWorkspace': 'Escolher workspace',
+  'hero.signature': 'Forjado pela FORM',
   'session.hierarchy': 'Hierarquia de sessões',
   'todo.title': 'Pendências',
   'todo.progress.done': '{done} concluídas',

@@ -8,6 +8,7 @@ import type {
   ThemeTokenOverrides,
 } from '@deepseek-ai/dsh-client-ui-theme/client'
 import { ThemeRuntime } from '@deepseek-ai/dsh-client-ui-theme/client'
+import { DEFAULT_LOOK } from '../src/theme-settings.ts'
 
 const make = (host = stubConfigForm<ThemeSettings>()): {
   ctx: Context
@@ -46,6 +47,47 @@ describe('ThemeRuntime', () => {
     }
   })
 
+  it('seeds the initial Look from the boot-script body attributes, ignoring unknown values', () => {
+    document.body.setAttribute('data-dsh-accent', 'forge')
+    document.body.setAttribute('data-dsh-motion', 'sideways')
+    try {
+      expect(make().theme.getTheme().look).toEqual({ ...DEFAULT_LOOK, accent: 'forge' })
+    } finally {
+      document.body.removeAttribute('data-dsh-accent')
+      document.body.removeAttribute('data-dsh-motion')
+    }
+    expect(make().theme.getTheme().look).toEqual(DEFAULT_LOOK)
+  })
+
+  it('setLook switches one field, writes through the scope, and republishes; same value is a no-op', () => {
+    const { theme, events, host } = make()
+    theme.setLook('backdrop', 'contour')
+    expect(theme.getTheme().look).toEqual({ ...DEFAULT_LOOK, backdrop: 'contour' })
+    expect(Object.isFrozen(theme.getTheme().look)).toBe(true)
+    expect(host.set).toHaveBeenCalledWith('backdrop', 'contour')
+    expect(events).toHaveLength(1)
+    theme.setLook('backdrop', 'contour')
+    expect(events).toHaveLength(1)
+    expect(host.set).toHaveBeenCalledOnce()
+  })
+
+  it('rejects Look values that are not choices of the field', () => {
+    const { theme, events, host } = make()
+    expect(() => { theme.setLook('working', 'hammer' as never) }).toThrow('look working "hammer" is not a choice')
+    expect(events).toHaveLength(0)
+    expect(host.set).not.toHaveBeenCalled()
+  })
+
+  it('adopts a published Host Look without writing it back', () => {
+    const { theme, events, host } = make()
+    host.publish({ status: 'ready', value: { preference: 'system', fontSize: 14, ...DEFAULT_LOOK, hero: 'off' }, revision: 1, writable: true })
+    expect(theme.getTheme().look.hero).toBe('off')
+    expect(events).toHaveLength(1)
+    expect(host.set).not.toHaveBeenCalled()
+    host.publish({ value: { preference: 'system', fontSize: 14, ...DEFAULT_LOOK, hero: 'off' }, revision: 2 })
+    expect(events).toHaveLength(1)
+  })
+
   it('setFontSize switches, writes through the scope, and republishes; same value is a no-op', () => {
     const { theme, events, host } = make()
     theme.setFontSize(17)
@@ -68,7 +110,7 @@ describe('ThemeRuntime', () => {
 
   it('adopts a published Host font size without writing it back', () => {
     const { theme, events, host } = make()
-    host.publish({ status: 'ready', value: { preference: 'system', fontSize: 12 }, revision: 1, writable: true })
+    host.publish({ status: 'ready', value: { preference: 'system', fontSize: 12, ...DEFAULT_LOOK }, revision: 1, writable: true })
     expect(theme.getTheme().fontSize).toBe(12)
     expect(events).toHaveLength(1)
     expect(host.set).not.toHaveBeenCalled()
@@ -92,17 +134,17 @@ describe('ThemeRuntime', () => {
 
   it('adopts a published Host section without writing it back', () => {
     const { theme, events, host } = make()
-    host.publish({ status: 'ready', value: { preference: 'dark', fontSize: 14 }, revision: 1, writable: true })
+    host.publish({ status: 'ready', value: { preference: 'dark', fontSize: 14, ...DEFAULT_LOOK }, revision: 1, writable: true })
     expect(theme.getTheme().preference).toBe('dark')
     expect(events).toHaveLength(1)
     expect(host.set).not.toHaveBeenCalled()
-    host.publish({ value: { preference: 'dark', fontSize: 14 }, revision: 2 })
+    host.publish({ value: { preference: 'dark', fontSize: 14, ...DEFAULT_LOOK }, revision: 2 })
     expect(events).toHaveLength(1)
   })
 
   it('adopts a section already standing at construction', () => {
     const host = stubConfigForm<ThemeSettings>()
-    host.publish({ status: 'ready', value: { preference: 'dark', fontSize: 14 }, revision: 1, writable: true })
+    host.publish({ status: 'ready', value: { preference: 'dark', fontSize: 14, ...DEFAULT_LOOK }, revision: 1, writable: true })
     const { theme } = make(host)
     expect(theme.getTheme().preference).toBe('dark')
   })

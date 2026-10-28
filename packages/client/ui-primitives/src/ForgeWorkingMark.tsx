@@ -1,5 +1,12 @@
-/** Anvil-and-hammer mark Chat shows while the Session runs: the whole logo is the hammer. */
-import css from './RunningForgeMark.module.css'
+/** Working mark shown while a Session runs: the anvil-and-hammer, or a quieter alternative. */
+import clsx from 'clsx'
+import css from './ForgeWorkingMark.module.css'
+
+/** Props of the working mark. */
+export interface ForgeWorkingMarkProps {
+  /** Placement class from the owner. */
+  className?: string | undefined
+}
 
 /**
  * Render the FORGE work mark: every strike starts from the upright brand logo
@@ -7,13 +14,16 @@ import css from './RunningForgeMark.module.css'
  * like a hammer head, with thin sparks fanning out from the struck face, drawn
  * over the logo so the head never hides them. The markup holds the impact pose;
  * the stylesheet owns the swing, so reduced motion can keep the upright logo
- * without React re-rendering.
- * @returns the animated svg, hidden from the accessibility tree.
+ * without React re-rendering. Two quieter marks (fanned sparks, a travelling
+ * bar) sit beside it; the stylesheet shows exactly one, chosen by the Look's
+ * `body[data-dsh-working]` attribute, and the hidden ones never animate.
+ * @param props - placement class.
+ * @returns the marks wrapper, hidden from the accessibility tree.
  */
-export function RunningForgeMark() {
+export function ForgeWorkingMark({ className }: ForgeWorkingMarkProps) {
   return (
-    <span className={css.icon} aria-hidden="true">
-      <svg width="100%" height="100%" viewBox="0 0 32 32" fill="none">
+    <span className={clsx(css.icon, className)} aria-hidden="true">
+      <svg className={css.anvilMark} data-forge-mark="anvil" width="100%" height="100%" viewBox="0 0 32 32" fill="none">
         <g className={css.anvil} data-forge-anvil fill="currentColor">
           <path d="M3 19.7C5 19.3 7 19.2 9 19.2H22.4Q23 19.2 23 19.8V21.4L20.2 22.6C18.4 23.2 17.6 24.2 17.8 25.6C18 26.8 19.6 27.4 21.4 27.6Q22 27.7 22 28.3V29.4H16.4Q14.5 28.3 12.6 29.4H8.4V28.3Q8.4 27.7 9 27.6C10.8 27.4 12.4 26.8 12.6 25.6C12.8 24.2 12 23.2 10.4 22.6C7.4 22 4.6 20.6 3 19.9Z" />
         </g>
@@ -40,6 +50,15 @@ export function RunningForgeMark() {
           <circle cx="22.59" cy="15.95" r="0.55" fill="currentColor" stroke="none" />
         </g>
       </svg>
+      <svg className={css.sparksMark} data-forge-mark="sparks" width="100%" height="100%" viewBox="0 0 32 32" fill="none"
+        stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+        <line className={css.flashA} x1="9.5" y1="22" x2="6.5" y2="15.5" />
+        <line className={css.flashB} x1="16" y1="21" x2="16" y2="12" />
+        <line className={css.flashC} x1="22.5" y1="22" x2="25.5" y2="15.5" />
+      </svg>
+      <span className={css.barMark} data-forge-mark="bar">
+        <span className={css.barSegment} />
+      </span>
     </span>
   )
 }

@@ -71,7 +71,7 @@ export interface HeroShellProps {
 }
 
 /**
- * Render the hero chrome (headline only; no composer, no workspace row).
+ * Render the hero chrome (headline and signature; no composer, no workspace row).
  * @param props - see {@link HeroShellProps}.
  * @returns the centered hero element tree.
  */
@@ -92,6 +92,7 @@ export function HeroShell({ t, renderSlot, children }: HeroShellProps) {
             <span className={css.previewBadge}>{t('hero.preview')}</span>
           </span>
         </div>
+        <div className={css.signature}>{t('hero.signature')}</div>
         <div className={css.body}>
           {/* The composer remains mounted outside this component. */}
         </div>

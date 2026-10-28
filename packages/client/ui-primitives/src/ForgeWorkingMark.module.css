@@ -34,12 +34,99 @@
 }
 
 .sparks {
+  /* The struck sparks keep the forge-spark tone whatever the Look accent. */
   color: var(--dsw-alias-state-warn-primary);
   opacity: 0;
   transform-box: view-box;
   /* The struck point on the anvil face, so the burst grows outward from it. */
   transform-origin: 14.8px 19.1px;
   animation: forge-sparks 1.5s linear infinite;
+}
+
+/* Only the mark picked by the Look is displayed; the others never animate. */
+.anvilMark {
+  display: block;
+}
+
+.sparksMark,
+.barMark {
+  display: none;
+}
+
+:global(body[data-dsh-working='sparks']) .anvilMark,
+:global(body[data-dsh-working='bar']) .anvilMark {
+  display: none;
+}
+
+:global(body[data-dsh-working='sparks']) .sparksMark {
+  display: block;
+}
+
+:global(body[data-dsh-working='bar']) .barMark {
+  display: block;
+}
+
+.sparksMark {
+  color: var(--dsh-accent-2, var(--dsw-alias-state-warn-primary));
+}
+
+.flashA,
+.flashB,
+.flashC {
+  opacity: 0.15;
+  animation: forge-flash 1.2s ease-in-out infinite;
+}
+
+.flashB {
+  animation-delay: 0.2s;
+}
+
+.flashC {
+  animation-delay: 0.4s;
+}
+
+.barMark {
+  position: relative;
+  align-self: center;
+  width: calc(18px + var(--dsh-content-font-delta, 0px));
+  height: 2px;
+  margin-inline: auto;
+  /* Cancel the anvil's baseline offset on .icon so the bar sits on the text's middle. */
+  translate: 0 calc((30px + var(--dsh-content-font-delta, 0px)) * -0.08125);
+  overflow: hidden;
+  background: var(--dsw-alias-border-l2);
+}
+
+.barSegment {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 30%;
+  background: var(--dsh-accent-2, var(--dsw-alias-label-tertiary));
+  animation: forge-bar 1.6s ease-in-out infinite;
+}
+
+@keyframes forge-flash {
+  0%,
+  60%,
+  100% {
+    opacity: 0.15;
+  }
+
+  25% {
+    opacity: 1;
+  }
+}
+
+@keyframes forge-bar {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  50% {
+    transform: translateX(233.33%);
+  }
 }
 
 @keyframes forge-strike {
@@ -130,6 +217,8 @@
   }
 }
 
+/* Static poses: the system's reduced-motion setting and the Look's motion
+   'off' choice are equivalent. */
 @media (prefers-reduced-motion: reduce) {
   .hammer {
     animation: none;
@@ -149,4 +238,45 @@
     animation: none;
     opacity: 0;
   }
+
+  .flashA,
+  .flashB,
+  .flashC {
+    animation: none;
+    opacity: 1;
+  }
+
+  .barSegment {
+    animation: none;
+    transform: translateX(116.67%);
+  }
+}
+
+:global(body[data-dsh-motion='off']) .hammer {
+  animation: none;
+  transform: rotate(-30deg);
+}
+
+:global(body[data-dsh-motion='off']) .head {
+  animation: none;
+  transform: rotate(-54deg);
+}
+
+:global(body[data-dsh-motion='off']) .anvil {
+  animation: none;
+}
+
+:global(body[data-dsh-motion='off']) .sparks {
+  animation: none;
+  opacity: 0;
+}
+
+:global(body[data-dsh-motion='off']) :is(.flashA, .flashB, .flashC) {
+  animation: none;
+  opacity: 1;
+}
+
+:global(body[data-dsh-motion='off']) .barSegment {
+  animation: none;
+  transform: translateX(116.67%);
 }
