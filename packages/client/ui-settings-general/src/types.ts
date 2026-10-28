@@ -33,3 +33,23 @@ export interface DesktopUpdateView {
   readonly failed: boolean
   readonly opening: boolean
 }
+
+/** The release the Host update check found for a Web or source install; absent when nothing should be shown. */
+export interface WebUpdateNotice {
+  /** Newer version without the leading `v`. */
+  readonly version: string
+  /** Release page opened by "See what's new". */
+  readonly releaseUrl: string
+}
+
+/** Shared Web update state for the sidebar chip and the collapsed-rail badge. */
+export interface WebUpdateView {
+  /** The notice to show; undefined while off, dismissed, current, failed or not yet known. */
+  readonly notice?: WebUpdateNotice
+}
+
+/** Persisted fields of the Host `update-check` entry that the General row edits. */
+export interface UpdateCheckSettings {
+  /** Whether the Host checks for new versions and the notice is shown. */
+  readonly enabled: boolean
+}

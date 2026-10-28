@@ -1,0 +1,84 @@
+.chip {
+  display: inline-grid;
+  grid-template-columns: 14px max-content;
+  align-items: center;
+  column-gap: 4px;
+  flex: none;
+  height: 28px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color) 20%, transparent);
+  border-radius: var(--dsw-radius-sm);
+  color: var(--dsw-alias-brand-primary-new-colorprimary-new-color);
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color) 8%, transparent);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :global(body[data-dsh-motion='full']) .chip {
+    animation: chip-in 160ms ease-out both;
+  }
+}
+
+@keyframes chip-in {
+  from { opacity: 0; }
+}
+
+/* Popover card: the Menu surface owns the translucent fill; text tokens are explicit for both themes. */
+.list {
+  min-width: 220px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 8px 6px;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.steps p {
+  margin: 4px 0 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.code {
+  display: block;
+  padding: 4px 8px;
+  border-radius: var(--dsw-radius-xs);
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+  font-family: var(--dsw-font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.back {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.back:hover,
+.back:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+  outline: none;
+}

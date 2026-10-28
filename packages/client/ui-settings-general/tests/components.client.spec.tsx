@@ -50,6 +50,7 @@ describe('Desktop collapsed update badge', () => {
     const props = { ...kit, t,
       useDesktopUpdate: (select => select(state)) as Parameters<typeof DesktopUpdateBadge>[0]['useDesktopUpdate'],
       useConnectionState: (select => select(connection)) as Parameters<typeof DesktopUpdateBadge>[0]['useConnectionState'],
+      useWebUpdate: (select => select({})) as Parameters<typeof DesktopUpdateBadge>[0]['useWebUpdate'],
     }
     const view = render(<DesktopUpdateBadge {...props} />)
     expect(screen.queryByRole('img')).toBeNull()

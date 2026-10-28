@@ -1,5 +1,5 @@
 /** Optional Electron status presentation; the native shell owns actions and Web owns visible copy. */
-import { IconDownloadOutlineRegular, IconLoadingOutlineRegular, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconDownloadOutlineRegular, IconLoadingOutlineRegular, IconWarningOutlineRegular, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import css from './DesktopUpdateIndicator.module.css'
 import type { DesktopUpdateFailureKind, DesktopUpdatePresentation, DesktopUpdateView } from '../types.ts'
@@ -71,7 +71,7 @@ export function DesktopUpdateIndicator({ wide, hidden, t, view, onOpen }: {
     <button type="button" className={css.indicator}
       aria-label={label} aria-disabled={busy} onClick={() => { if (!busy) onOpen() }}>
       <span className={css.icon} aria-hidden="true">
-        {error ? <span className={css.errorDot} />
+        {error ? <IconWarningOutlineRegular size={14} />
           : busy ? <IconLoadingOutlineRegular className={css.spinner} size={14} /> : <IconDownloadOutlineRegular size={14} />}
       </span>
       <span>{label}</span>
@@ -80,21 +80,30 @@ export function DesktopUpdateIndicator({ wide, hidden, t, view, onOpen }: {
 }
 
 type BadgeProps = PropsRuntime<'sidebar.toggle.badge'> & PropsLocale<'settings'>
-  & Pick<InjectFace<SettingsRootInjected>, 'useDesktopUpdate' | 'useConnectionState'>
+  & Pick<InjectFace<SettingsRootInjected>, 'useDesktopUpdate' | 'useConnectionState' | 'useWebUpdate'>
 
 /**
- * @param props - Framework-bound carrier and connection state.
- * @returns A non-interactive brand-blue notification on the sidebar expand button.
+ * @param props - Framework-bound carrier, Web release notice and connection state.
+ * @returns A non-interactive brand-blue download mark on the sidebar expand button.
  */
-export function DesktopUpdateBadge({ useDesktopUpdate, useConnectionState, t }: BadgeProps) {
+export function DesktopUpdateBadge({ useDesktopUpdate, useConnectionState, useWebUpdate, t }: BadgeProps) {
   const { presentation: state, failed } = useDesktopUpdate(value => value)
+  const web = useWebUpdate(value => value.notice)
   const connection = useConnectionState(value => value)
-  if (((connection === 'disconnected' || connection === 'connecting') && state?.phase !== 'installing')
-    || (!failed && (state === undefined || state.phase === 'idle'))) return null
+  const offline = connection === 'disconnected' || connection === 'connecting'
+  if (!failed && (state === undefined || state.phase === 'idle')) {
+    // Without a Desktop update the same seat marks a Web release, as tinted glyph rather than a dot.
+    if (web === undefined || offline) return null
+    const label = t('webUpdate.title', { version: web.version })
+    return <Tooltip label={label} side="right">
+      <span role="img" aria-label={label} className={css.badge}><IconDownloadOutlineRegular size={9} /></span>
+    </Tooltip>
+  }
+  if (offline && state?.phase !== 'installing') return null
   const retryLabel = t('desktop.update.retry')
   const copy = state === undefined ? { label: retryLabel, detail: retryLabel } : updateCopy(state, t)
   const label = failed ? retryLabel : copy.label
   return <Tooltip label={failed ? label : copy.detail} side="right">
-    <span role="img" aria-label={label} className={css.badge} />
+    <span role="img" aria-label={label} className={css.badge}><IconDownloadOutlineRegular size={9} /></span>
   </Tooltip>
 }

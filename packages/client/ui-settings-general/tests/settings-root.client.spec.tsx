@@ -11,7 +11,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SettingsRootComponentProps } from '../src/client/shell-contract.ts'
 import { SettingsRoot } from '../src/client/SettingsRoot.tsx'
 import { en, zh } from '../src/client/locales.ts'
-import type { DesktopUpdateView } from '../src/types.ts'
+import type { DesktopUpdateView, WebUpdateView } from '../src/types.ts'
 import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 
 // Every fixture carries the resource hook the resources plugin merges into GlobalStandardProps.
@@ -45,6 +45,9 @@ function mount({
   dictionary = en,
   connectionState = 'connected',
   desktopUpdate = { failed: false, opening: false },
+  webUpdate = {},
+  dismissWebUpdate = () => {},
+  openWebUpdateRelease = () => {},
   onboardingActive = true,
   mainView = true,
   rows = [
@@ -62,6 +65,9 @@ function mount({
   dictionary?: typeof en | typeof zh
   connectionState?: ConnectionSnapshot
   desktopUpdate?: DesktopUpdateView
+  webUpdate?: WebUpdateView
+  dismissWebUpdate?: () => void
+  openWebUpdateRelease?: (url: string) => void
   onboardingActive?: boolean
   mainView?: boolean
   rows?: Row[]
@@ -108,6 +114,9 @@ function mount({
     reconnect,
     openDesktopUpdate: () => {},
     useDesktopUpdate: select => select(desktopUpdate),
+    useWebUpdate: select => select(webUpdate),
+    dismissWebUpdate: () => { dismissWebUpdate() },
+    openWebUpdateRelease: (url) => { openWebUpdateRelease(url) },
     t: makeTranslate(dictionary),
     useConnectionState: (select) => {
       const [, force] = useState(0)
@@ -169,6 +178,20 @@ function openPanel() {
 }
 
 describe('SettingsRoot trigger', () => {
+  it('shows the Web release chip beside the settings button and yields to connection feedback', () => {
+    const dismiss = vi.fn()
+    const open = vi.fn()
+    const webUpdate = { notice: { version: '1.2.0', releaseUrl: 'https://github.com/FORM-BR/forge/releases/tag/v1.2.0' } }
+    const f = mount({ webUpdate, dismissWebUpdate: dismiss, openWebUpdateRelease: open })
+    fireEvent.click(screen.getByRole('button', { name: 'New FORGE version: v1.2.0' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: "See what's new" }))
+    expect(open).toHaveBeenCalledWith(webUpdate.notice.releaseUrl)
+    fireEvent.click(screen.getByRole('button', { name: 'New FORGE version: v1.2.0' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Dismiss this version' }))
+    expect(dismiss).toHaveBeenCalledOnce()
+    f.setConnectionState('disconnected')
+    expect(screen.queryByRole('button', { name: 'New FORGE version: v1.2.0' })).toBeNull()
+  })
   it('shows installation instead of expected backend reconnection and restores connection feedback after failure', () => {
     const presentation = { phase: 'installing' as const, version: '1.0.1' }
     const f = mount({ dictionary: zh, connectionState: 'connecting',

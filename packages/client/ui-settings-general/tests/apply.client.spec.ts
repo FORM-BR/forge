@@ -12,7 +12,9 @@ import type { SettingsNamespaceView } from '@deepseek-ai/dsh-settings/types'
 import { createClientTest, type TestClient, webApp } from '@deepseek-ai/dsh-client-test-runtime/src/assembly/index.ts'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_SETTINGS_NAMESPACE, LocaleSettingsSchema } from '@deepseek-ai/dsh-client-locale/src/locale-settings.ts'
+import z from '@deepseek-ai/schemastery'
 import { inject } from '../src/client/index.ts'
+import type { WebUpdateRowInjected } from '../src/client/WebUpdateRow.tsx'
 import type { DeveloperToolsRowInjected } from '../src/client/DeveloperToolsRow.tsx'
 import type { RemoteAccessRowInjected } from '../src/client/RemoteAccessRow.tsx'
 import { CloseLabel, HeaderContent, TriggerContent } from '../src/client/chrome.tsx'
@@ -44,6 +46,18 @@ function localeView(preference: string, revision = 0): SettingsNamespaceView {
     // The Remote wire serializes nested Schema values before the client rehydrates them.
     schema: JSON.parse(JSON.stringify(LocaleSettingsSchema.toJSON())) as SettingsNamespaceView['schema'],
     value: { preference },
+    autoGenerate: true, applies: 'live',
+    secrets: [],
+    revision,
+  }
+}
+
+/** One Host view of the update-check entry, whose `enabled` field is the user's notice choice. */
+function updateCheckView(enabled: boolean, revision = 0): SettingsNamespaceView {
+  return {
+    ns: 'update-check',
+    schema: JSON.parse(JSON.stringify(z.object({ enabled: z.boolean().default(true) }).toJSON())) as SettingsNamespaceView['schema'],
+    value: { enabled },
     autoGenerate: true, applies: 'live',
     secrets: [],
     revision,
@@ -90,7 +104,7 @@ function setPageUrl(url: string): void {
 
 describe('ui-settings-general apply', () => {
   it('declares the services it uses', () => {
-    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'remote.settings', 'remote.remoteAccess', 'configForms', 'shortcuts'])
+    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'remote.settings', 'remote.remoteAccess', 'remote.updateCheck', 'configForms', 'shortcuts'])
   })
 
   it('fills the five seats of the shell it declares, with the locale-following General label', async ({ mock, start }) => {
@@ -119,6 +133,26 @@ describe('ui-settings-general apply', () => {
     for (const [name, component] of SEATS) {
       expect(c.ctx.slots.entries(name).find(row => row.component === component)!.locale).toBe(NS)
     }
+  }, COLD_BOOT_TIMEOUT_MS)
+
+  it('seats the new-version toggle once the Host serves update-check and writes the choice', async ({ mock, start }) => {
+    const settings = mock.remote.settings
+    settings.describe.mockResolvedValue(ok({ writable: true, hasDocument: false, namespaces: [localeView('zh'), updateCheckView(true)] }))
+    const c = await start()
+    await c.ctx.configForms.describe().ensure()
+    const row = await vi.waitFor(() => {
+      const found = c.ctx.slots.entries('settings.general.item').find(entry => entry.options.id === 'update-notice')
+      expect(found).toBeDefined()
+      return found!
+    })
+    const injected = (row.inject as unknown as () => WebUpdateRowInjected)()
+    expect(injected.hooks.updateNotice.getSnapshot()).toBe(true)
+    settings.mutate.mockResolvedValueOnce(ok(updateCheckView(false, 1)))
+    await injected.setEnabled(false)
+    expect(settings.mutate).toHaveBeenCalledWith('update-check', [{ op: 'set', path: ['enabled'], value: false }], 0)
+    await vi.waitFor(() => { expect(injected.hooks.updateNotice.getSnapshot()).toBe(false) })
+    settings.mutate.mockResolvedValueOnce({ ok: false, error: { code: 'gateway/internal', message: 'refused' } } as never)
+    await expect(injected.setEnabled(true)).rejects.toThrow('Update notice preference was not saved')
   }, COLD_BOOT_TIMEOUT_MS)
 
   it('feeds the phone-access row from the Host and reports a refused call as a failure', async ({ mock, start }) => {

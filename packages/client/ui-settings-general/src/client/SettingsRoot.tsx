@@ -22,6 +22,7 @@ import type { ConnectionIndicatorState } from '@deepseek-ai/dsh-client-ui-primit
 import type { SettingsRootComponentProps, SettingsSectionRow } from './shell-contract.ts'
 import css from './SettingsRoot.module.css'
 import { DesktopUpdateIndicator } from './DesktopUpdateIndicator.tsx'
+import { WebUpdateNotice } from './WebUpdateNotice.tsx'
 
 const RECOVERY_CONFIRMATION_MS = 2_000
 
@@ -112,7 +113,7 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
 export function SettingsRoot(props: SettingsRootComponentProps) {
   const {
     wide, reconnect, useConnectionState, useSections, useOnboardingSteps, useSessions, renderSlot, t,
-    useDesktopUpdate, openDesktopUpdate, useStore, actions, useShortcuts,
+    useDesktopUpdate, openDesktopUpdate, useWebUpdate, dismissWebUpdate, openWebUpdateRelease, useStore, actions, useShortcuts,
   } = props
   const { open, activeId } = useStore(state => state)
   const shortcut = useShortcuts(rows => rows.find(row => row.id === 'settings.open'))
@@ -128,6 +129,7 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
   // seats re-render through their own outlets' subscriptions.
   const rows = useSections(s => s)
   const desktopUpdate = useDesktopUpdate(state => state)
+  const webUpdate = useWebUpdate(state => state)
   const connectionState = useConnectionState(state => state)
   const previousConnectionState = useRef(connectionState)
   const onboardingSteps = useOnboardingSteps(s => s)
@@ -242,6 +244,8 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
         />
         <DesktopUpdateIndicator wide={wide} hidden={connectionIndicator !== undefined && desktopUpdate.presentation?.phase !== 'installing'}
           t={t} view={desktopUpdate} onOpen={openDesktopUpdate} />
+        <WebUpdateNotice wide={wide} hidden={connectionIndicator !== undefined}
+          t={t} view={webUpdate} onDismiss={dismissWebUpdate} onOpenRelease={openWebUpdateRelease} />
       </div>
       {open && (
         <SettingsPanel

@@ -7,6 +7,7 @@
  */
 import { describe, expect, onTestFinished, vi } from 'vitest'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import { ok } from '@deepseek-ai/dsh-remote-mock'
 import { createClientTest, type TestClient, webApp } from '@deepseek-ai/dsh-client-test-runtime/src/assembly/index.ts'
 import { inject } from '../src/client/index.ts'
 import type { SettingsRootInjected } from '../src/client/shell-contract.ts'
@@ -49,7 +50,7 @@ const PRODUCT_ONBOARDING: readonly { id: string; order: number }[] = [
 ]
 
 describe('ui-settings-general shell', () => {
-  it('shares one carrier subscription between both update locations and releases it on unload', async ({ start }) => {
+  it('shares one carrier subscription between both update locations and releases it on unload', async ({ mock, start }) => {
     const initial = Promise.withResolvers<DesktopUpdatePresentation>()
     let publish: ((state: DesktopUpdatePresentation) => void) | undefined
     const off = vi.fn()
@@ -58,9 +59,14 @@ describe('ui-settings-general shell', () => {
     vi.stubGlobal('dshDesktop', { protocolVersion: 1, updates: { status: () => initial.promise, subscribe, open } })
     onTestFinished(() => { vi.unstubAllGlobals(); initial.resolve({ phase: 'idle' }) })
     const c = await start()
+    expect(mock.remote.updateCheck.status).not.toHaveBeenCalled()
     const row = injectedOf(c)
     const badge = (c.ctx.slots.entries('sidebar.toggle.badge')[0]!.inject as () => Pick<SettingsRootInjected, 'hooks'>)()
     expect(badge.hooks.desktopUpdate).toBe(row.hooks.desktopUpdate)
+    // Under the Desktop updater the Web notice stays empty, never asks the Host, and has no toggle.
+    expect(row.hooks.webUpdate.getSnapshot()).toEqual({})
+    row.dismissWebUpdate()
+    expect(c.ctx.slots.entries('settings.general.item').some(entry => entry.options.id === 'update-notice')).toBe(false)
     expect(subscribe).toHaveBeenCalledOnce()
     const status = { phase: 'available' as const, version: '1.0.1' }
     publish!(status)
@@ -76,8 +82,38 @@ describe('ui-settings-general shell', () => {
     expect(row.hooks.desktopUpdate.getSnapshot().presentation).toEqual(status)
   }, COLD_BOOT_TIMEOUT_MS)
 
+  it('feeds the Web release notice from the Host check, dismisses it per version and opens the release outside the app', async ({ mock, start }) => {
+    const releaseUrl = 'https://github.com/FORM-BR/forge/releases/tag/v1.2.0'
+    mock.remote.updateCheck.status.mockResolvedValue(ok({ enabled: true, current: '1.0.0', failed: false, checking: false, newerVersion: '1.2.0', releaseUrl }))
+    const open = vi.fn()
+    vi.stubGlobal('open', open)
+    onTestFinished(() => { vi.unstubAllGlobals(); localStorage.clear() })
+    localStorage.clear()
+    const c = await start()
+    const row = injectedOf(c)
+    const badge = (c.ctx.slots.entries('sidebar.toggle.badge')[0]!.inject as () => Pick<SettingsRootInjected, 'hooks'>)()
+    expect(badge.hooks.webUpdate).toBe(row.hooks.webUpdate)
+    await vi.waitFor(() => { expect(row.hooks.webUpdate.getSnapshot().notice).toEqual({ version: '1.2.0', releaseUrl }) })
+    row.openWebUpdateRelease(releaseUrl)
+    expect(open).toHaveBeenCalledExactlyOnceWith(releaseUrl, '_blank', 'noopener,noreferrer')
+    row.dismissWebUpdate()
+    expect(row.hooks.webUpdate.getSnapshot()).toEqual({})
+    await c.unload(SELF)
+    await c.flush()
+  }, COLD_BOOT_TIMEOUT_MS)
+
+  it('stays silent when the Host refuses the update status', async ({ mock, start }) => {
+    mock.remote.updateCheck.status.mockResolvedValue({ ok: false, error: { code: 'gateway/internal', message: 'refused' } } as never)
+    const c = await start()
+    const row = injectedOf(c)
+    await vi.waitFor(() => { expect(mock.remote.updateCheck.status).toHaveBeenCalled() })
+    expect(row.hooks.webUpdate.getSnapshot()).toEqual({})
+    await c.unload(SELF)
+    await c.flush()
+  }, COLD_BOOT_TIMEOUT_MS)
+
   it('declares its services', () => {
-    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'remote.settings', 'remote.remoteAccess', 'configForms', 'shortcuts'])
+    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'remote.settings', 'remote.remoteAccess', 'remote.updateCheck', 'configForms', 'shortcuts'])
   })
 
   it('occupies sidebar.settings, declared by ui-sidebar, and declares every child slot', async ({ start }) => {

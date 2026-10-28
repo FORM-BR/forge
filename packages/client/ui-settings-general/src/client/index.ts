@@ -28,8 +28,11 @@ import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client
 import { createSettingsShellStore } from './shell-store.ts'
 import { SettingsRoot } from './SettingsRoot.tsx'
 import { DesktopUpdateBadge } from './DesktopUpdateIndicator.tsx'
-import type { DesktopUpdateBridge } from '../types.ts'
+import type { DesktopUpdateBridge, UpdateCheckSettings, WebUpdateView } from '../types.ts'
+import { createSnapshotStore, type ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import { DesktopUpdateSource } from './desktop-update-source.ts'
+import { WebUpdateSource } from './web-update-source.ts'
+import { WebUpdateRow, type WebUpdateRowInjected } from './WebUpdateRow.tsx'
 import { CloseLabel, HeaderContent, TriggerContent } from './chrome.tsx'
 import { GeneralSection } from './GeneralSection.tsx'
 import { CurrentVersionRow } from './CurrentVersionRow.tsx'
@@ -60,13 +63,15 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 /** Dictionary namespace owned by this plugin (shell chrome + General copy). */
 const NS = 'settings'
+/** Host entry whose `enabled` field is the user's choice to hear about new versions. */
+const UPDATE_CHECK_NAMESPACE = 'update-check'
 
 /**
  * Required services (cordis fiber inject). The target slots are declared by
  * ui-settings' apply, whose activation order relative to this one is NOT
  * constrained; registrations depend on their slots through `slots.inject()`.
  */
-export const inject = ['slots', 'locale', 'connection', 'remote', 'remote.settings', 'remote.remoteAccess', 'configForms', 'shortcuts']
+export const inject = ['slots', 'locale', 'connection', 'remote', 'remote.settings', 'remote.remoteAccess', 'remote.updateCheck', 'configForms', 'shortcuts']
 
 /**
  * Register the `settings` dictionaries, the chrome content, and the General
@@ -102,11 +107,39 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-settings-general: dictionaries')
   const connection = ctx.get('connection') as ConnectionHandle
   const carrier = (globalThis as typeof globalThis & { dshDesktop?: { protocolVersion: number; updates?: DesktopUpdateBridge } }).dshDesktop
-  const desktopUpdate = new DesktopUpdateSource(carrier?.protocolVersion === 1 ? carrier.updates : undefined)
+  const desktopBridge = carrier?.protocolVersion === 1 ? carrier.updates : undefined
+  const desktopUpdate = new DesktopUpdateSource(desktopBridge)
+  // A Web or source install has no electron-updater: the Host update check feeds the notice instead. The
+  // Desktop app keeps its own indicator, so under its bridge this source is never created.
+  const updateForm = ctx.configForms.get<UpdateCheckSettings>(UPDATE_CHECK_NAMESPACE)
+  const updatePreference: ObservableSnapshot<boolean> = {
+    getSnapshot: () => updateForm.getSnapshot().value?.enabled ?? true,
+    subscribe: listener => updateForm.subscribe(listener),
+  }
+  const webUpdate = desktopBridge === undefined
+    ? new WebUpdateSource(async () => {
+      const response = await ctx.remote.updateCheck.status()
+      return response.ok ? response.value : undefined
+    }, updatePreference)
+    : undefined
+  const webUpdateStore = webUpdate?.store ?? createSnapshotStore<WebUpdateView>({})
+  ctx.effect(() => () => { webUpdate?.dispose() }, 'ui-settings-general: web update source')
+  if (desktopBridge === undefined) {
+    ctx.effect(() => ctx.configForms.whileServed([UPDATE_CHECK_NAMESPACE], () => ctx.slots.inject('settings.general.item', () =>
+      ctx.slots.register({
+        name: 'settings.general.item', id: 'update-notice', order: 17, locale: NS,
+        inject: (): WebUpdateRowInjected => ({
+          hooks: { updateNotice: updatePreference },
+          setEnabled: async (enabled) => {
+            if (!await updateForm.set('enabled', enabled)) throw new Error('Update notice preference was not saved')
+          },
+        }),
+      }, WebUpdateRow))), 'ui-settings-general: update notice preference')
+  }
   ctx.effect(() => () => { desktopUpdate.dispose() }, 'ui-settings-general: desktop update carrier')
   ctx.slots.inject('sidebar.toggle.badge', () => ctx.slots.register({
     name: 'sidebar.toggle.badge', locale: NS,
-    inject: () => ({ hooks: { desktopUpdate: desktopUpdate.store, connectionState: connection.state } }),
+    inject: () => ({ hooks: { desktopUpdate: desktopUpdate.store, webUpdate: webUpdateStore, connectionState: connection.state } }),
   }, DesktopUpdateBadge))
 
   // Copy freshness is framework-owned: components read the standard `t`
@@ -136,10 +169,13 @@ export function apply(ctx: ClientContext): void {
   let onboardingSteps: readonly SettingsOnboardingStep[] = []
   const shellInjected = (): SettingsRootInjected => ({
     openDesktopUpdate: () => { desktopUpdate.open() },
+    dismissWebUpdate: () => { webUpdate?.dismiss() },
+    openWebUpdateRelease: (url) => { window.open(url, '_blank', 'noopener,noreferrer') },
     reconnect: () => { connection.reconnect() },
     hooks: {
       shortcuts: ctx.shortcuts.catalog,
       desktopUpdate: desktopUpdate.store,
+      webUpdate: webUpdateStore,
       connectionState: connection.state,
       sections: {
         getSnapshot: () => {
