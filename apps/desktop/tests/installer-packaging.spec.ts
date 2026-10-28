@@ -91,7 +91,7 @@ describe('installer preparation preserves application dependencies', () => {
       DSH_DESKTOP_GITHUB_OWNER: 'FORM-BR',
       DSH_DESKTOP_GITHUB_REPO: 'forge',
     }, 'win32', 'x64')
-    expect(config.productName).toBe('FORGE')
+    expect(Reflect.get(config, 'productName')).toBe('FORGE')
     expect(config.publish).toEqual([{ provider: 'github', owner: 'FORM-BR', repo: 'forge' }])
   })
 

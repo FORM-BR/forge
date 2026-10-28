@@ -118,7 +118,8 @@ export function createElectronBuilderConfig(
     },
     productName,
     // Unsigned builds carry their own suffix so a shared file can never pass for a release artifact.
-    artifactName: `deepseek-harness-\${version}-\${os}-\${arch}${unsigned ? '-unsigned' : ''}.\${ext}`,
+    // The default product keeps its historical artifact stem; a rebranded fork uses its own name.
+    artifactName: `${productName === 'DeepSeek Harness' ? 'deepseek-harness' : productName.replace(/\s+/gu, '-')}-\${version}-\${os}-\${arch}${unsigned ? '-unsigned' : ''}.\${ext}`,
     directories: { output: unsigned ? buildPaths.unsignedArtifacts : buildPaths.artifacts },
     asar: true,
     electronDist: buildPaths.electron,

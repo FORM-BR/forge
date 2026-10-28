@@ -19,20 +19,27 @@ const config: Config = { repository: 'FORM-BR/forge', intervalHours: 6, enabled:
 /** Scripted fetcher: returns one answer per call, in order; repeats the last answer once exhausted. */
 function scripted(...answers: readonly GitHubLatestReleaseCheck[]): GitHubLatestReleaseFetcher & { calls: number } {
   let index = 0
-  const fetchLatest = (async () => {
-    const answer = answers[Math.min(index, answers.length - 1)]
+  const fetchLatest: GitHubLatestReleaseFetcher = async () => {
+    const answer = answers[Math.min(index, answers.length - 1)] as GitHubLatestReleaseCheck
     index++
-    fetchLatest.calls = index
     return answer
-  }) as GitHubLatestReleaseFetcher & { calls: number }
-  fetchLatest.calls = 0
-  return fetchLatest
+  }
+  Object.defineProperty(fetchLatest, 'calls', { get: () => index })
+  return fetchLatest as GitHubLatestReleaseFetcher & { calls: number }
 }
 
-function boot(fetchLatest: GitHubLatestReleaseFetcher, overrides: Partial<Config> = {}, currentVersion = () => '1.0.0') {
+/** Overrides for {@link boot}; `omitRepository` drops the field (exactOptionalPropertyTypes forbids an explicit undefined). */
+type BootOverrides = Partial<Omit<Config, 'repository'>> & { omitRepository?: boolean }
+
+/** Build a controller from the shared defaults. */
+function boot(fetchLatest: GitHubLatestReleaseFetcher, overrides: BootOverrides = {}, currentVersion = () => '1.0.0') {
+  const { omitRepository = false, ...rest } = overrides
+  const resolved: Config = omitRepository
+    ? { intervalHours: rest.intervalHours ?? config.intervalHours, enabled: rest.enabled ?? config.enabled }
+    : { ...config, ...rest }
   const ctx = new Context()
   roots.push(ctx)
-  const controller = new UpdateCheckController(ctx, { ...config, ...overrides }, { fetchLatest, currentVersion })
+  const controller = new UpdateCheckController(ctx, resolved, { fetchLatest, currentVersion })
   return { ctx, controller }
 }
 
@@ -61,7 +68,7 @@ describe('the updateCheck Remote namespace', () => {
   })
 
   it('reports disabled when no repository is configured', () => {
-    const { controller } = boot(scripted({ kind: 'unavailable' }), { repository: undefined })
+    const { controller } = boot(scripted({ kind: 'unavailable' }), { omitRepository: true })
     expect(controller.status()).toEqual({ enabled: false })
   })
 
@@ -157,23 +164,23 @@ describe('fetchGitHubLatestRelease', () => {
   afterEach(() => { vi.unstubAllGlobals() })
 
   it('sends the User-Agent and Accept headers, and If-None-Match only when an ETag is supplied', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ tag_name: 'v1.2.0', html_url: 'https://example.com' }), {
+    const fetchMock = vi.fn(async (_input: string, _init?: RequestInit) => new Response(JSON.stringify({ tag_name: 'v1.2.0', html_url: 'https://example.com' }), {
       status: 200, headers: { etag: '"xyz"' },
     }))
     vi.stubGlobal('fetch', fetchMock)
     const signal = new AbortController().signal
     const result = await fetchGitHubLatestRelease('FORM-BR', 'forge', undefined, signal)
     expect(result).toEqual({ kind: 'release', release: { tagName: 'v1.2.0', htmlUrl: 'https://example.com', etag: '"xyz"' } })
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
-    expect(url).toBe('https://api.github.com/repos/FORM-BR/forge/releases/latest')
-    const headers = init.headers as Record<string, string>
+    const firstCall = fetchMock.mock.calls[0]
+    expect(firstCall?.[0]).toBe('https://api.github.com/repos/FORM-BR/forge/releases/latest')
+    const headers = (firstCall?.[1]?.headers ?? {}) as Record<string, string>
     expect(headers['user-agent']).toBe('FORGE')
     expect(headers['accept']).toBe('application/vnd.github+json')
     expect(headers['if-none-match']).toBeUndefined()
 
     await fetchGitHubLatestRelease('FORM-BR', 'forge', '"prev-etag"', signal)
-    const [, secondInit] = fetchMock.mock.calls[1] as [string, RequestInit]
-    expect((secondInit.headers as Record<string, string>)['if-none-match']).toBe('"prev-etag"')
+    const secondCall = fetchMock.mock.calls.at(1)
+    expect(((secondCall?.[1]?.headers ?? {}) as Record<string, string>)['if-none-match']).toBe('"prev-etag"')
   })
 
   it('reports not-modified on HTTP 304 without reading a body', async () => {
@@ -293,7 +300,7 @@ describe('edge cases for full coverage', () => {
     const fetchLatest = scripted({ kind: 'unavailable' })
     const ctx = new Context()
     roots.push(ctx)
-    const controller = new UpdateCheckController(ctx, { repository: undefined, intervalHours: 6, enabled: true }, { fetchLatest, currentVersion: () => '1.0.0' })
+    const controller = new UpdateCheckController(ctx, { intervalHours: 6, enabled: true }, { fetchLatest, currentVersion: () => '1.0.0' })
     await (controller as unknown as { checkNow: () => Promise<void> }).checkNow()
     expect(fetchLatest.calls).toBe(0)
   })
