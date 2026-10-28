@@ -29,10 +29,10 @@ function chip(path: string | undefined, title: string | undefined, gitInfo: GitI
 describe('HeroGitChip', () => {
   it('shows only the branch when the repository name is the Workspace name', async () => {
     const gitInfo = vi.fn<GitInfo>(async path => repoValue(path, 'repform'))
-    render(chip('C:\\Users\\Felipe\\Dev\\repform', 'repform', gitInfo))
+    render(chip('C:\\Users\\dev\\Dev\\repform', 'repform', gitInfo))
     await waitFor(() => { expect(screen.getByText('master')).toBeTruthy() })
     expect(screen.getByTitle(/Git repository/)).toBeTruthy()
-    expect(gitInfo).toHaveBeenCalledWith('C:\\Users\\Felipe\\Dev\\repform', expect.any(AbortSignal))
+    expect(gitInfo).toHaveBeenCalledWith('C:\\Users\\dev\\Dev\\repform', expect.any(AbortSignal))
   })
 
   it('treats the folder name as the Workspace name when the title was renamed', async () => {
@@ -43,7 +43,7 @@ describe('HeroGitChip', () => {
 
   it('compares against the folder name alone while the Workspace title is not known yet', async () => {
     const gitInfo = vi.fn<GitInfo>(async path => repoValue(path, 'repform'))
-    render(chip('C:\\Users\\Felipe\\Dev\\repform', undefined, gitInfo))
+    render(chip('C:\\Users\\dev\\Dev\\repform', undefined, gitInfo))
     await waitFor(() => { expect(screen.getByText('master')).toBeTruthy() })
   })
 

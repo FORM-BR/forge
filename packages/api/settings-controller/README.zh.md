@@ -31,6 +31,12 @@ kind: "package-reference"
 
 `settings.openSettingsDocument()` 准备提供方持有的文档，并用原生文本编辑器打开；该方法不接受浏览器提供的文件系统目标。
 
+### GitHub 发布版本更新检查
+
+`updateCheck` 命名空间回答是否存在更新的 FORGE 发布版本，服务于没有自带 `electron-updater` 的 Web 或源码安装（Electron 桌面应用有自己独立的更新提示）。它由独立的 Loader 条目 `@deepseek-ai/dsh-api-settings-controller/update-check` 挂载，接受 `repository`（GitHub 上的 `owner/repo` 字符串；未设置时检查保持空闲）与 `intervalHours`（默认 6）。`updateCheck.status()` 回答最近一次已知结果且不触发新请求：来自 `DSH_CLIENT_VERSION` 的运行版本、是否有检查正在进行、上次是否失败，以及——当最新发布更新时——其版本号与发布页面 URL。
+
+检查在启动时调用一次 `GET https://api.github.com/repos/<owner>/<repo>/releases/latest`，此后每 `intervalHours` 调用一次，携带 `User-Agent: FORGE`；首次响应之后，后续请求带上存储的 `ETag` 作为 `If-None-Match`，因此未变化的发布版本回答 `304`。网络故障、超时、速率限制或无法解析的响应会把检查标记为失败而不是抛错，最后一次已知的发布版本仍然可见。除这次匿名请求外，不会有任何数据离开本机。
+
 -----
 
 <a id="configuration"></a>

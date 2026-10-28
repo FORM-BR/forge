@@ -3,6 +3,9 @@ import { readFileSync } from 'node:fs'
 import type { NotarizeOptions } from '@electron/notarize'
 import {
   resolveDesktopAppId,
+  resolveDesktopGitHubPublishTarget,
+  resolveDesktopProductName,
+  resolveDesktopWindowsIconOverride,
   resolveMacOSNotarizationEnvironment,
   resolveMacOSSigningEnvironment,
 } from '../scripts/desktop-release-environment.mjs'
@@ -182,6 +185,28 @@ describe('desktop macOS release signature', () => {
         'TeamIdentifier=OTHERID123',
       ].join('\n'), expected)
     }).toThrow(`TeamIdentifier=${expected.teamId}`)
+  })
+
+  it('resolves the packaged product name and Windows icon override', () => {
+    expect(resolveDesktopProductName({})).toBe('DeepSeek Harness')
+    expect(resolveDesktopProductName({ DSH_DESKTOP_PRODUCT_NAME: '  ' })).toBe('DeepSeek Harness')
+    expect(resolveDesktopProductName({ DSH_DESKTOP_PRODUCT_NAME: 'FORGE' })).toBe('FORGE')
+    expect(resolveDesktopWindowsIconOverride({})).toBeUndefined()
+    expect(resolveDesktopWindowsIconOverride({ DSH_DESKTOP_WINDOWS_ICON: '  ' })).toBeUndefined()
+    expect(resolveDesktopWindowsIconOverride({ DSH_DESKTOP_WINDOWS_ICON: 'C:/icons/forge.png' })).toBe('C:/icons/forge.png')
+  })
+
+  it('resolves and validates the optional GitHub publish target', () => {
+    expect(resolveDesktopGitHubPublishTarget({})).toBeUndefined()
+    expect(resolveDesktopGitHubPublishTarget({ DSH_DESKTOP_GITHUB_OWNER: '  ', DSH_DESKTOP_GITHUB_REPO: '  ' })).toBeUndefined()
+    expect(resolveDesktopGitHubPublishTarget({ DSH_DESKTOP_GITHUB_OWNER: 'FORM-BR', DSH_DESKTOP_GITHUB_REPO: 'forge' }))
+      .toEqual({ owner: 'FORM-BR', repo: 'forge' })
+    expect(() => resolveDesktopGitHubPublishTarget({ DSH_DESKTOP_GITHUB_OWNER: 'FORM-BR' })).toThrow(/must both be set/u)
+    expect(() => resolveDesktopGitHubPublishTarget({ DSH_DESKTOP_GITHUB_REPO: 'forge' })).toThrow(/must both be set/u)
+    expect(() => resolveDesktopGitHubPublishTarget({ DSH_DESKTOP_GITHUB_OWNER: 'bad owner!', DSH_DESKTOP_GITHUB_REPO: 'forge' }))
+      .toThrow(/valid GitHub owner/u)
+    expect(() => resolveDesktopGitHubPublishTarget({ DSH_DESKTOP_GITHUB_OWNER: 'FORM-BR', DSH_DESKTOP_GITHUB_REPO: 'bad repo!' }))
+      .toThrow(/valid GitHub repository/u)
   })
 
   it('rejects missing and malformed release identifiers', () => {

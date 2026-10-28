@@ -1,0 +1,111 @@
+# Build e publica uma Release do FORGE para Windows quando uma tag "v*" sobe para o repo.
+#
+# So dispara por tag — nunca em push comum de branch. Minutos de GitHub Actions sao
+# gratuitos em repositorio publico; nao habilitar em repo privado sem o dono decidir
+# (ver NOTICE.md e README.md deste repositorio).
+#
+# O que este workflow faz:
+#   1. builda o repositorio (pnpm install + build:lib:host) e o app Desktop para Windows x64;
+#   2. empacota o instalador NSIS sem assinatura de codigo (DSH_DESKTOP_UNSIGNED=1), ja que
+#      o fork ainda nao tem certificado de assinatura (ver README.md, secao "Baixar e instalar");
+#   3. gera as notas de release a partir dos commits desde a tag anterior;
+#   4. cria/atualiza a GitHub Release da tag com o instalador, seu blockmap e o latest.yml
+#      que o electron-updater consome (ver forge-update-check e DesktopUpdateIndicator).
+#
+# O app id e o nome do produto embutidos no instalador vem de variaveis de ambiente
+# (DSH_DESKTOP_APP_ID, DSH_DESKTOP_PRODUCT_NAME, DSH_DESKTOP_WINDOWS_ICON), configuradas
+# abaixo neste workflow — nao ficam fixos no codigo (apps/desktop/scripts/electron-builder-config.mjs).
+name: forge-release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: forge-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-windows:
+    name: Build e empacotar (Windows x64)
+    runs-on: windows-latest
+    env:
+      DSH_DESKTOP_APP_ID: com.formbr.forge
+      DSH_DESKTOP_PRODUCT_NAME: FORGE
+      DSH_DESKTOP_WINDOWS_ICON: ${{ github.workspace }}/apps/desktop/resources/forge-logo-square.png
+      DSH_DESKTOP_UNSIGNED: '1'
+      DSH_DESKTOP_AUTO_UPDATE_ENV: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # necessario para listar commits desde a tag anterior
+
+      - name: Instalar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.19'
+
+      - name: Instalar pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - name: Resolver a versao da tag
+        id: version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if ($tag -notmatch '^v(?<ver>\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?)$') {
+            throw "forge-release: tag '$tag' nao segue o formato v<semver> (ex.: v0.3.0-forge.1)."
+          }
+          $version = $Matches['ver']
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+
+      - name: Build do repositorio
+        run: pnpm run build:lib:host
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+
+      - name: Empacotar instalador Windows (sem assinatura)
+        run: pnpm run package:desktop:win:x64:unsigned
+
+      - name: Gerar notas de release a partir dos commits desde a tag anterior
+        id: notes
+        shell: pwsh
+        run: |
+          $currentTag = "${{ github.ref_name }}"
+          $previousTag = git describe --tags --abbrev=0 "$currentTag^" 2>$null
+          if ($LASTEXITCODE -ne 0 -or -not $previousTag) {
+            $range = $currentTag
+            $header = "Primeira release do FORGE ($currentTag)."
+          } else {
+            $range = "$previousTag..$currentTag"
+            $header = "Mudancas desde $previousTag :"
+          }
+          $log = git log $range --pretty=format:"- %s (%h)" --no-merges
+          $notesPath = Join-Path $env:RUNNER_TEMP 'release-notes.md'
+          @($header, '', $log) | Out-File -FilePath $notesPath -Encoding utf8
+          "notes_path=$notesPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Publicar/atualizar a GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: FORGE ${{ steps.version.outputs.version }}
+          body_path: ${{ steps.notes.outputs.notes_path }}
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+          files: |
+            apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts/*.exe
+            apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts/*.exe.blockmap
+            apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts/latest.yml

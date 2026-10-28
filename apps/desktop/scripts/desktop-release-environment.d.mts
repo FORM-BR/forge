@@ -1,6 +1,18 @@
 /** Environment variable that supplies the Electron application identifier. */
 export const DESKTOP_APP_ID_ENV: 'DSH_DESKTOP_APP_ID'
 
+/** Environment variable that overrides the packaged product name shown to the installer and OS; defaults to 'DeepSeek Harness'. */
+export const DESKTOP_PRODUCT_NAME_ENV: 'DSH_DESKTOP_PRODUCT_NAME'
+
+/** Environment variable that overrides the Windows installer/app icon path (PNG); defaults to resources/icon-windows.png. */
+export const DESKTOP_WINDOWS_ICON_ENV: 'DSH_DESKTOP_WINDOWS_ICON'
+
+/** Environment variable naming the GitHub repository owner electron-updater checks for releases. */
+export const DESKTOP_GITHUB_OWNER_ENV: 'DSH_DESKTOP_GITHUB_OWNER'
+
+/** Environment variable naming the GitHub repository electron-updater checks for releases. */
+export const DESKTOP_GITHUB_REPO_ENV: 'DSH_DESKTOP_GITHUB_REPO'
+
 /** Environment variable that supplies electron-builder's macOS certificate qualifier. */
 export const MACOS_SIGNING_IDENTITY_ENV: 'DSH_DESKTOP_MACOS_SIGNING_IDENTITY'
 
@@ -48,6 +60,33 @@ export type MacOSNotarizationEnvironment =
  * @returns Reverse-DNS application identifier.
  */
 export function resolveDesktopAppId(env: NodeJS.ProcessEnv): string
+
+/**
+ * Resolve the packaged product name shown in the installer, Start Menu, and window title.
+ * @param env - Packaging environment.
+ * @returns Trimmed product name; 'DeepSeek Harness' unless overridden.
+ */
+export function resolveDesktopProductName(env: NodeJS.ProcessEnv): string
+
+/**
+ * Resolve an absolute override path for the Windows installer/app icon.
+ * @param env - Packaging environment.
+ * @returns Absolute PNG path, or undefined to keep the bundled default icon.
+ */
+export function resolveDesktopWindowsIconOverride(env: NodeJS.ProcessEnv): string | undefined
+
+/** Coordinates of a GitHub-provider auto-update publish target. */
+export interface DesktopGitHubPublishTarget {
+  readonly owner: string
+  readonly repo: string
+}
+
+/**
+ * Resolve a GitHub-provider auto-update publish target, when configured.
+ * @param env - Packaging environment.
+ * @returns GitHub coordinates, or undefined to keep the default deployment.
+ */
+export function resolveDesktopGitHubPublishTarget(env: NodeJS.ProcessEnv): DesktopGitHubPublishTarget | undefined
 
 /**
  * Resolve the npm registry used to materialize the bundled runtime and its external dependencies.

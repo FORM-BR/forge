@@ -3601,6 +3601,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'updateCheckController',
+    summary: 'Host service backing the generated `ctx.remote.updateCheck` namespace.',
+    description: 'Host service backing the generated `ctx.remote.updateCheck` namespace. Polls `GET https://api.github.com/repos/<owner>/<repo>/releases/latest` once at boot and every `intervalHours` after that, and answers the last known result to any caller without triggering a new request.',
+    methods: [
+      {
+        signature: '@Remote status(): UpdateCheckStatus',
+        description: 'Read the last known result without triggering a new check.',
+        parameters: [],
+        returns: 'whether checking is on, the current and latest versions, and the release page URL when a newer version is known.',
+      },
+    ],
+  },
+  {
     key: 'userQuestions',
     summary: '`ctx.userQuestions`: validation plus the scoped answerer waterfall.',
     description: '`ctx.userQuestions`: validation plus the scoped answerer waterfall.',
@@ -8121,6 +8134,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'TypertTypeModel',
     declaration: 'export interface TypertTypeModel {\n    readonly name: string;\n    readonly declaration: string;\n}',
+  },
+  {
+    name: 'UpdateCheckStatus',
+    declaration: 'export interface UpdateCheckStatus {\n    enabled: boolean;\n    checking?: boolean;\n    current?: string;\n    failed?: boolean;\n    newerVersion?: string;\n    releaseUrl?: string;\n}',
   },
   {
     name: 'UpdateTeamTaskRequest',

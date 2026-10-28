@@ -31,6 +31,12 @@ Mount this package as a Loader entry in a profile that serves browser configurat
 
 `settings.openSettingsDocument()` prepares the provider-owned document and opens it with the native text editor; it accepts no browser-supplied filesystem target.
 
+### GitHub release update check
+
+The `updateCheck` namespace answers whether a newer FORGE release exists, for a Web or source install that has no `electron-updater` of its own (the Electron Desktop app carries a separate update indicator). Mount it from its own Loader entry, `@deepseek-ai/dsh-api-settings-controller/update-check`, which accepts `repository` (an `owner/repo` string on GitHub; unset keeps the check idle) and `intervalHours` (default 6). `updateCheck.status()` answers the last known result without triggering a request: the running version from `DSH_CLIENT_VERSION`, whether a check is in flight, whether the last one failed, and — when the latest release is newer — its version and release page URL.
+
+The check calls `GET https://api.github.com/repos/<owner>/<repo>/releases/latest` once at boot and every `intervalHours` afterwards, sending `User-Agent: FORGE` and, after the first response, an `If-None-Match` carrying the stored `ETag` so an unchanged release answers `304`. A network failure, timeout, rate limit, or unparseable response marks the check failed rather than raising, and the last known release stays visible. Nothing beyond that anonymous request leaves the machine.
+
 -----
 
 <a id="configuration"></a>
