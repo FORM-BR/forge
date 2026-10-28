@@ -298,6 +298,16 @@ describe('BrowserBody', () => {
     expect(mounted.view.container.querySelector('iframe')?.getAttribute('src')).toBe('http://localhost:5173/')
   })
 
+  it('keeps the system-browser button disabled and inert until a URL is loaded', () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+    const mounted = mountBrowser()
+    const button = mounted.view.getByRole('button', { name: zh.external })
+    expect(button).toHaveProperty('disabled', true)
+    expect(button.getAttribute('title')).toBe(zh.external)
+    fireEvent.click(button)
+    expect(open).not.toHaveBeenCalled()
+  })
+
   it('opens known Web targets externally and consumes an initial typed navigation', async () => {
     const open = vi.spyOn(window, 'open').mockImplementation(() => null)
     const mounted = mountBrowser({ url: 'https://initial.example/path' })
