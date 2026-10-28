@@ -8,22 +8,31 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { MessageBranchRequest } from '../contract/slots.ts'
 
 /**
- * Restore `text` into a Session's composer draft. The Session must already
- * be catalogued on the Host; this retains it only long enough for the write,
- * waiting for its binding to be ready first so the draft shell exists.
+ * Restore `text` into a Session's draft while it stays retained. The retained
+ * reference must outlive this write and release only after `openSession` has
+ * taken its own hold — releasing to zero references between the two tears
+ * the Session generation (and its draft shell) down immediately.
  * @param ctx - Client root context.
  * @param sessionId - target Session.
  * @param text - draft text; a no-op when empty.
  */
-async function restoreDraft(ctx: Context, sessionId: SessionId, text: string): Promise<void> {
-  if (text === '') return
-  await ctx.sessions.using(sessionId, { source: 'controllerOperation' }, async (reference) => {
-    await reference.ready
-    ctx.conversation.input.for(reference.binding.ctx).setDraft(text)
-  }).catch(() => {
-    // The child Session still opens; losing the restored draft leaves the
-    // user able to retype instead of blocking navigation.
+async function restoreDraft(ctx: Context, sessionId: SessionId): Promise<(text: string) => void> {
+  const reference = ctx.sessions.retain(sessionId, { source: 'controllerOperation' })
+  await reference.ready.catch(() => {
+    // Falls through: a failed open still releases below and opens the child
+    // through the normal navigation path, which reports its own failure.
   })
+  return (text) => {
+    if (text !== '') {
+      try {
+        ctx.conversation.input.for(reference.binding.ctx).setDraft(text)
+      } catch {
+        // The child Session still opens; losing the restored draft leaves
+        // the user able to retype instead of blocking navigation.
+      }
+    }
+    reference.release()
+  }
 }
 
 /**
@@ -57,7 +66,7 @@ export async function performBranch(ctx: Context, sessionId: SessionId, request:
     click_position: clickPosition,
     action: mode,
   })
-  await restoreDraft(ctx, childId, draftText)
+  const releaseChild = await restoreDraft(ctx, childId)
   if (mode === 'rewind') {
     try {
       await ctx.uiWorkspace.archiveSession(sessionId)
@@ -66,4 +75,5 @@ export async function performBranch(ctx: Context, sessionId: SessionId, request:
     }
   }
   ctx.uiWorkspace.openSession(childId)
+  releaseChild(draftText)
 }

@@ -78,13 +78,20 @@ async function bench(initialSettings?: ChatSettings, withBrowserRegistry = true,
     () => Promise.resolve({ ok: true, value: { opened: true } }),
   )
   runtime.remote.provideNamespaces({ session: { openWorkspacePath } })
-  const openSession = vi.fn<(id: SessionId) => void>()
+  // Mirrors ui-workspace's real replaceMain: retains the target (source
+  // 'mainView') synchronously, before the caller's own reference releases, so
+  // a handoff between the two never passes through a zero-reference drop.
+  const openSession = vi.fn<(id: SessionId) => void>((id) => {
+    runtime.sessions.retain(id, { source: 'mainView' })
+  })
+  const archiveSession = vi.fn<(id: SessionId) => Promise<void>>(() => Promise.resolve())
   runtime.ctx.provide('uiWorkspace', {
     openWorkspace: vi.fn(async (_workspaceId: WorkspaceId, beforeOpen: (id: SessionId) => void) => {
       beforeOpen(ROOT)
       openSession(ROOT)
     }),
     openSession,
+    archiveSession,
   } as never)
   const session = sessionFakeFor()
   await runtime.sessions.add({
@@ -126,6 +133,7 @@ async function bench(initialSettings?: ChatSettings, withBrowserRegistry = true,
     },
     runtime, chat, chatSettings, browserAvailable,
     layout, openWorkspacePath, sidebarRight, sidebarRightTabs, session, chatViewApi, rootReference, openSession,
+    archiveSession,
   }
 }
 
@@ -206,6 +214,74 @@ describe('Chat inject API', () => {
     injected.branchAt({ point: { kind: 'after', seq: 18 }, mode: 'branch', draftText: '', clickPosition: 'footer' })
     await vi.waitFor(() => {
       expect(fork).toHaveBeenCalledWith({ sessionId: ROOT, atSeq: 18, increaseTitle: true })
+    })
+    await b.runtime.dispose()
+  })
+
+  it('rewinds at the exact cut point: archives the source, restores the draft, and opens the child without a title bump', async () => {
+    const b = await bench()
+    const CHILD = 'root-child' as SessionId
+    await b.runtime.sessions.add({
+      id: CHILD,
+      summary: { title: 'R', displayTitle: 'R', cwd: '/proj' },
+      session: sessionFakeFor(),
+    })
+    const fork = vi.spyOn(b.runtime.sessions, 'fork').mockResolvedValue(CHILD)
+    const { injected } = b.chatViewApi(b.rootReference)
+    injected.branchAt({
+      point: { kind: 'after', seq: 9 }, mode: 'rewind', draftText: 'continue from here', clickPosition: 'message',
+    })
+    await vi.waitFor(() => {
+      // The exact inclusive Host boundary rewinds call sent, never incremented
+      // (increaseTitle is branch-only; rewind keeps the source title verbatim).
+      expect(fork).toHaveBeenCalledWith({ sessionId: ROOT, atSeq: 9, increaseTitle: false })
+    })
+    await vi.waitFor(() => {
+      const childReference = b.runtime.sessions.retain(CHILD)
+      try {
+        expect(b.runtime.ctx.conversation.input.for(childReference.binding.ctx).state.getSnapshot().draft)
+          .toBe('continue from here')
+      } finally {
+        childReference.release()
+      }
+    })
+    await vi.waitFor(() => {
+      expect(b.archiveSession).toHaveBeenCalledWith(ROOT)
+    })
+    await vi.waitFor(() => {
+      expect(b.openSession).toHaveBeenCalledWith(CHILD)
+    })
+    await b.runtime.dispose()
+  })
+
+  it('rewinds the first message of a Session into a new blank sibling instead of forking', async () => {
+    const b = await bench()
+    const BLANK = 'root-blank' as SessionId
+    await b.runtime.sessions.add({
+      id: BLANK,
+      summary: { title: 'B', displayTitle: 'B', cwd: '/proj' },
+      session: sessionFakeFor(),
+    })
+    b.runtime.sessions.stubCreate(() => Promise.resolve(BLANK))
+    const fork = vi.spyOn(b.runtime.sessions, 'fork')
+    const { injected } = b.chatViewApi(b.rootReference)
+    injected.branchAt({ point: { kind: 'empty' }, mode: 'rewind', draftText: 'first draft', clickPosition: 'message' })
+    await vi.waitFor(() => {
+      expect(b.runtime.sessions.calls).toContainEqual({ method: 'create', args: [{ cwd: '/proj' }] })
+    })
+    expect(fork).not.toHaveBeenCalled()
+    await vi.waitFor(() => {
+      const childReference = b.runtime.sessions.retain(BLANK)
+      try {
+        expect(b.runtime.ctx.conversation.input.for(childReference.binding.ctx).state.getSnapshot().draft)
+          .toBe('first draft')
+      } finally {
+        childReference.release()
+      }
+    })
+    await vi.waitFor(() => {
+      expect(b.archiveSession).toHaveBeenCalledWith(ROOT)
+      expect(b.openSession).toHaveBeenCalledWith(BLANK)
     })
     await b.runtime.dispose()
   })

@@ -56,7 +56,7 @@ const CHAT_NODE_INJECT: ChatNodeInjected = {
 
 /** Services required by the Chat target and its presentation registrations. */
 export const inject = [
-  'slots', 'sessions', 'uiWorkspace', 'uiSession', 'uiConversation', 'locale',
+  'slots', 'sessions', 'uiWorkspace', 'uiSession', 'uiConversation', 'conversation', 'locale',
   'configForms', 'remote', 'remote.session', 'sidebarRight',
 ]
 
