@@ -286,6 +286,58 @@ describe('Chat inject API', () => {
     await b.runtime.dispose()
   })
 
+  it('creates the blank sibling without a cwd when the source Session has none', async () => {
+    const b = await bench()
+    const NO_CWD = 'root-nocwd' as SessionId
+    const BLANK = 'root-blank2' as SessionId
+    await b.runtime.sessions.add({ id: NO_CWD, summary: { title: 'N', displayTitle: 'N' }, session: sessionFakeFor() })
+    await b.runtime.sessions.add({ id: BLANK, summary: { title: 'B', displayTitle: 'B' }, session: sessionFakeFor() })
+    b.runtime.sessions.stubCreate(() => Promise.resolve(BLANK))
+    using reference = b.runtime.sessions.retain(NO_CWD)
+    const { injected } = b.chatViewApi(reference)
+    injected.branchAt({ point: { kind: 'empty' }, mode: 'rewind', draftText: '', clickPosition: 'message' })
+    await vi.waitFor(() => {
+      expect(b.runtime.sessions.calls).toContainEqual({ method: 'create', args: [{}] })
+    })
+    await b.runtime.dispose()
+  })
+
+  it('still opens the child when archiving the source fails, and skips the draft write when empty', async () => {
+    const b = await bench()
+    const CHILD = 'root-child2' as SessionId
+    await b.runtime.sessions.add({ id: CHILD, summary: { title: 'R', displayTitle: 'R', cwd: '/proj' }, session: sessionFakeFor() })
+    vi.spyOn(b.runtime.sessions, 'fork').mockResolvedValue(CHILD)
+    b.archiveSession.mockRejectedValueOnce(new Error('archive refused'))
+    const setDraft = vi.spyOn(b.runtime.ctx.conversation.input, 'for')
+    const { injected } = b.chatViewApi(b.rootReference)
+    injected.branchAt({ point: { kind: 'after', seq: 4 }, mode: 'rewind', draftText: '', clickPosition: 'message' })
+    await vi.waitFor(() => {
+      // The refused archive is reported but never blocks navigation to the child.
+      expect(b.openSession).toHaveBeenCalledWith(CHILD)
+    })
+    // An empty draft performs no composer write at all.
+    expect(setDraft).not.toHaveBeenCalled()
+    await b.runtime.dispose()
+  })
+
+  it('opens the child even when its own initial open fails', async () => {
+    const b = await bench()
+    const CHILD = 'root-child3' as SessionId
+    await b.runtime.sessions.add({
+      id: CHILD,
+      summary: { title: 'R', displayTitle: 'R', cwd: '/proj' },
+      session: sessionFakeFor(),
+      initialOpen: () => Promise.reject(new Error('child open failed')),
+    })
+    vi.spyOn(b.runtime.sessions, 'fork').mockResolvedValue(CHILD)
+    const { injected } = b.chatViewApi(b.rootReference)
+    injected.branchAt({ point: { kind: 'after', seq: 6 }, mode: 'branch', draftText: 'x', clickPosition: 'message' })
+    await vi.waitFor(() => {
+      expect(b.openSession).toHaveBeenCalledWith(CHILD)
+    })
+    await b.runtime.dispose()
+  })
+
   it('addresses file paths under the Session\'s scope and opens them in the right Sidebar', async () => {
     const b = await bench()
     const { injected } = b.chatViewApi(b.rootReference)

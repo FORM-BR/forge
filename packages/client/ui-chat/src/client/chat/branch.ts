@@ -55,8 +55,11 @@ export async function performBranch(ctx: Context, sessionId: SessionId, request:
         increaseTitle: mode === 'branch',
       })
     }
-  } catch {
-    // Fork, create, or title failure leaves the source view unchanged.
+  } catch (error) {
+    // The source view stays unchanged, and the failure is reported rather
+    // than silent: a swallowed rejection made a refused cut look like a
+    // dead button.
+    console.warn('ui-chat: per-message branch/rewind failed:', error)
     return
   }
   ctx.get('productAnalytics')?.track('branch_session_click', {
