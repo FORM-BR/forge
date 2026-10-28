@@ -303,7 +303,7 @@ function makeHarness(
     save: (position) => { savedScroll = position },
     read: () => savedScroll,
   }
-  const forkAt = vi.fn()
+  const branchAt = vi.fn()
   // Rows and the harness must observe the same chat-store instance.
   const chat = createChatStore().create()
   const transcriptView = createSnapshotStore<TranscriptViewMode>('compact')
@@ -453,7 +453,7 @@ function makeHarness(
     loadThrough,
     loadImage: vi.fn(() => Promise.reject(new Error('not used'))),
     chatScroll,
-    forkAt,
+    branchAt,
     // Absent-service default; mention tests override with a real resolver.
     fileMentions: () => undefined,
     t,
@@ -480,7 +480,7 @@ function makeHarness(
     set, setSession: session.set, setChat: chatSource.set, ChatView, props,
     openFile, openSkill, loadOlder, loadThrough, openView,
     setOutline: (value: unknown) => { outlineValue = value },
-    chatScroll, forkAt, toolOwners,
+    chatScroll, branchAt, toolOwners,
     setPerformanceUsage: (mode: 'compact' | 'detailed') => { performanceUsage.set(mode) },
     setGrouped: (value: ConversationGroupedView<ProcessGroupData> | undefined) => {
       grouped = value
@@ -1663,7 +1663,9 @@ describe('ChatView', () => {
     fireEvent.click(branchButtons[0]!)
     // The branch action sends the real turn/end seq (the exact inclusive
     // Host boundary), not the assistant node seq.
-    expect(h.forkAt).toHaveBeenCalledWith(3)
+    expect(h.branchAt).toHaveBeenCalledWith({
+      point: { kind: 'after', seq: 3 }, mode: 'branch', draftText: '', clickPosition: 'footer',
+    })
   }))
 
   it('keeps a later pending occurrence visible when it reuses a durable MessageId', () => {
@@ -3075,7 +3077,9 @@ describe('ChatView', () => {
     expect(buttons).toHaveLength(1)
     expect(buttons[0]!.getAttribute('aria-disabled')).toBeNull()
     fireEvent.click(buttons[0]!)
-    expect(h.forkAt.mock.calls).toEqual([[3]])
+    expect(h.branchAt.mock.calls).toEqual([[{
+      point: { kind: 'after', seq: 3 }, mode: 'branch', draftText: '', clickPosition: 'footer',
+    }]])
   })
 
   it('disables fork when the indexed Turn has a later steering Node', () => {
@@ -3098,7 +3102,7 @@ describe('ChatView', () => {
     const branch = view.getByRole('button', { name: '在新对话中分支' })
     expect(branch.getAttribute('aria-disabled')).toBe('true')
     fireEvent.click(branch)
-    expect(h.forkAt).not.toHaveBeenCalled()
+    expect(h.branchAt).not.toHaveBeenCalled()
   })
 
   it('keeps final content actions but disables branch when Tool and interrupted Think follow it', () => {
@@ -3116,7 +3120,7 @@ describe('ChatView', () => {
     expect(buttons).toHaveLength(1)
     expect(buttons[0]!.getAttribute('aria-disabled')).toBe('true')
     fireEvent.click(buttons[0]!)
-    expect(h.forkAt).not.toHaveBeenCalled()
+    expect(h.branchAt).not.toHaveBeenCalled()
   })
 
   it('renders assistant Markdown across history, streaming, final, and interrupted states while user text stays literal', () => {
