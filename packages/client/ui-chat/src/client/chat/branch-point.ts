@@ -23,3 +23,17 @@ export function branchPointBefore(snapshot: ChatSnapshot, nodeKey: string): Mess
   }
   return { kind: 'after', seq: predecessor.anchorSeq }
 }
+
+/**
+ * Whether rewinding at `turn` requires confirmation: more than one Turn
+ * follows it in the loaded timeline. A cut inside or at the end of the last
+ * or second-to-last Turn needs no confirmation.
+ * @param snapshot - current Chat snapshot.
+ * @param turn - Turn number the cut point falls in or immediately before.
+ * @returns whether more than one later Turn is loaded.
+ */
+export function rewindNeedsConfirmation(snapshot: ChatSnapshot, turn: number): boolean {
+  const index = snapshot.timeline.turnOrder.indexOf(turn)
+  if (index === -1) return snapshot.timeline.turnOrder.length > 1
+  return snapshot.timeline.turnOrder.length - index - 1 > 1
+}

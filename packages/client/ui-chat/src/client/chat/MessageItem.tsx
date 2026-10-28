@@ -3,8 +3,10 @@ import type { ReactNode } from 'react'
 import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { MessageImageSource } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { fileExtension, FileTypeIcon, fileSizeText, JsonBlock, projectUserText, StateDot, TextShimmer } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps } from '../contract/slots.ts'
+import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
+import type { ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps, MessageBranchPoint } from '../contract/slots.ts'
 import type { ModelRetryNode, TurnErrorNode, UserMessageNode } from '../contract/snapshot.ts'
+import { branchPointBefore, rewindNeedsConfirmation } from './branch-point.ts'
 import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
 import { MessageIconActions } from './MessageIconActions.tsx'
@@ -385,9 +387,25 @@ export function PendingSubmissionBubble({ submission, renderMessageImages, t }: 
 
 /** User and admitted-steering keyed Chat renderer. */
 export const UserMessageNodeView = memo(function UserMessageNodeView({
-  node, renderMessageImages, openFile, openSkill, t,
+  node, renderMessageImages, openFile, openSkill, branchAt, useChat, useSession, t,
 }: ChatNodeViewProps<'user' | 'steering'>) {
   const data = node.data
+  const running = useSession(s => s.running)
+  const turn = node.location.kind === 'turn' || node.location.kind === 'step'
+    ? node.location.turn.turn
+    : undefined
+  // Selectors return only primitives: an object literal here would compare
+  // unequal every render and loop the snapshot-store subscription.
+  const pointSeq = useChat((snapshot) => {
+    const resolved = branchPointBefore(snapshot, node.key)
+    return resolved.kind === 'empty' ? null : resolved.seq
+  })
+  const point = useMemo<MessageBranchPoint>(
+    () => (pointSeq === null ? { kind: 'empty' } : { kind: 'after', seq: pointSeq }),
+    [pointSeq],
+  )
+  const confirmRequired = useChat(snapshot => turn !== undefined && rewindNeedsConfirmation(snapshot, turn))
+  const messageId: MessageId | undefined = data.kind === 'steering' ? data.messageId : undefined
   return (
     <UserStyleBubble
       content={data.content}
@@ -402,6 +420,18 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
           time={data.time}
           clock="start"
           className={css.actions}
+          disabledWhileRunning={running}
+          rewindConfirmRequired={confirmRequired}
+          onRewind={() => {
+            branchAt({
+              point, mode: 'rewind', draftText: text, ...messageId === undefined ? {} : { messageId }, clickPosition: 'message',
+            })
+          }}
+          onBranch={() => {
+            branchAt({
+              point, mode: 'branch', draftText: text, ...messageId === undefined ? {} : { messageId }, clickPosition: 'message',
+            })
+          }}
           t={t}
         />
       )}

@@ -1623,6 +1623,7 @@ describe('ChatView', () => {
     expect(pendingBubble).not.toBeNull()
     fireEvent.click(within(pendingBubble as HTMLElement).getByRole('button', { name: '复制' }))
     expect(writeText).toHaveBeenCalledWith('interrupt now')
+    // A local echo (not yet a durable Node) carries no rewind/branch actions at all.
     expect(within(pendingBubble as HTMLElement).queryByRole('button', { name: '在新对话中分支' })).toBeNull()
     expect(turnProcessControl(view.container)).toBeNull()
     expect(runningContent(view.container)?.textContent).toMatch(/^深度求索中，用时 \d+秒\.\.\.$/)
@@ -1645,22 +1646,26 @@ describe('ChatView', () => {
     expect(view.getAllByText('interrupt now')).toHaveLength(1)
     expect(view.container.querySelector('[data-pending-steering]')).toBeNull()
     // Only the durable steering bubble: the turn is still running, so its
-    // assistant narration owns no footer yet, and a steering bubble never
-    // carries a branch action.
+    // assistant narration owns no footer yet. Its own branch action exists but
+    // stays disabled while the run is active.
     expect(view.getAllByRole('button', { name: '复制' })).toHaveLength(1)
     const durableBubble = view.getByText('interrupt now').closest('[class*="userRow"]') as HTMLElement
-    expect(within(durableBubble).queryByRole('button', { name: '在新对话中分支' })).toBeNull()
+    const steeringBranch = within(durableBubble).getByRole('button', { name: '在新对话中分支' })
+    expect(steeringBranch.getAttribute('aria-disabled')).toBe('true')
 
     act(() => {
       h.setSession({ running: false })
       h.setChat({ turnEnds: new Map([[1, 3]]) })
     })
     // The Turn Tail belongs to the closed Turn, independently of a later
-    // steering bubble's placement in the Chat list.
+    // steering bubble's placement in the Chat list; the steering bubble keeps
+    // its own available branch action now the turn is no longer running.
     const branchButtons = view.getAllByRole('button', { name: '在新对话中分支' })
-    expect(branchButtons).toHaveLength(1)
-    expect(branchButtons[0]!.getAttribute('aria-disabled')).toBeNull()
-    fireEvent.click(branchButtons[0]!)
+    expect(branchButtons).toHaveLength(2)
+    const footerBranch = within(view.container.querySelector('[data-turn-tail]') as HTMLElement)
+      .getByRole('button', { name: '在新对话中分支' })
+    expect(footerBranch.getAttribute('aria-disabled')).toBeNull()
+    fireEvent.click(footerBranch)
     // The branch action sends the real turn/end seq (the exact inclusive
     // Host boundary), not the assistant node seq.
     expect(h.branchAt).toHaveBeenCalledWith({
@@ -2179,11 +2184,13 @@ describe('ChatView', () => {
       turnEnds: new Map([[1, 4], [2, 6]]),
     })
     const view = render(<h.ChatView {...h.props} />)
-    // Branch renders only under assistant answers; user bubbles keep copy alone.
+    // The Turn Tail's footer IconActions render only under the last
+    // content-bearing assistant answer of each Turn; both user messages carry
+    // their own independent, always-present branch action.
     expect(view.getAllByRole('button', { name: '复制' })).toHaveLength(4)
     const branchButtons = view.getAllByRole('button', { name: '在新对话中分支' })
-    expect(branchButtons).toHaveLength(2)
-    expect(branchButtons.map(button => button.getAttribute('aria-disabled'))).toEqual([null, null])
+    expect(branchButtons).toHaveLength(4)
+    expect(branchButtons.map(button => button.getAttribute('aria-disabled'))).toEqual([null, null, null, null])
   })
 
   it('folds Think and Tool rows before the final answer without unmounting them', () => {
@@ -3072,11 +3079,12 @@ describe('ChatView', () => {
       turnEnds: new Map([[1, 3]]),
     })
     const view = render(<h.ChatView {...h.props} />)
-    // The user bubble offers no branch; the settled answer's is live.
-    const buttons = view.getAllByRole('button', { name: '在新对话中分支' })
-    expect(buttons).toHaveLength(1)
-    expect(buttons[0]!.getAttribute('aria-disabled')).toBeNull()
-    fireEvent.click(buttons[0]!)
+    // The user message carries its own always-available branch action; the
+    // Turn Tail's footer branch is the one gated on transcript-tail position.
+    const footerBranch = within(view.container.querySelector('[data-turn-tail]') as HTMLElement)
+      .getByRole('button', { name: '在新对话中分支' })
+    expect(footerBranch.getAttribute('aria-disabled')).toBeNull()
+    fireEvent.click(footerBranch)
     expect(h.branchAt.mock.calls).toEqual([[{
       point: { kind: 'after', seq: 3 }, mode: 'branch', draftText: '', clickPosition: 'footer',
     }]])
@@ -3099,7 +3107,10 @@ describe('ChatView', () => {
     const view = render(<h.ChatView {...h.props} />)
     expect(view.getByText('change direction')).toBeTruthy()
     expect(chat.locations.getTurn(1)).toContain(later.key)
-    const branch = view.getByRole('button', { name: '在新对话中分支' })
+    // The Turn Tail's own branch is unavailable; the user message's branch
+    // (a separate per-message action) is unaffected by this Turn's later evidence.
+    const branch = within(view.container.querySelector('[data-turn-tail]') as HTMLElement)
+      .getByRole('button', { name: '在新对话中分支' })
     expect(branch.getAttribute('aria-disabled')).toBe('true')
     fireEvent.click(branch)
     expect(h.branchAt).not.toHaveBeenCalled()
@@ -3116,10 +3127,12 @@ describe('ChatView', () => {
     })
     const view = render(<h.ChatView {...h.props} />)
     expect(view.getAllByRole('button', { name: '复制' })).toHaveLength(2)
-    const buttons = view.getAllByRole('button', { name: '在新对话中分支' })
-    expect(buttons).toHaveLength(1)
-    expect(buttons[0]!.getAttribute('aria-disabled')).toBe('true')
-    fireEvent.click(buttons[0]!)
+    // The user message's own branch action is unaffected by this Turn's
+    // trailing Tool/Think; only the Turn Tail's footer branch is unavailable.
+    const footerBranch = within(view.container.querySelector('[data-turn-tail]') as HTMLElement)
+      .getByRole('button', { name: '在新对话中分支' })
+    expect(footerBranch.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(footerBranch)
     expect(h.branchAt).not.toHaveBeenCalled()
   })
 

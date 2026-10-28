@@ -1,36 +1,50 @@
 // Shared IconActions chrome for user and assistant messages: copy
-// live, optional branch wiring, and an optional date-aware clock.
+// live, optional rewind/branch wiring, and an optional date-aware clock.
 
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import {
-  IconBranchOutlineRegular, IconCheckOutlineRegular, IconCopyOutlineRegular, Tooltip, writeClipboard,
+  useCallback, useEffect, useId, useRef, useState, type ReactNode,
+} from 'react'
+import {
+  Button, IconBranchOutlineRegular, IconCheckOutlineRegular, IconCopyOutlineRegular, IconRewindOutlineRegular,
+  Menu, Tooltip, writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { formatMessageClock } from './message-chrome.ts'
 import { useCalendarDay } from './use-calendar-day.ts'
 import css from './MessageIconActions.module.css'
 
-export interface MessageIconActionsProps {
+/** Rewind and branch share availability and the disabled-while-running reason; each keeps its own click handler. */
+export interface MessageHistoryActions {
+  onRewind?: (() => void) | undefined
+  onBranch?: (() => void) | undefined
+  /** The message is not eligible from the current loaded window (later non-rendered evidence follows it). */
+  unavailable?: boolean | undefined
+  /** A turn is running; both actions stay visible but inert with a dedicated reason. */
+  disabledWhileRunning?: boolean | undefined
+  /**
+   * Rewind requires confirmation when more than one turn follows the cut
+   * point; branch never asks. Ignored when `onRewind` is absent.
+   */
+  rewindConfirmRequired?: boolean | undefined
+}
+
+export interface MessageIconActionsProps extends MessageHistoryActions {
   /** Plain text the copy action writes. */
   text: string
   /** Unix epoch ms for the clock label; omitted for transient messages. */
   time?: number | undefined
   /** Clock before icons (user) or after (assistant). */
   clock: 'start' | 'end'
-  /** Fork the session at this message; omission hides the branch action. */
-  onBranch?: (() => void) | undefined
-  /** The message is not a completed transcript tail, so branch stays visible but unavailable. */
-  branchUnavailable?: boolean | undefined
   /** Parent layout class composed onto the actions row. */
   className?: string | undefined
   /**
    * Slot-rendered actions owned by independent plugins, placed between the
-   * built-in copy and branch controls.
+   * built-in copy and rewind/branch controls.
    */
   extraActions?: ReactNode
   /**
    * Icon-row Turn-usage trigger (the TurnUsagePanel pill), seated after the
-   * branch control at the end of the icon cluster.
+   * rewind/branch controls at the end of the icon cluster.
    */
   usageAction?: ReactNode
   /** The owning view's locale seat, passed down as a plain prop. */
@@ -39,15 +53,17 @@ export interface MessageIconActionsProps {
 
 /**
  * Copy / branch (/ clock) IconActions row shared by user and assistant chrome.
- * @param props - Copy text, event time, clock side, branch callback, className.
+ * @param props - Copy text, event time, clock side, rewind/branch callbacks, className.
  * @returns The actions row element.
  */
 export function MessageIconActions({
-  text, time, clock, onBranch, branchUnavailable = false, className,
-  extraActions, usageAction, t,
+  text, time, clock, onRewind, onBranch, unavailable = false, disabledWhileRunning = false,
+  rewindConfirmRequired = false, className, extraActions, usageAction, t,
 }: MessageIconActionsProps) {
   const day = useCalendarDay()
-  const reasonId = useId()
+  const branchReasonId = useId()
+  const rewindReasonId = useId()
+  const [confirming, setConfirming] = useState(false)
   // Same success chrome as CodeBlock: a short check swap after the write,
   // gated so re-clicks during the window neither re-copy nor stack timers.
   const [copied, setCopied] = useState(false)
@@ -79,6 +95,25 @@ export function MessageIconActions({
       {formatMessageClock(time, t, day)}
     </span>
   )
+  const inert = unavailable || disabledWhileRunning
+  const branchLabel = disabledWhileRunning
+    ? t('message.actionsDisabledWhileRunning')
+    : unavailable ? t('message.branchUnavailable') : t('message.branch')
+  const rewindLabel = disabledWhileRunning
+    ? t('message.actionsDisabledWhileRunning')
+    : unavailable ? t('message.rewindUnavailable') : t('message.rewind')
+  const confirmRewind = useCallback(() => {
+    setConfirming(false)
+    onRewind?.()
+  }, [onRewind])
+  const rewindClick = useCallback(() => {
+    if (inert) return
+    if (rewindConfirmRequired) setConfirming(true)
+    else onRewind?.()
+  }, [inert, onRewind, rewindConfirmRequired])
+  // Menu's own effects key on onClose identity; an inline arrow here would
+  // recreate it every render and loop (see Menu.tsx's open-gated effects).
+  const closeConfirm = useCallback(() => { setConfirming(false) }, [])
   return (
     <div className={className === undefined ? css.actions : `${css.actions} ${className}`} data-clock={clock}>
       {clock === 'start' ? clockEl : null}
@@ -88,24 +123,61 @@ export function MessageIconActions({
         </button>
       </Tooltip>
       {extraActions}
+      {onRewind !== undefined && (
+        <Menu
+          open={confirming}
+          onClose={closeConfirm}
+          anchor={(
+            <Tooltip label={rewindLabel} side="bottom">
+              {/* Native disabled buttons do not deliver the hover/focus events Tooltip needs. */}
+              <button
+                type="button"
+                className={css.action}
+                aria-label={t('message.rewind')}
+                aria-disabled={inert || undefined}
+                aria-describedby={inert ? rewindReasonId : undefined}
+                data-unavailable={inert || undefined}
+                onClick={rewindClick}
+              >
+                <IconRewindOutlineRegular />
+              </button>
+            </Tooltip>
+          )}
+        >
+          <div className={css.confirmPopover}>
+            <p className={css.confirmText}>{t('message.rewindConfirm.body')}</p>
+            <div className={css.confirmButtons}>
+              <Button variant="outline" size="sm" onClick={closeConfirm}>
+                {t('message.rewindConfirm.cancel')}
+              </Button>
+              <Button variant="primary" size="sm" onClick={confirmRewind}>
+                {t('message.rewindConfirm.accept')}
+              </Button>
+            </div>
+          </div>
+        </Menu>
+      )}
+      {onRewind !== undefined && inert && (
+        <span id={rewindReasonId} className={css.visuallyHidden}>{rewindLabel}</span>
+      )}
       {onBranch !== undefined && (
-        <Tooltip label={branchUnavailable ? t('message.branchUnavailable') : t('message.branch')} side="bottom">
+        <Tooltip label={branchLabel} side="bottom">
           {/* Native disabled buttons do not deliver the hover/focus events Tooltip needs. */}
           <button
             type="button"
             className={css.action}
             aria-label={t('message.branch')}
-            aria-disabled={branchUnavailable || undefined}
-            aria-describedby={branchUnavailable ? reasonId : undefined}
-            data-unavailable={branchUnavailable || undefined}
-            onClick={branchUnavailable ? undefined : onBranch}
+            aria-disabled={inert || undefined}
+            aria-describedby={inert ? branchReasonId : undefined}
+            data-unavailable={inert || undefined}
+            onClick={inert ? undefined : onBranch}
           >
             <IconBranchOutlineRegular />
           </button>
         </Tooltip>
       )}
-      {onBranch !== undefined && branchUnavailable && (
-        <span id={reasonId} className={css.visuallyHidden}>{t('message.branchUnavailable')}</span>
+      {onBranch !== undefined && inert && (
+        <span id={branchReasonId} className={css.visuallyHidden}>{branchLabel}</span>
       )}
       {clock === 'end'
         ? <span className={css.endInfo}>{usageAction}{clockEl}</span>

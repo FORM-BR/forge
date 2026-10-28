@@ -1656,3 +1656,20 @@ export const IconMicrophoneOutlineRegular = (props: IconProps) => (
 export const IconMicrophoneOutlineMedium = (props: IconProps) => (
   <IconMicrophoneOutlineArtwork {...props} strokeWidth={ICON_MEDIUM_STROKE} />
 )
+
+const IconRewindOutlineArtwork = ({ size = 16, className, strokeWidth }: WeightedIconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" strokeWidth={strokeWidth}>
+    <path d="M2.5 8A5.5 5.5 0 1 1 8 13.5" stroke="currentColor" strokeLinecap="round" />
+    <path d="M2.5 4.5V8H6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+)
+
+/** Regular one-pixel IconRewindOutline artwork: a counter-clockwise arc back to a starting point. */
+export const IconRewindOutlineRegular = (props: IconProps) => (
+  <IconRewindOutlineArtwork {...props} strokeWidth={ICON_REGULAR_STROKE} />
+)
+
+/** Medium IconRewindOutline artwork with a 1.3px stroke. */
+export const IconRewindOutlineMedium = (props: IconProps) => (
+  <IconRewindOutlineArtwork {...props} strokeWidth={ICON_MEDIUM_STROKE} />
+)
