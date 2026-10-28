@@ -32,10 +32,9 @@ No `cordis.patch.yml` do perfil, o `name` do insert pode apontar direto para o
 ```yaml
 - insert:
     - id: experimental-cua-screen-border
-      name: 'C:/Users/Felipe/Dev/<checkout>/forge/plugins/cua-border/index.js'
+      name: 'C:/caminho/para/<checkout>/forge/plugins/cua-border/index.js'
       config: {}
 ```
 
-Validação visual, de geometria e de tracking está registrada no Vault de
-`C:\Users\Felipe\OneDrive\Documentos\Vault-IA\forge\` (nota "Forge - busca web
-e controle de tela").
+Validação visual, de geometria e de tracking foi feita manualmente pelo
+mantenedor; não há suíte automatizada para o overlay WPF.

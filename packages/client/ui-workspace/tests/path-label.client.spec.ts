@@ -3,7 +3,7 @@ import { abbreviatePath, PATH_LABEL_MAX } from '../src/client/status/path-label.
 
 describe('abbreviatePath', () => {
   it('returns a path that fits unchanged', () => {
-    expect(abbreviatePath('C:\\Users\\Felipe\\Dev\\repo')).toBe('C:\\Users\\Felipe\\Dev\\repo')
+    expect(abbreviatePath('C:\\Users\\dev\\Dev\\repo')).toBe('C:\\Users\\dev\\Dev\\repo')
     expect(abbreviatePath('/home/a/repo')).toBe('/home/a/repo')
   })
 
@@ -14,7 +14,7 @@ describe('abbreviatePath', () => {
   })
 
   it('keeps backslashes for a long Windows path and drops the drive prefix', () => {
-    const label = abbreviatePath('C:\\Users\\Felipe\\Dev\\forge-features\\status-bar\\packages', 36)
+    const label = abbreviatePath('C:\\Users\\dev\\Dev\\forge-features\\status-bar\\packages', 36)
     expect(label).toBe('…\\forge-features\\status-bar\\packages')
     expect(label.length).toBeLessThanOrEqual(36)
   })

@@ -17,7 +17,7 @@ param(
 #    ao lado do cwd do servidor. Se o modo seguro tambem falhar: balao de erro final, sem loop. Boot normal bom: nada muda.
 #    Para ver o fallback sem quebrar nada: `launch-forge.ps1 web -SimularFalha`.
 #  - o servidor roda com cwd num diretorio neutro, NUNCA na raiz do repo (o sandbox do Forge marca o cwd
-#    com integridade Low e isso quebrou os hooks do git; ver Vault-IA/geral/Forge - sandbox Windows ...).
+#    com integridade Low de forma permanente e isso quebra os hooks do git).
 $ErrorActionPreference = 'Stop'
 $r = if ($env:FORGE_REPO_ROOT) { $env:FORGE_REPO_ROOT } else { $PSScriptRoot }   # a pasta deste script (instalacao portatil); FORGE_REPO_ROOT: so para testar outra worktree
 $state = Join-Path $env:LOCALAPPDATA 'forge-launch'
