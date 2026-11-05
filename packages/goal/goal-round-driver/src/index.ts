@@ -11,6 +11,8 @@ import type { GoalMessageSource, GoalRef, GoalView } from '@deepseek-ai/dsh-goal
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, MessageId, MessageSource } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, UserMessage } from '@deepseek-ai/dsh-session'
+import type { ToolExecution } from '@deepseek-ai/dsh-tools'
+import { Config, resolveConfig, type ResolvedConfig } from './config.ts'
 import { renderGoalRoundPrompt } from './prompt.ts'
 
 export { renderGoalRoundPrompt } from './prompt.ts'
@@ -23,6 +25,8 @@ interface RoundIdentity {
   readonly goalId: GoalRef['id']
   readonly revision: number
   readonly round: number
+  /** Whether this round is an enforced re-anchor onto the workspace anchors. */
+  readonly reanchor: boolean
 }
 
 /** One queued, claimed, or admitted goal message retained until whole-agent quiescence. */
@@ -43,6 +47,8 @@ interface DriverState {
   requested: boolean
   run: Promise<void> | undefined
   stopping: boolean
+  /** Root-level tool results the goal agent produced since its last enforcement. */
+  callsSinceAnchor: number
 }
 
 /** Whether a source identifies an automatic, positive-numbered goal round. */
@@ -55,6 +61,7 @@ function sameRound(source: GoalMessageSource, round: RoundIdentity): boolean {
   return source.goalId === round.goalId
     && source.revision === round.revision
     && source.round === round.round
+    && (source.reanchor === true) === round.reanchor
 }
 
 /** Compare the complete queued record to the driver's reservation. */
@@ -73,7 +80,8 @@ function renderThrown(value: unknown): string {
 }
 
 /** Install automatic same-session continuation and its race fences. */
-export function apply(ctx: Context): void {
+export function apply(ctx: Context, config?: Config): void {
+  const resolved: ResolvedConfig = resolveConfig(config ?? {})
   const states = new Map<Agent, DriverState>()
 
   /** Create state for an exact currently live agent. */
@@ -88,6 +96,7 @@ export function apply(ctx: Context): void {
       requested: false,
       run: undefined,
       stopping: false,
+      callsSinceAnchor: 0,
     }
     states.set(agent, state)
     return state
@@ -172,15 +181,24 @@ export function apply(ctx: Context): void {
     }
 
     const round = goal.roundsStarted + 1
-    const content = renderGoalRoundPrompt(goal, round)
+    const reanchor = resolved.reanchorCadence > 0 && state.callsSinceAnchor >= resolved.reanchorCadence
+    if (reanchor) state.callsSinceAnchor = 0
+    const content = renderGoalRoundPrompt(goal, round, reanchor ? { reanchor: true } : undefined)
     const message = createUserMessage({
       content,
-      source: { kind: 'goal', goalId: goal.id, revision: goal.revision, round },
+      source: {
+        kind: 'goal',
+        goalId: goal.id,
+        revision: goal.revision,
+        round,
+        ...(reanchor ? { reanchor: true } : {}),
+      },
     })
     const reservation: RoundAttempt = {
       goalId: goal.id,
       revision: goal.revision,
       round,
+      reanchor,
       messageId: message.id,
       content,
       phase: 'queued',
@@ -254,6 +272,7 @@ export function apply(ctx: Context): void {
       state.attempt = undefined
       state.competingQueued = false
       state.needsCheckpoint = false
+      state.callsSinceAnchor = 0
     })
     ctx.on('agent/status', ({ agent, status }) => {
       const state = stateFor(agent)
@@ -339,6 +358,13 @@ export function apply(ctx: Context): void {
         default:
           return
       }
+    })
+
+    ctx.on('tools/result', (exec: ToolExecution) => {
+      if (exec.parent !== undefined || exec.signal.aborted) return
+      const state = exec.agent === undefined ? undefined : states.get(exec.agent)
+      if (state === undefined) return
+      state.callsSinceAnchor += 1
     })
 
     /** Fail closed unless the queued prompt still owns the exact live revision. */
