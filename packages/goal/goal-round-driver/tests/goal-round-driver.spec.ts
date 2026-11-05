@@ -6,11 +6,13 @@ import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import GoalService, { GoalId } from '@deepseek-ai/dsh-goal'
 import type { GoalView } from '@deepseek-ai/dsh-goal'
-import { createUserMessage, LlmAdapter, LlmError  } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, LlmAdapter, LlmError, ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
+import type { ToolExecution, ToolExecutionToken } from '@deepseek-ai/dsh-tools'
+import type { Config } from '../src/config.ts'
 import * as goalSession from '../src/index.ts'
 
 declare module '@deepseek-ai/dsh-llm' {
@@ -19,7 +21,12 @@ declare module '@deepseek-ai/dsh-llm' {
   }
 }
 
-type ScriptEntry = StreamChunk[] | Error | 'hang' | ((options: GenerateOptions) => StreamChunk[])
+type ScriptEntry =
+  | StreamChunk[]
+  | AsyncIterable<StreamChunk>
+  | Error
+  | 'hang'
+  | ((options: GenerateOptions) => StreamChunk[] | AsyncIterable<StreamChunk>)
 
 /** Small request-recording adapter with controllable failure and cancellation. */
 class ScriptedAdapter extends LlmAdapter {
@@ -47,7 +54,7 @@ class ScriptedAdapter extends LlmAdapter {
       return
     }
     const chunks = typeof entry === 'function' ? entry(options) : entry
-    for (const chunk of chunks) yield chunk
+    for await (const chunk of chunks) yield chunk
   }
 }
 
@@ -69,11 +76,42 @@ function maxTokensResponse(text: string): StreamChunk[] {
   ]
 }
 
+const testSignal = new AbortController().signal
+
+/** Build a pipeline execution for a synthetic `tools/result` emission. */
+function stubToolExecution(
+  input: Omit<ToolExecution, 'token' | 'rootCallId'> & {
+    token?: ToolExecutionToken
+    rootCallId?: ToolExecution['rootCallId']
+  },
+): ToolExecution {
+  return {
+    token: input.token ?? Symbol('goal-reanchor-execution') as ToolExecutionToken,
+    ...input,
+    rootCallId: input.rootCallId ?? input.callId,
+  }
+}
+
 /** Complete request history as a single string for ordering assertions. */
 function requestText(request: GenerateOptions): string {
   return request.messages
     .flatMap(message => message.content)
     .filter(block => block.type === 'text')
+    .map(block => block.text)
+    .join('\n')
+}
+
+/**
+ * The goal-round prompt of the current continuation only. Each dispatched
+ * request carries the full accumulated history, so per-round assertions must
+ * read the trailing goal-sourced user message rather than the flattened list.
+ */
+function currentRoundText(request: GenerateOptions): string {
+  const goalMessage = [...request.messages]
+    .reverse()
+    .find(message => message.role === 'user' && message.source?.kind === 'goal')
+  return (goalMessage?.content ?? [])
+    .filter((block): block is { type: 'text'; text: string } => block.type === 'text')
     .map(block => block.text)
     .join('\n')
 }
@@ -92,12 +130,12 @@ afterEach(async () => {
 })
 
 /** Mount a real loop with only its model scripted. */
-async function harness(script: ScriptEntry[]): Promise<Harness> {
+async function harness(script: ScriptEntry[], config?: Config): Promise<Harness> {
   const ctx = new Context()
   contexts.push(ctx)
   await mountAgentLoopTestDependencies(ctx)
   await ctx.plugin(GoalService)
-  const driver = await ctx.plugin(goalSession)
+  const driver = await ctx.plugin(goalSession, config)
   await ctx.plugin(AgentLoop, { agents: [] })
   const adapter = new ScriptedAdapter(script)
   ctx.llm.registerAdapter(['mock'], adapter)
@@ -216,6 +254,62 @@ describe('same-session goal driving', () => {
     expect(requestText(test.adapter.requests[1]!)).toContain('Round: 2/2')
     expect(test.agent.session.snapshotEvents().flatMap(event =>
       event.type === 'request/header' ? [event.data.reason] : [])).toEqual(['initial', 'series'])
+  })
+
+  it('re-anchors a prompted round after the configured root-tool cadence', async () => {
+    // Hold round 1 open so the two synthetic tool results are emitted while
+    // the agent is still running: the driver reads the cadence only when it
+    // reserves the next round, so the emissions must land before then.
+    let releaseRoundOne: () => void = () => {}
+    const roundOneGate = new Promise<void>((resolve) => { releaseRoundOne = resolve })
+    const gatedRoundOne = (async function* (): AsyncGenerator<StreamChunk> {
+      yield { type: 'block-start', index: 0, blockType: 'text' }
+      await roundOneGate
+      yield { type: 'block-end', index: 0, block: { type: 'text', text: 'r1' } }
+      yield { type: 'finish', reason: { kind: 'stop' } }
+    })()
+    const test = await harness([gatedRoundOne, textResponse('r2'), textResponse('r3')], { reanchorCadence: 2 })
+    test.ctx.goals.create(test.agent, { objective: 'keep working', maxGoalRounds: 3 })
+
+    // Round 1 is dispatched before any root tool result advances the cadence.
+    await waitForRequests(test.adapter, 1)
+    expect(currentRoundText(test.adapter.requests[0]!)).not.toContain('<goal_anchor>')
+
+    // Two root tool results now reach the configured cadence, so the next
+    // round must re-anchor onto the current workspace anchors.
+    test.ctx.emit('tools/result', stubToolExecution({
+      callId: ToolCallId('reanchor-cadence-1'),
+      name: 'read',
+      arguments: { file_path: 'file.txt' },
+      agent: test.agent,
+      signal: testSignal,
+    }), { content: [], isError: false, value: null })
+    test.ctx.emit('tools/result', stubToolExecution({
+      callId: ToolCallId('reanchor-cadence-2'),
+      name: 'read',
+      arguments: { file_path: 'file.txt' },
+      agent: test.agent,
+      signal: testSignal,
+    }), { content: [], isError: false, value: null })
+    releaseRoundOne()
+
+    // Every remaining round is text-synchronous, so one stable wait for the
+    // durable round cap is enough; the re-anchor lands on the round after the
+    // cadence and the reset leaves the next round plain again.
+    await waitForRequests(test.adapter, 3)
+    expect(currentRoundText(test.adapter.requests[0]!)).not.toContain('<goal_anchor>')
+    expect(currentRoundText(test.adapter.requests[1]!)).toContain('<goal_anchor>')
+    expect(currentRoundText(test.adapter.requests[2]!)).not.toContain('<goal_anchor>')
+
+    // The re-anchor flag is logged with the source, not only the prompt text,
+    // so the round stays reconstructable from the session log.
+    const reanchors: (boolean | undefined)[] = []
+    for (const event of test.agent.session.snapshotEvents()) {
+      if (event.type === 'user/message' && event.data.source.kind === 'goal' && event.data.source.round > 0) {
+        reanchors.push(event.data.source.reanchor)
+      }
+    }
+    expect(reanchors).toEqual([undefined, true, undefined])
   })
 
   it('never adopts activation from an already-live driver and waits for explicit resume', async () => {

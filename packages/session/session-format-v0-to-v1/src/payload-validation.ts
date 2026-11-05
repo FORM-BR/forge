@@ -585,10 +585,11 @@ function messageSourceValue(
       stringValue(source['senderName'], `${label} senderName`)
       return
     case 'goal':
-      assertReleasedV0Keys(source, ['kind', 'goalId', 'revision', 'round'], [], label)
+      assertReleasedV0Keys(source, ['kind', 'goalId', 'revision', 'round'], ['reanchor'], label)
       nonEmptyString(source['goalId'], `${label} goalId`)
       positiveIntegerValue(source['revision'], `${label} revision`)
       positiveIntegerValue(source['round'], `${label} round`)
+      if (source['reanchor'] !== undefined) booleanValue(source['reanchor'], `${label} reanchor`)
       return
     case 'skill-invocation':
       assertReleasedV0Keys(source, ['kind', 'name', 'form'], [], label)
