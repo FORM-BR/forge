@@ -50,6 +50,11 @@ export interface GoalMessageSource {
   readonly revision: number
   /** Positive admitted continuation round. */
   readonly round: number
+  /**
+   * True when this round re-anchors the objective onto the current workspace
+   * instructions and memory/feedback anchors rather than only continuing.
+   */
+  readonly reanchor?: boolean
 }
 
 declare module '@deepseek-ai/dsh-llm' {

@@ -1,8 +1,9 @@
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, type ContentBlock } from '@deepseek-ai/dsh-llm'
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import {
   GoalId,
+  type GoalMessageSource,
   type GoalSnapshotChangeMeta,
   type GoalView,
 } from '@deepseek-ai/dsh-goal'
@@ -35,11 +36,23 @@ function appendChange(session: Session): void {
   session.append('goal/change', change)
 }
 
-function appendRound(session: Session, turn: number, content = renderGoalRoundPrompt(view(turn - 2), turn - 1)): void {
-  const source = { kind: 'goal', goalId: change.goal.id, revision: 1, round: turn - 1 } as const
+function appendRound(
+  session: Session,
+  turn: number,
+  content?: ContentBlock[],
+  reanchor = false,
+): void {
+  const source: GoalMessageSource = {
+    kind: 'goal',
+    goalId: change.goal.id,
+    revision: 1,
+    round: turn - 1,
+    ...(reanchor ? { reanchor: true } : {}),
+  }
   session.append('turn/start', { turn })
   session.append('user/message', createUserMessage({
-    content, source,
+    content: content ?? renderGoalRoundPrompt(view(turn - 2), turn - 1, reanchor ? { reanchor: true } : undefined),
+    source,
   }), { surfaceOp: 'append' })
   session.append('turn/end', { turn, reason: { kind: 'completed' } })
 }
@@ -124,5 +137,39 @@ describe('goal-round-driver prompt invariants', () => {
       code: 'INVARIANT',
       packageName: '@deepseek-ai/dsh-goal-round-driver',
     })
+  })
+
+  it('reconstructs a re-anchor round from the canonical re-anchor prompt', async () => {
+    const { session } = await mount()
+    appendChange(session)
+
+    // Round 1 re-anchors; the canonical renderer output must be admitted.
+    expect(() => { appendRound(session, 2, undefined, true) }).not.toThrow()
+    // A following re-anchor round folds the first and still matches.
+    expect(() => { appendRound(session, 3, undefined, true) }).not.toThrow()
+  })
+
+  it('rejects a re-anchor source whose content omits the anchor prefix', async () => {
+    const { session } = await mount()
+    appendChange(session)
+
+    expect(() => {
+      appendRound(session, 2, renderGoalRoundPrompt(view(0), 1), true)
+    }).toThrow(expect.objectContaining<Partial<InvariantError>>({
+      code: 'INVARIANT',
+      packageName: '@deepseek-ai/dsh-goal-round-driver',
+    }))
+  })
+
+  it('rejects a plain source whose content carries the anchor prefix', async () => {
+    const { session } = await mount()
+    appendChange(session)
+
+    expect(() => {
+      appendRound(session, 2, renderGoalRoundPrompt(view(0), 1, { reanchor: true }))
+    }).toThrow(expect.objectContaining<Partial<InvariantError>>({
+      code: 'INVARIANT',
+      packageName: '@deepseek-ai/dsh-goal-round-driver',
+    }))
   })
 })

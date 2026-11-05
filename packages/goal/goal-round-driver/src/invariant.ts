@@ -51,7 +51,11 @@ function validateEvent(
   if (event.type !== 'user/message') return
   const source = event.data.source
   if (source.kind !== 'goal' || source.round <= 0) return
-  const expected = renderGoalRoundPrompt(goalView(foldChecked(prior, fail), source, fail), source.round)
+  const expected = renderGoalRoundPrompt(
+    goalView(foldChecked(prior, fail), source, fail),
+    source.round,
+    source.reanchor === true ? { reanchor: true } : undefined,
+  )
   if (!isDeepStrictEqual(event.data.content, expected)) {
     fail(`goal round ${source.round} content does not match the package-owned continuation prompt`)
   }
