@@ -31,7 +31,7 @@ export function apply(ctx) {
     description:
       'Mostra o estado do fluxo FORGE: branch e sujeira da Trilha A (o harness em uso) '
       + 'e da Trilha B (staging de edição), além das versões (tags) existentes.',
-    parameters: {},
+    parameters: { type: 'object', properties: {} },
     output: {
       schema: { type: 'object' },
       render: (_args, value) => [
