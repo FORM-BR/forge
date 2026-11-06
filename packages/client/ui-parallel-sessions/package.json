@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-client-ui-parallel-sessions",
   "description": "Web card that offers independent tasks as separate sessions",
-  "version": "0.2.0-rc.1",
+  "version": "0.2.1",
   "publishConfig": {
     "access": "public"
   },
