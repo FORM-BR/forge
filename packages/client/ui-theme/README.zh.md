@@ -33,7 +33,7 @@ kind: "package-reference"
 
 ### 风格（Look）
 
-风格行（「通用」分区，位于字号步进器之后）顶部是一个吸顶的实时预览（产品的缩小版：侧栏条、带星座的新会话首屏、输入框、运行行、链接与开关），下方提供七个相互独立的选项，每个都作为 `ui-theme` 设置文档的顶层字段存储；第一项为默认值。预览仅作装饰（`aria-hidden`，无可聚焦元素），读取与真实界面相同的变量，因此无需关闭设置即可立即看到每个选项的效果。
+风格行（「通用」分区，位于字号步进器之后）顶部是一个吸顶的实时预览（产品的缩小版：侧栏条、带星座的新会话首屏、输入框、运行行、链接与开关），下方提供八个相互独立的选项，每个都作为 `ui-theme` 设置文档的顶层字段存储；第一项为默认值。预览仅作装饰（`aria-hidden`，无可聚焦元素），读取与真实界面相同的变量，因此无需关闭设置即可立即看到每个选项的效果。
 
 | 字段 | 选项 |
 |---|---|
@@ -44,10 +44,11 @@ kind: "package-reference"
 | `working` | `anvil`、`sparks`、`bar` |
 | `motion` | `full`、`indicator`、`off` |
 | `signature` | `on`、`off` |
+| `fontPack` | `claude`、`system` |
 
 快照以 `ThemeSnapshot.look` 携带它们，`ThemeRuntime.setLook(field, value)` 写入单个字段，Host 启动脚本在首帧绘制前写入 `body[data-dsh-<字段>="<值>"]`（head 中的 CSS 同时绘制配色的底色，因此不会闪烁）；ui-layout 的 presenter 负责让这些属性保持最新。系统的「减少动态效果」偏好始终等同于 `motion: off`。
 
-`look.css` 是唯一含有字面 Look 颜色的样式表。每个非 `forge` 的配色在浅色与深色下重新定义表面与文字 token（`--dsw-alias-bg-base`、`-layer-1..3`、`-overlay`、`-module-platform`、`--dsw-specific-sidebar-fill`、`--dsw-alias-label-primary/secondary/tertiary`），并发布 `--dsh-palette-accent` 与 `--dsh-palette-accent-2`；测试会对每个配色和模式检查 WCAG 对比度（主文字相对底色不低于 7，次文字 4.5，三级文字 3，主文字相对浮层 4.5，配色强调色 3）。`theme` 强调色跟随配色；显式强调色直接设置 `--dsh-accent` 与 `--dsh-accent-2`。其他包读取它们时必须带回退值，因为默认 Look（`forge` 配色、`theme` 强调色）不定义其中任何一个。使用显式强调色，或在非 `forge` 配色上使用 `theme` 时，样式表还会把绘制发送按钮（`--dsw-alias-button-info-fill`）、链接、运行标签、「预览」徽标、开关与主按钮的产品 token 指向强调色，并为 `::selection` 着色；该映射从不作用于默认 Look，默认 Look 保持产品蓝。纹理发布 `--dsh-backdrop-wash`（由配色派生）、`--dsh-backdrop-ink`、`--dsh-backdrop-tile` 与 `--dsh-backdrop-size`（仅在 `backdrop` 不是 `plain` 时存在）。样本 token（`--dsh-swatch-p-<配色>-bg|fg|accent`、`--dsh-swatch-a-<强调色>`、`--dsh-tile-<纹理>`）始终定义，供风格行预览未选中的选项。「通用」分区末尾的「关于」行显示 FORM 署名与 inForm 邀请；`signature: off` 会将其隐藏。
+`look.css` 是唯一含有字面 Look 颜色的样式表。每个非 `forge` 的配色在浅色与深色下重新定义表面与文字 token（`--dsw-alias-bg-base`、`-layer-1..3`、`-overlay`、`-module-platform`、`--dsw-specific-sidebar-fill`、`--dsw-alias-label-primary/secondary/tertiary`），并发布 `--dsh-palette-accent` 与 `--dsh-palette-accent-2`；测试会对每个配色和模式检查 WCAG 对比度（主文字相对底色不低于 7，次文字 4.5，三级文字 3，主文字相对浮层 4.5，配色强调色 3）。`theme` 强调色跟随配色；显式强调色直接设置 `--dsh-accent` 与 `--dsh-accent-2`。其他包读取它们时必须带回退值，因为默认 Look（`forge` 配色、`theme` 强调色）不定义其中任何一个。使用显式强调色，或在非 `forge` 配色上使用 `theme` 时，样式表还会把绘制发送按钮（`--dsw-alias-button-info-fill`）、链接、运行标签、「预览」徽标、开关与主按钮的产品 token 指向强调色，并为 `::selection` 着色；该映射从不作用于默认 Look，默认 Look 保持产品蓝。纹理发布 `--dsh-backdrop-wash`（由配色派生）、`--dsh-backdrop-ink`、`--dsh-backdrop-tile` 与 `--dsh-backdrop-size`（仅在 `backdrop` 不是 `plain` 时存在）。样本 token（`--dsh-swatch-p-<配色>-bg|fg|accent`、`--dsh-swatch-a-<强调色>`、`--dsh-tile-<纹理>`）始终定义，供风格行预览未选中的选项。`fontPack` 字段重新设定字体栈：`claude`（默认值）把内置的 Inter 与 JetBrains Mono 字形（`pack-fonts.css`）排在各平台回退之前，`system` 则重述原始的系统字体栈。「通用」分区末尾的「关于」行显示 FORM 署名与 inForm 邀请；`signature: off` 会将其隐藏。
 
 ### 注册主题
 

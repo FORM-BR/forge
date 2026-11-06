@@ -48,6 +48,8 @@ export const THEME_LOOK_CHOICES = {
   motion: ['full', 'indicator', 'off'],
   /** Whether the FORM signature lines render. */
   signature: ['on', 'off'],
+  /** Font pack styling the interface and code stacks; `claude` is the Inter/JetBrains Mono pack. */
+  fontPack: ['claude', 'system'],
 } as const
 
 /** Look field names, also their settings-document field names. */
@@ -69,6 +71,8 @@ export interface ThemeLook {
   motion: typeof THEME_LOOK_CHOICES.motion[number]
   /** FORM signature visibility. */
   signature: typeof THEME_LOOK_CHOICES.signature[number]
+  /** Font pack for the interface and code stacks. */
+  fontPack: typeof THEME_LOOK_CHOICES.fontPack[number]
 }
 
 /** Look field names in Style-row order. */
@@ -76,7 +80,7 @@ export const THEME_LOOK_FIELDS = Object.keys(THEME_LOOK_CHOICES) as ThemeLookFie
 
 /** Look when the user-settings document has no override: the first choice of each field. */
 export const DEFAULT_LOOK: ThemeLook = Object.freeze({
-  palette: 'forge', accent: 'theme', backdrop: 'plain', hero: 'constellation', working: 'anvil', motion: 'full', signature: 'on',
+  palette: 'forge', accent: 'theme', backdrop: 'plain', hero: 'constellation', working: 'anvil', motion: 'full', signature: 'on', fontPack: 'claude',
 })
 
 /** Durable theme section shared by the Host schema and the browser scope. */
@@ -107,6 +111,7 @@ export const ThemeSettingsSchema: z<ThemeSettings> = z.object({
   working: lookFieldSchema('working'),
   motion: lookFieldSchema('motion'),
   signature: lookFieldSchema('signature'),
+  fontPack: lookFieldSchema('fontPack'),
 })
 
 /**

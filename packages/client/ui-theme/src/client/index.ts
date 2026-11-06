@@ -431,6 +431,7 @@ function lookOf(read: <F extends ThemeLookField>(field: F) => ThemeLook[F]): The
     working: read('working'),
     motion: read('motion'),
     signature: read('signature'),
+    fontPack: read('fontPack'),
   })
 }
 
