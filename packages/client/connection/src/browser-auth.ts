@@ -119,7 +119,10 @@ function cookieValue(headerValue: string, name: string): string | undefined {
 
 /** Serialize the fixed browser-session attributes; generated names and values are cookie-safe base64url. */
 function sessionCookie(name: string, value: string, expiresAt: number, maxAgeSeconds: number): string {
-  return `${name}=${value}; Max-Age=${String(maxAgeSeconds)}; Path=/; Expires=${new Date(expiresAt).toUTCString()}; HttpOnly; SameSite=Strict`
+  // Lax, not Strict: the one-time ?token= hand-off usually arrives from another
+  // site or app (chat link, QR scanner), and browsers never ship Strict cookies
+  // on that cross-site navigation, so the follow-up request would answer 401.
+  return `${name}=${value}; Max-Age=${String(maxAgeSeconds)}; Path=/; Expires=${new Date(expiresAt).toUTCString()}; HttpOnly; SameSite=Lax`
 }
 
 function signature(secret: Buffer, body: string): Buffer {
