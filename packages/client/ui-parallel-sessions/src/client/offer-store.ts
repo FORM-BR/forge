@@ -4,6 +4,11 @@
  * carries, so the row that renders the call is the one place that can hand it to the pinned seat.
  * One call owns one entry: a later call replaces it, and a settled or dismissed entry ignores
  * further publications of the same call.
+ *
+ * A dismissed or fully settled call leaves a tombstone per Session: the transcript row unmounts
+ * and remounts as the history window moves, and without the tombstone that remount would
+ * republish the declined offer forever. The tombstone keeps the latest declined callId only;
+ * a newer call with a different identity still offers normally.
  */
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -38,7 +43,8 @@ export interface ParallelOfferSource {
 export interface ParallelOfferStore {
   readonly state: ParallelOfferSource
   /**
-   * Publish the offer one call proposed; ignored once that call's entry exists.
+   * Publish the offer one call proposed; ignored once that call's entry exists or
+   * once that call was dismissed or fully settled (its tombstone).
    * @param sessionId - the Session whose transcript renders the call.
    * @param offer - the call identity and its tasks.
    */
@@ -54,6 +60,8 @@ export interface ParallelOfferStore {
 /** @returns the offer store shared by the row and the pinned card. */
 export function createParallelOfferStore(): ParallelOfferStore {
   const store = createSnapshotStore<ParallelOfferMap>(new Map())
+  /** Latest dismissed or fully settled callId per Session; a remount must not resurrect it. */
+  const gone = new Map<SessionId, string>()
 
   const write = (sessionId: SessionId, next: ParallelOffer | undefined): void => {
     const current = store.getSnapshot()
@@ -63,11 +71,17 @@ export function createParallelOfferStore(): ParallelOfferStore {
     store.set(entries)
   }
 
+  /** Bound reads: the snapshot store methods are not stable `this` references. */
+  const read = (): ParallelOfferMap => store.getSnapshot()
+  const watch = (listener: () => void): (() => void) => store.subscribe(listener)
+
   return {
-    state: { getSnapshot: store.getSnapshot, subscribe: store.subscribe },
+    state: { getSnapshot: read, subscribe: watch },
     publish: (sessionId, offer) => {
+      // A settled or dismissed entry belongs to the same call: it must not come back,
+      // even when an unmount cleared the entry and the row remounted.
+      if (gone.get(sessionId) === offer.callId) return
       const existing = store.getSnapshot().get(sessionId)
-      // A settled or dismissed entry belongs to the same call: it must not come back.
       if (existing?.callId === offer.callId) return
       write(sessionId, offer)
     },
@@ -75,11 +89,14 @@ export function createParallelOfferStore(): ParallelOfferStore {
     settle: (sessionId, title) => {
       const offer = store.getSnapshot().get(sessionId)
       if (offer === undefined) return
-      write(sessionId, { callId: offer.callId, tasks: offer.tasks.filter(task => task.title !== title) })
+      const tasks = offer.tasks.filter(task => task.title !== title)
+      if (tasks.length === 0) gone.set(sessionId, offer.callId)
+      write(sessionId, { callId: offer.callId, tasks })
     },
     dismiss: (sessionId) => {
       const offer = store.getSnapshot().get(sessionId)
       if (offer === undefined) return
+      gone.set(sessionId, offer.callId)
       write(sessionId, { callId: offer.callId, tasks: [] })
     },
   }

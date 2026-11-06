@@ -1,4 +1,4 @@
-﻿import { useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   IconChevronDownOutlineRegular, IconCloseOutlineRegular, IconCompareSplitOutlineRegular,
   IconQuestionOutlineRegular, Menu, Tooltip, useDismissOnOutsidePointer,
@@ -54,17 +54,26 @@ type StartState = 'starting' | 'opened' | 'failed'
  */
 export function ParallelSessionsAction(props: ParallelSessionsActionProps) {
   const sessionId = props.sessionId
-  const offer = props.useParallelOffer(offers => sessionId === undefined ? undefined : offers.get(sessionId))
+  const offer = props.useParallelOffer(offers => offers.get(sessionId))
   const [expanded, setExpanded] = useState(false)
   const [states, setStates] = useState<Record<string, StartState>>({})
   const [menuTask, setMenuTask] = useState<string | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   useDismissOnOutsidePointer(rootRef, expanded, setExpanded)
-  if (sessionId === undefined || offer === undefined || offer.tasks.length === 0) return null
+  if (offer === undefined || offer.tasks.length === 0) return null
   const start = (task: ParallelTask, mode: ParallelStartMode): void => {
     setStates(current => ({ ...current, [task.title]: 'starting' }))
-    void props.startSession(sessionId, task, mode).then(
+    // A synchronous throw must settle as 'failed' too: handed to .then directly
+    // it would escape the promise chain and leave the task in 'starting' forever.
+    let started: Promise<void>
+    try {
+      started = props.startSession(sessionId, task, mode)
+    } catch {
+      setStates(current => ({ ...current, [task.title]: 'failed' }))
+      return
+    }
+    void started.then(
       () => {
         setStates(current => ({ ...current, [task.title]: 'opened' }))
         props.settle(sessionId, task.title)
