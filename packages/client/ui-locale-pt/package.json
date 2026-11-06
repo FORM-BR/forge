@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-client-ui-locale-pt",
   "description": "Brazilian Portuguese language pack for the Forge web GUI: the pt-BR language definition and its namespace dictionaries",
-  "version": "0.2.0-rc.1",
+  "version": "0.2.1",
   "publishConfig": {
     "access": "public"
   },

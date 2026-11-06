@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-cost-meter",
   "description": "Replay-aware catalog-priced API cost measurement service (ctx.costMeter) for the DeepSeek Harness",
-  "version": "0.2.0-rc.1",
+  "version": "0.2.1",
   "publishConfig": {
     "access": "public"
   },
