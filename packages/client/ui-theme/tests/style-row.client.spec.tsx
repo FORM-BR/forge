@@ -74,12 +74,12 @@ describe('StyleRow', () => {
 
   it('marks the persisted choice of every field as pressed', () => {
     mount({
-      palette: 'nord', accent: 'inform', backdrop: 'grid', hero: 'off', working: 'bar', motion: 'indicator', signature: 'off',
+      palette: 'nord', accent: 'inform', backdrop: 'grid', hero: 'off', working: 'bar', motion: 'indicator', signature: 'off', fontPack: 'system',
     })
-    for (const name of ['palette.nord', 'accent.inform', 'backdrop.grid', 'hero.off', 'working.bar', 'motion.indicator', 'signature.off']) {
+    for (const name of ['palette.nord', 'accent.inform', 'backdrop.grid', 'hero.off', 'working.bar', 'motion.indicator', 'signature.off', 'fontPack.system']) {
       expect(pressed(name)).toBe('true')
     }
-    for (const name of ['palette.forge', 'accent.theme', 'backdrop.plain', 'hero.constellation', 'working.anvil', 'motion.full', 'signature.on']) {
+    for (const name of ['palette.forge', 'accent.theme', 'backdrop.plain', 'hero.constellation', 'working.anvil', 'motion.full', 'signature.on', 'fontPack.claude']) {
       expect(pressed(name)).toBe('false')
     }
   })
