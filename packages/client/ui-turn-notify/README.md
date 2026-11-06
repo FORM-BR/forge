@@ -5,6 +5,8 @@ kind: "package"
 
 # ui-turn-notify — central de avisos de fim de turno
 
+English | [中文](README.zh.md)
+
 ## Para que serve
 
 Com várias sessões rodando ao mesmo tempo (o FORGE fazendo o básico enquanto você trabalha em outra coisa), é fácil
