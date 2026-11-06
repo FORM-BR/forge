@@ -38,6 +38,8 @@ export interface Config {
   motion: Volatile<ThemeLook['motion']>
   /** FORM signature visibility. */
   signature: Volatile<ThemeLook['signature']>
+  /** Font pack for the interface and code stacks. */
+  fontPack: Volatile<ThemeLook['fontPack']>
 }
 
 /** Live theme, typography, and style preferences. */
@@ -51,6 +53,7 @@ export const Config = z.object({
   working: lookFieldSchema('working').volatile(),
   motion: lookFieldSchema('motion').volatile(),
   signature: lookFieldSchema('signature').volatile(),
+  fontPack: lookFieldSchema('fontPack').volatile(),
 })
 
 /** Supply the current palette before browser plugins start.
@@ -68,6 +71,7 @@ export function apply(ctx: Context, config: Config): void {
       working: config.working.get(),
       motion: config.motion.get(),
       signature: config.signature.get(),
+      fontPack: config.fontPack.get(),
     }))
   }, { prepend: true })
 }
