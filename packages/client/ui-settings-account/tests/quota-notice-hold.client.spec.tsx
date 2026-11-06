@@ -52,7 +52,7 @@ const storedView: AccountView = {
   links: { usageUrl: 'http://localhost:8081/usage', topUpUrl: 'http://localhost:8081/top_up' },
 }
 const theme: ThemeSnapshot = {
-  preference: 'light', fontSize: 14, active: { id: 'light', colorScheme: 'light', tokens: {} }, themes: [], revision: 0, look: { palette: 'forge', accent: 'graphite', backdrop: 'plain', hero: 'constellation', working: 'anvil', motion: 'full', signature: 'on' },
+  preference: 'light', fontSize: 14, active: { id: 'light', colorScheme: 'light', tokens: {} }, themes: [], revision: 0, look: { palette: 'forge', accent: 'graphite', backdrop: 'plain', hero: 'constellation', working: 'anvil', motion: 'full', signature: 'on', fontPack: 'claude' },
 }
 
 /** The account settings commands, trimmed to what this composition renders. */

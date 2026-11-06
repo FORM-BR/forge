@@ -13,7 +13,7 @@ afterEach(cleanup)
 
 const theme: ThemeSnapshot = {
   preference: 'light', fontSize: 14,
-  active: { id: 'light', colorScheme: 'light', tokens: {} }, themes: [], revision: 0, look: { palette: 'forge', accent: 'graphite', backdrop: 'plain', hero: 'constellation', working: 'anvil', motion: 'full', signature: 'on' },
+  active: { id: 'light', colorScheme: 'light', tokens: {} }, themes: [], revision: 0, look: { palette: 'forge', accent: 'graphite', backdrop: 'plain', hero: 'constellation', working: 'anvil', motion: 'full', signature: 'on', fontPack: 'claude' },
 }
 
 it('claims onboarding while loading, offers API key fallback, and completes after login', () => {

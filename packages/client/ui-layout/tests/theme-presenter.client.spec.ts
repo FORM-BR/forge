@@ -7,7 +7,7 @@ import { DARK_ATTRIBUTE, LOOK_ATTRIBUTE_PREFIX, THEME_SOURCE_ATTRIBUTE, ThemePre
 const LIGHT_THEME_COLOR = 'rgb(255, 255, 255)'
 const DARK_THEME_COLOR = 'rgb(21, 21, 23)'
 const LOOK: ThemeLook = {
-  palette: 'forge', accent: 'graphite', backdrop: 'plain', hero: 'constellation', working: 'anvil', motion: 'full', signature: 'on',
+  palette: 'forge', accent: 'graphite', backdrop: 'plain', hero: 'constellation', working: 'anvil', motion: 'full', signature: 'on', fontPack: 'claude',
 }
 const LOOK_FIELDS = Object.keys(LOOK) as (keyof ThemeLook)[]
 
