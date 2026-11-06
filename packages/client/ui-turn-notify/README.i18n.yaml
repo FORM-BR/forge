@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/client/ui-turn-notify/README.md
+/:
+  en: 62aafb0be58b2a9e
+  zh: 5b89dcc38b7a3297
+/ui-turn-notify-central-de-avisos-de-fim-de-turno:
+  en: 232f65b70f2ea7e5
+  zh: 5f2a0298474fc077
+/ui-turn-notify-central-de-avisos-de-fim-de-turno/para-que-serve:
+  en: aa50e5adf7f90157
+  zh: 56d88d9e271578d5
+/ui-turn-notify-central-de-avisos-de-fim-de-turno/regras-de-aviso:
+  en: 10b5720d1d750d55
+  zh: 6cefcc3d3d78e211
+/ui-turn-notify-central-de-avisos-de-fim-de-turno/prefer-ncias:
+  en: a9208ee34749f055
+  zh: 86f79d16ea39ef2c
+/ui-turn-notify-central-de-avisos-de-fim-de-turno/estrutura:
+  en: 2d487b7f5cf4aab7
+  zh: 001231659ff1cd17
+/ui-turn-notify-central-de-avisos-de-fim-de-turno/limita-es-conhecidas:
+  en: 591fd9d200f8bc64
+  zh: a00f9db11f1f47a9
+/ui-turn-notify-central-de-avisos-de-fim-de-turno/testes:
+  en: 4c286c13861f3c6b
+  zh: 7b9fc215b23c8d37
