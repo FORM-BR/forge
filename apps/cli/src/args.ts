@@ -59,8 +59,21 @@ interface PluginInvocation {
   args: string[]
 }
 
+/** List or toggle MCP server rows in one profile's patch or the shared home patch. */
+interface McpInvocation {
+  mode: 'mcp'
+  /** Profile whose patch to edit, when scope is a profile layer. */
+  profile?: string | undefined
+  /** Edit the shared home patch that applies to every profile. */
+  home: boolean
+  /** `list`, `on`, or `off`. */
+  operation: 'list' | 'on' | 'off'
+  /** Loader entry id when operation is `on` or `off`. */
+  id?: string | undefined
+}
+
 /** The resolved `dsh` invocation. Help, version, and errors exit inside {@link parseDshArgs}. */
-export type DshInvocation = ProfileInvocation | DumpConfigInvocation | DumpConfigSchemaInvocation | PluginInvocation
+export type DshInvocation = ProfileInvocation | DumpConfigInvocation | DumpConfigSchemaInvocation | PluginInvocation | McpInvocation
 
 /** Launcher flags for profile boot and configuration dumps. */
 interface BootOptions {
@@ -102,6 +115,8 @@ Examples:
   dsh tui --resume <session>                arguments after the launcher flags reach the app
   dsh web --help                            the web app's own flags and help
   dsh plugin --profile tui add <package>    install a plugin into the tui profile
+  dsh mcp --profile web list               list the MCP servers of the web profile
+  dsh mcp --home off mcp-service           disable a server for every profile
 `
 
 /**
@@ -156,7 +171,7 @@ export function parseDshArgs(argv: readonly string[], version: string): DshInvoc
   program
     .name('dsh')
     .version(version, '-V, --version', 'output the version number')
-    .usage('[--profile] <name> [options] [app-args...]\n       dsh plugin --profile <name> <pnpm-args...>')
+    .usage('[--profile] <name> [options] [app-args...]\n       dsh plugin --profile <name> <pnpm-args...>\n       dsh mcp [--profile <name>|--home] [list|on <id>|off <id>]')
     .description('dsh: boot a DeepSeek Harness profile — an ordered stack of plugin-bundle patch layers under your own overrides.')
     .addHelpText('after', HELP_EXAMPLES)
     .exitOverride()
@@ -203,8 +218,42 @@ export function parseDshArgs(argv: readonly string[], version: string): DshInvoc
       })
   }
 
+  if (first === 'mcp') {
+    const mcp = program.command('mcp').description("list and toggle MCP server rows in one profile's patch file or the shared home patch")
+    mcp
+      .option('--profile <name>', 'the profile whose MCP configuration to edit', selectProfile)
+      .option('--home', 'edit the shared home patch that applies to every profile')
+      .argument('[operation]', '"list" (default), or "on <id>" / "off <id>"')
+      .argument('[id]', 'the Loader entry id of the server')
+      .action((operation: string | undefined, id: string | undefined, options: { profile?: string; home?: boolean }) => {
+        const profile = options.profile
+        const home = options.home === true
+        if (profile !== undefined && home) program.error('error: --profile and --home are mutually exclusive')
+        if (profile === undefined && !home) program.error('error: --profile <name> or --home is required')
+        if (profile !== undefined) {
+          if (profile === '') program.error('error: --profile needs a name')
+          rejectElectronProfile(mcp, profile)
+        }
+        const op = operation ?? 'list'
+        if (op === 'list') {
+          if (id !== undefined) program.error('error: list takes no server id')
+        } else if (op === 'on' || op === 'off') {
+          if (id === undefined || id === '') program.error(`error: ${op} needs a server id, e.g. dsh mcp ${op} <id>`)
+        } else {
+          program.error(`error: unknown mcp operation ${JSON.stringify(op)}; expected list, on, or off`)
+        }
+        resolved = {
+          mode: 'mcp',
+          ...(profile === undefined ? {} : { profile }),
+          home,
+          operation: op,
+          ...(op === 'list' ? {} : { id }),
+        }
+      })
+  }
+
   try {
-    const expanded = first !== undefined && !first.startsWith('-') && first !== 'plugin'
+    const expanded = first !== undefined && !first.startsWith('-') && first !== 'plugin' && first !== 'mcp'
       ? ['--profile', ...argv]
       : argv
     program.parse(expanded, { from: 'user' })

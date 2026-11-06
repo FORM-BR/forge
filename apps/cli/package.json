@@ -96,9 +96,11 @@
     "js-yaml": "^4.2.0",
     "node-addon-require-builtin": "^0.1.6",
     "@deepseek-ai/dsh-http-proxy": "workspace:*",
+    "yaml": "^2.8.1",
     "@deepseek-ai/dsh-mcp-resources": "workspace:*",
     "@deepseek-ai/dsh-plugin-manager": "workspace:*",
     "@deepseek-ai/dsh-atomic-write": "workspace:*",
+    "@deepseek-ai/dsh-api-mcp-status": "workspace:*",
     "@deepseek-ai/dsh-agent-preset": "workspace:*",
     "@deepseek-ai/dsh-experimental-voice-input-bundle": "workspace:*",
     "@deepseek-ai/dsh-experimental-auto-review": "workspace:*"

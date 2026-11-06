@@ -43,6 +43,16 @@ export async function runCli(): Promise<void> {
       process.exit(await runPlugin(invocation.profile, invocation.args))
       break
     }
+    case 'mcp': {
+      const { runMcp } = await import('./mcp.ts')
+      process.exit(await runMcp({
+        scope: invocation.home ? 'home' : 'profile',
+        profile: invocation.profile,
+        operation: invocation.operation,
+        id: invocation.id,
+      }))
+      break
+    }
     case 'dump-config': {
       const { runDumpConfig } = await import('./dump-config.ts')
       runDumpConfig(

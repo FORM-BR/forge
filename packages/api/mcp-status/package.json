@@ -34,6 +34,10 @@
       "types": "./lib/types/tool.d.ts",
       "default": "./lib/types/tool.js"
     },
+    "./patch-file": {
+      "types": "./lib/types/patch-file.d.ts",
+      "default": "./lib/types/patch-file.js"
+    },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
