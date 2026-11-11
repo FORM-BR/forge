@@ -7,10 +7,13 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
+// Type-only: pulls the `modelDirectories` Context merge.
+import type {} from '@deepseek-ai/dsh-client-ui-model-selection/client'
 // Type-only: pulls the SlotRegistry service merge (ctx.slots).
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: pulls the `uiWorkspace` Context merge and the service type.
@@ -40,8 +43,8 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
   }
 }
 
-/** Required services: the slot and locale registries, both Controllers, and workspace navigation. */
-export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'uiWorkspace']
+/** Required services: the slot and locale registries, both Controllers, workspace navigation, and the shared model directory. */
+export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'uiWorkspace', 'modelDirectories']
 
 /**
  * Register the dictionaries, the transcript line, and the header chip.
@@ -57,6 +60,7 @@ export function apply(ctx: Context): void {
     sessionId: SessionId,
     task: ParallelTask,
     mode: ParallelStartMode,
+    selection?: ModelSelection,
   ): Promise<void> => {
     // The offer was made in this session's workspace, so its copy starts where the work is.
     let workspaceId = workspaces.list.getSnapshot().items
@@ -72,6 +76,12 @@ export function apply(ctx: Context): void {
     const created = await sessions.create(workspaceId === undefined ? {} : { workspaceId })
     await sessions.using(created, { source: 'parallelSessions' }, async (reference) => {
       const binding = await reference.ready
+      // Apply the picker's selection before the prompt, so the new Session's first
+      // request already runs the chosen model and effort.
+      if (selection !== undefined) {
+        const applied = await ctx.modelDirectories.directoryFor(created).select(selection)
+        if (!applied.ok) throw new Error(`parallel session model selection rejected: ${applied.error.message}`)
+      }
       const result = await binding.session.prompt([{ type: 'text', text: task.prompt }], 'queue')
       if (!result.ok) throw new Error(`parallel session prompt rejected: ${result.error.message}`)
     })
@@ -100,11 +110,20 @@ export function apply(ctx: Context): void {
       // The offer follows the background-job chip in the same header band.
       order: 30,
       locale: NS,
-      inject: (): ParallelSessionsActionInjected => ({
-        hooks: { parallelOffer: offers.state },
+      inject: (sessionId: SessionId): ParallelSessionsActionInjected => ({
+        hooks: {
+          parallelOffer: offers.state,
+          // The offering Session's shared model directory: the picker's catalog and
+          // its durable selection. Resolved per Session like the composer seat does.
+          modelDirectory: ctx.modelDirectories.directoryFor(sessionId).store,
+        },
         startSession,
         dismiss: (sessionId) => { offers.dismiss(sessionId) },
         settle: (sessionId, title) => { offers.settle(sessionId, title) },
+        loadModels: () => {
+          ctx.modelDirectories.directoryFor(sessionId).load()
+            .catch(() => { /* the directory store carries the failure */ })
+        },
       }),
     },
     ParallelSessionsAction,

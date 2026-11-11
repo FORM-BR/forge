@@ -11,6 +11,10 @@ export const pt: Record<string, string> = {
   'row.pinned': 'No topo da janela',
   'notice.close': 'Fechar cartão',
   'notice.details': 'Detalhes da tarefa',
+  'pick.model': 'Modelo',
+  'pick.effort': 'Esforço',
+  'pick.effortDefault': 'Padrão',
+  'pick.modelDefault': 'Padrão',
   'chip.count': '{n} sessões',
   'chip.aria': '{n} sessões em paralelo sugeridas',
 }

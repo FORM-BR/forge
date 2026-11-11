@@ -16,6 +16,10 @@ export const zh = {
   'row.pinned': '在标题栏',
   'notice.close': '关闭卡片',
   'notice.details': '查看任务说明',
+  'pick.model': '模型',
+  'pick.effort': '推理等级',
+  'pick.effortDefault': 'Default',
+  'pick.modelDefault': '默认',
   'chip.count': '{n} 个会话',
   'chip.aria': '{n} 个并行会话建议',
 } satisfies Record<string, string>
@@ -36,6 +40,10 @@ export const en = {
   'row.pinned': 'In the header',
   'notice.close': 'Close card',
   'notice.details': 'Task details',
+  'pick.model': 'Model',
+  'pick.effort': 'Effort',
+  'pick.effortDefault': 'Default',
+  'pick.modelDefault': 'Default',
   'chip.count': '{n} sessions',
   'chip.aria': '{n} parallel sessions suggested',
 } satisfies Record<ParallelSessionsKey, string>

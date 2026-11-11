@@ -2,6 +2,7 @@
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
@@ -19,6 +20,17 @@ const TASKS = [
   { title: 'Waitlist copy', prompt: 'Rewrite the waitlist page copy to name the launch date.' },
 ]
 
+/** Empty ready catalog: the repro scenarios exercise the offer flow, not the picker. */
+const MODEL_STATE: ModelDirectoryState = {
+  current: null,
+  routable: true,
+  groups: [],
+  failures: [],
+  status: 'ready',
+  pending: null,
+  error: null,
+}
+
 afterEach(cleanup)
 
 /**
@@ -31,6 +43,8 @@ function props(offers: ReturnType<typeof createParallelOfferStore>, over: Partia
   return {
     sessionId: SESSION,
     useParallelOffer: (selector: (value: ParallelOfferMap) => unknown) => selector(offers.state.getSnapshot()),
+    useModelDirectory: (selector: (value: ModelDirectoryState) => unknown) => selector(MODEL_STATE),
+    loadModels: vi.fn(),
     startSession: vi.fn(() => Promise.resolve()),
     dismiss: vi.fn((sessionId: SessionId) => { offers.dismiss(sessionId) }),
     settle: vi.fn((sessionId: SessionId) => { offers.dismiss(sessionId) }),
