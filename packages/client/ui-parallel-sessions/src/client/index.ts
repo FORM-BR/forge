@@ -88,6 +88,20 @@ export function apply(ctx: Context): void {
     ctx.uiWorkspace.openSession(created)
   }
 
+  /**
+   * Whether a worktree checkout can be created from the Session's working
+   * directory. A missing directory answers false, and the read-only `gitInfo`
+   * lookup answers without `git` for anything git refuses; only a transport
+   * failure rejects, leaving the caller's worktree row as it was.
+   * @param sessionId - the Session whose origin would be forked.
+   * @returns completion with true when the origin is inside a git repository.
+   */
+  const checkWorktreeSupport = async (sessionId: SessionId): Promise<boolean> => {
+    const cwd = sessions.list.getSnapshot().byId[sessionId]?.cwd
+    if (cwd === undefined || cwd === '') return false
+    return (await workspaces.gitInfo(cwd)).git !== undefined
+  }
+
   // The call is the only place the offer exists, so the row that renders it publishes the tasks
   // and the pinned card reads them.
   ctx.slots.inject('tool.call.toolview', () => ctx.slots.register(
@@ -124,6 +138,7 @@ export function apply(ctx: Context): void {
           ctx.modelDirectories.directoryFor(sessionId).load()
             .catch(() => { /* the directory store carries the failure */ })
         },
+        checkWorktreeSupport,
       }),
     },
     ParallelSessionsAction,

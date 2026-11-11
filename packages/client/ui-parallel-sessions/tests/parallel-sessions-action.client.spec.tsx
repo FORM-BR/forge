@@ -65,6 +65,7 @@ function props(
     startSession: vi.fn(() => Promise.resolve()),
     dismiss: vi.fn(),
     settle: vi.fn(),
+    checkWorktreeSupport: vi.fn(() => Promise.resolve(true)),
     t,
     ...over,
   } as unknown as ActionProps
@@ -112,15 +113,57 @@ describe('ParallelSessionsAction', () => {
     await waitFor(() => { expect(settle).toHaveBeenCalledWith(SESSION, 'Waitlist copy') })
   })
 
-  it('offers a worktree checkout as the other place to start the session', () => {
+  it('offers a worktree checkout as the other place to start the session', async () => {
     const offers = createParallelOfferStore()
     offers.publish(SESSION, { callId: 'call-1', tasks: TASKS })
     const startSession = vi.fn(() => Promise.resolve())
     render(<ParallelSessionsAction {...props(offers, { startSession })} />)
     fireEvent.click(screen.getByRole('button', { name: '2 parallel sessions suggested' }))
     fireEvent.click(screen.getAllByRole('button', { name: 'Open' })[1]!)
+    // The default stub origin is a repository: the row is offered and starts.
+    await waitFor(() => {
+      expect(screen.getByRole('menuitem', { name: 'Worktree' }).hasAttribute('disabled')).toBe(false)
+    })
     fireEvent.click(screen.getByRole('menuitem', { name: 'Worktree' }))
     expect(startSession).toHaveBeenCalledWith(SESSION, TASKS[1], 'worktree', undefined)
+  })
+
+  it('locks the Worktree row and explains why when the origin is not a git repository', async () => {
+    const offers = createParallelOfferStore()
+    offers.publish(SESSION, { callId: 'call-1', tasks: TASKS })
+    const startSession = vi.fn(() => Promise.resolve())
+    render(<ParallelSessionsAction {...props(offers, {
+      startSession,
+      checkWorktreeSupport: vi.fn(() => Promise.resolve(false)),
+    })} />)
+    fireEvent.click(screen.getByRole('button', { name: '2 parallel sessions suggested' }))
+    // The panel states the limitation; the row is locked inside the task's menu.
+    await waitFor(() => {
+      expect(screen.getByText('Worktree needs the origin to be inside a git repository')).toBeTruthy()
+    })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Open' })[0]!)
+    await waitFor(() => {
+      expect(screen.getByRole('menuitem', { name: 'Worktree' }).hasAttribute('disabled')).toBe(true)
+    })
+    // Local stays fully functional on the same panel.
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Local' }))
+    expect(startSession).toHaveBeenCalledWith(SESSION, TASKS[0], 'local', undefined)
+    expect(startSession).not.toHaveBeenCalledWith(SESSION, TASKS[0], 'worktree', undefined)
+  })
+
+  it('keeps the Worktree row offered when the availability check fails', async () => {
+    const offers = createParallelOfferStore()
+    offers.publish(SESSION, { callId: 'call-1', tasks: TASKS })
+    const startSession = vi.fn(() => Promise.resolve())
+    render(<ParallelSessionsAction {...props(offers, {
+      startSession,
+      checkWorktreeSupport: vi.fn(() => Promise.reject(new Error('transport down'))),
+    })} />)
+    fireEvent.click(screen.getByRole('button', { name: '2 parallel sessions suggested' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Open' })[1]!)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Worktree' }))
+    expect(startSession).toHaveBeenCalledWith(SESSION, TASKS[1], 'worktree', undefined)
+    expect(screen.queryByText('Worktree needs the origin to be inside a git repository')).toBeNull()
   })
 
   it('keeps a task that failed to start', async () => {

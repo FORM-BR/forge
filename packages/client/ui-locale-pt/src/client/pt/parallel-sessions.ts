@@ -9,6 +9,7 @@ export const pt: Record<string, string> = {
   'row.opened': 'Aberta',
   'row.failed': 'Não foi possível iniciar a sessão',
   'row.pinned': 'No topo da janela',
+  'panel.worktreeUnavailable': 'Worktree exige que a origem esteja dentro de um repositório git',
   'notice.close': 'Fechar cartão',
   'notice.details': 'Detalhes da tarefa',
   'pick.model': 'Modelo',

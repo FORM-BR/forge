@@ -48,6 +48,7 @@ function props(offers: ReturnType<typeof createParallelOfferStore>, over: Partia
     startSession: vi.fn(() => Promise.resolve()),
     dismiss: vi.fn((sessionId: SessionId) => { offers.dismiss(sessionId) }),
     settle: vi.fn((sessionId: SessionId) => { offers.dismiss(sessionId) }),
+    checkWorktreeSupport: vi.fn(() => Promise.resolve(true)),
     t,
     ...over,
   } as unknown as ActionProps

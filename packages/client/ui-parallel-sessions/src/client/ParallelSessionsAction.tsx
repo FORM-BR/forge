@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   IconChevronDownOutlineRegular, IconCloseOutlineRegular, IconCompareSplitOutlineRegular,
   IconQuestionOutlineRegular, Menu, Tooltip, useDismissOnOutsidePointer,
@@ -42,13 +42,20 @@ export interface ParallelSessionsActionInjected {
    */
   dismiss: (sessionId: SessionId) => void
   /**
-   * Drop one started task from the offer, so the chip lists only what is still available.
+   * Hide one started task from the offer, so the chip lists only what is still available.
    * @param sessionId - the Session whose header carries the chip.
    * @param title - the started task's title.
    */
   settle: (sessionId: SessionId, title: string) => void
   /** Reload the shared model catalog backing the model/effort picker. */
   loadModels: () => void
+  /**
+   * Report whether the offering Session's working directory is inside a git
+   * repository, which is what a worktree checkout is created from.
+   * @param sessionId - the Session whose header carries the chip.
+   * @returns completion with true when a worktree can be created from the origin.
+   */
+  checkWorktreeSupport: (sessionId: SessionId) => Promise<boolean>
 }
 
 /** Full props of the header chip: owner data, the chip's copy, and the injected offer. */
@@ -59,6 +66,13 @@ export type ParallelSessionsActionProps =
 
 /** Per-task outcome of the chip's only gesture. */
 type StartState = 'starting' | 'opened' | 'failed'
+
+/**
+ * Whether a worktree checkout can be created from the offering Session's
+ * working directory. The answer arrives after mount, so until then the worktree
+ * row stays selectable and a refused start still surfaces the real error.
+ */
+type WorktreeSupport = 'checking' | 'supported' | 'unsupported'
 
 /** Effort row id meaning "the model's provider default"; model rows are `${provider}/${model}`. */
 const PROVIDER_DEFAULT_EFFORT = 'effort:default'
@@ -83,12 +97,26 @@ export function ParallelSessionsAction(props: ParallelSessionsActionProps) {
   const [pickMenu, setPickMenu] = useState<'model' | 'effort' | null>(null)
   // Explicit model/effort for the next started session; null keeps the Host default.
   const [pick, setPick] = useState<ModelSelection | null>(null)
+  // Worktree availability of the offering Session's origin; resolved once per mount.
+  const [worktreeSupport, setWorktreeSupport] = useState<WorktreeSupport>('checking')
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   // While any menu is open, it (not the panel) owns outside-pointer dismissal: the menu lists
   // are portaled to document.body, so a pointerdown on a menu item is outside the panel root
   // and would otherwise collapse the panel and unmount the menu before onSelect fires.
   useDismissOnOutsidePointer(rootRef, expanded && menuTask === null && pickMenu === null, setExpanded)
+  useEffect(() => {
+    let live = true
+    props.checkWorktreeSupport(sessionId)
+      .then((supported) => {
+        if (live) setWorktreeSupport(supported ? 'supported' : 'unsupported')
+      })
+      .catch(() => {
+        // Unresolved availability leaves the worktree row as it was: a refused
+        // start still surfaces the real error, so no answer is never a lock-out.
+      })
+    return () => { live = false }
+  }, [sessionId, props.checkWorktreeSupport])
   if (offer === undefined || offer.tasks.length === 0) return null
 
   /** Keep the real failure text beside the generic label, so a refused start is diagnosable. */
@@ -265,6 +293,9 @@ export function ParallelSessionsAction(props: ParallelSessionsActionProps) {
                 </div>
               )
               : null}
+            {worktreeSupport === 'unsupported'
+              ? <p className={css.worktreeHint}>{props.t('panel.worktreeUnavailable')}</p>
+              : null}
             <ul className={css.tasks}>
               {offer.tasks.map((task) => {
                 const state = states[task.title]
@@ -299,7 +330,13 @@ export function ParallelSessionsAction(props: ParallelSessionsActionProps) {
                       )}
                       items={[
                         { id: 'local', label: props.t('row.openLocal') },
-                        { id: 'worktree', label: props.t('row.openWorktree') },
+                        // A worktree forks the offering Session's repository, so
+                        // the row stays locked while the origin cannot provide one.
+                        {
+                          id: 'worktree',
+                          label: props.t('row.openWorktree'),
+                          disabled: worktreeSupport === 'unsupported',
+                        },
                       ]}
                       onSelect={(id) => {
                         setMenuTask(null)
