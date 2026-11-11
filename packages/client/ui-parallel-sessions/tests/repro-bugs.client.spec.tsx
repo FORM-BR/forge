@@ -68,4 +68,20 @@ describe('ParallelSessionsAction (reprodução dos bugs relatados)', () => {
     view.rerender(<ParallelSessionsAction {...props(offers)} />)
     expect(view.container.firstChild).toBeNull()
   })
+
+  it('clicar no item do menu (pointerdown no portal) NÃO deve colapsar o painel antes do onSelect', async () => {
+    const offers = createParallelOfferStore()
+    offers.publish(SESSION, { callId: 'call-1', tasks: TASKS })
+    const startSession = vi.fn(() => Promise.resolve())
+    render(<ParallelSessionsAction {...props(offers, { startSession })} />)
+    fireEvent.click(screen.getByRole('button', { name: '1 parallel sessions suggested' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }))
+    const item = screen.getByRole('menuitem', { name: 'Local' })
+    // O menu é portal: o pointerdown cai fora do rootRef do painel, mas NÃO pode
+    // colapsar o painel antes do clique — senão o Menu desmonta e onSelect nunca roda.
+    fireEvent.pointerDown(item)
+    expect(screen.getByRole('button', { name: 'Close card' })).toBeTruthy()
+    fireEvent.click(item)
+    expect(startSession).toHaveBeenCalledTimes(1)
+  })
 })

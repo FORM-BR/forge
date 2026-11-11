@@ -60,7 +60,10 @@ export function ParallelSessionsAction(props: ParallelSessionsActionProps) {
   const [menuTask, setMenuTask] = useState<string | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
-  useDismissOnOutsidePointer(rootRef, expanded, setExpanded)
+  // While a task menu is open, it (not the panel) owns outside-pointer dismissal: the menu
+  // list is portaled to document.body, so a pointerdown on a menu item is outside the panel
+  // root and would otherwise collapse the panel and unmount the menu before onSelect fires.
+  useDismissOnOutsidePointer(rootRef, expanded && menuTask === null, setExpanded)
   if (offer === undefined || offer.tasks.length === 0) return null
   const start = (task: ParallelTask, mode: ParallelStartMode): void => {
     setStates(current => ({ ...current, [task.title]: 'starting' }))
