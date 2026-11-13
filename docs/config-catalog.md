@@ -313,7 +313,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-api-workspace-controller`
 
 - `inject`: `typert` · `workspaceRegistry`
-- `source`: [`packages/api/workspace-controller/src/index.ts:40`](../packages/api/workspace-controller/src/index.ts)
+- `source`: [`packages/api/workspace-controller/src/index.ts:43`](../packages/api/workspace-controller/src/index.ts)
 
 ```ts config-catalog
 /** First-use directory policy for the Host account. */
@@ -324,6 +324,8 @@ export interface Config {
   documentsLookupTimeoutMs?: number
   /** Maximum duration of one git repository lookup. */
   gitLookupTimeoutMs?: number
+  /** Maximum duration of one git history lookup. */
+  gitGraphTimeoutMs?: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-api-workspace-controller -->
@@ -692,6 +694,8 @@ export interface Config {
   motion: Volatile<ThemeLook['motion']>
   /** FORM signature visibility. */
   signature: Volatile<ThemeLook['signature']>
+  /** Font pack for the interface and code stacks. */
+  fontPack: Volatile<ThemeLook['fontPack']>
 }
 
 /** Theme preference persisted by the product Appearance row. */
@@ -713,6 +717,8 @@ export interface ThemeLook {
   motion: typeof THEME_LOOK_CHOICES.motion[number]
   /** FORM signature visibility. */
   signature: typeof THEME_LOOK_CHOICES.signature[number]
+  /** Font pack for the interface and code stacks. */
+  fontPack: typeof THEME_LOOK_CHOICES.fontPack[number]
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-client-ui-theme -->
@@ -1351,6 +1357,28 @@ export interface Config {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-goal -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-goal-round-driver -->
+<a id="deepseek-aidsh-goal-round-driver"></a>
+
+## `@deepseek-ai/dsh-goal-round-driver`
+
+- `inject`: `agents` · `goals` · `sessions`
+- `source`: [`packages/goal/goal-round-driver/src/config.ts:10`](../packages/goal/goal-round-driver/src/config.ts)
+
+```ts config-catalog
+/** User-facing goal continuation configuration. */
+export interface Config {
+  /**
+   * Tool calls admitted by one goal's agent between enforced re-anchor rounds.
+   * A positive cadence makes every Nth round re-anchor the objective onto the
+   * current workspace instructions and memory/feedback anchors; 0 disables
+   * re-anchoring. Defaults to 5.
+   */
+  reanchorCadence?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-goal-round-driver -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-headless -->
 <a id="deepseek-aidsh-headless"></a>
@@ -4317,6 +4345,31 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-web-search-perplexity -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-web-search-tavily -->
+<a id="deepseek-aidsh-web-search-tavily"></a>
+
+## `@deepseek-ai/dsh-web-search-tavily`
+
+- `inject`: `web`
+- `source`: [`packages/web/web-search-tavily/src/index.ts:38`](../packages/web/web-search-tavily/src/index.ts)
+
+```ts config-catalog
+/** Plugin config (all optional — `apply` fills env-var and constant defaults). */
+export interface Config {
+  /** Literal Tavily API key; prefer `apiKeyEnv` so no secret enters configuration files. */
+  apiKey?: string
+  /** Credential reference resolved for each search; defaults to `TAVILY_API_KEY`. */
+  apiKeyEnv?: string
+  /** Endpoint base; `/search` is appended. Defaults to the public API. */
+  baseURL?: string
+  /** Retrieval depth sent as Tavily's `search_depth`: `basic` or `advanced`. */
+  searchDepth?: 'basic' | 'advanced'
+  /** Default result cap when a request carries no `maxResults`. Omitted = none. */
+  maxResults?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-web-search-tavily -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-webhook-github -->
 <a id="deepseek-aidsh-webhook-github"></a>
 
@@ -4461,6 +4514,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-client-ui-subagent` | — | [`packages/client/ui-subagent/src/index.ts`](../packages/client/ui-subagent/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-tool` | — | [`packages/client/ui-tool/src/index.ts`](../packages/client/ui-tool/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-trajectory` | — | [`packages/client/ui-trajectory/src/index.ts`](../packages/client/ui-trajectory/src/index.ts) |
+| `@deepseek-ai/dsh-client-ui-turn-notify` | — | [`packages/client/ui-turn-notify/src/index.ts`](../packages/client/ui-turn-notify/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-user-questions` | — | [`packages/client/ui-user-questions/src/index.ts`](../packages/client/ui-user-questions/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-workflow-run` | — | [`packages/client/ui-workflow-run/src/index.ts`](../packages/client/ui-workflow-run/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-workspace` | — | [`packages/client/ui-workspace/src/index.ts`](../packages/client/ui-workspace/src/index.ts) |
@@ -4479,7 +4533,6 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-experimental-computer-use-cua-driver-native` | `computerUse` · `tools` · `systemPrompt` | [`packages/experimental/computer-use-cua-driver-native/src/index.ts`](../packages/experimental/computer-use-cua-driver-native/src/index.ts) |
 | `@deepseek-ai/dsh-fs-observation-policy` | — | [`packages/fs/fs-observation-policy/src/index.ts`](../packages/fs/fs-observation-policy/src/index.ts) |
 | `@deepseek-ai/dsh-fs-ssh` | `ssh` · `sandboxPolicy` | [`packages/ssh/fs-ssh/src/index.ts`](../packages/ssh/fs-ssh/src/index.ts) |
-| `@deepseek-ai/dsh-goal-round-driver` | `agents` · `goals` · `sessions` | [`packages/goal/goal-round-driver/src/index.ts`](../packages/goal/goal-round-driver/src/index.ts) |
 | `@deepseek-ai/dsh-host-directory-picker-auto` | `webServer` · `loader` | [`packages/host/directory-picker-auto/src/index.ts`](../packages/host/directory-picker-auto/src/index.ts) |
 | `@deepseek-ai/dsh-host-directory-picker-native` | — | [`packages/host/directory-picker-native/src/index.ts`](../packages/host/directory-picker-native/src/index.ts) |
 | `@deepseek-ai/dsh-host-plugin-inventory` | `loader` | [`packages/host/plugin-inventory/src/index.ts`](../packages/host/plugin-inventory/src/index.ts) |
