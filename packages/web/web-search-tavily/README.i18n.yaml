@@ -1,0 +1,61 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/web/web-search-tavily/README.md
+/:
+  en: a9a18ea4ca1c67fd
+  zh: eec2c74ad66eb635
+/deepseek-ai-dsh-web-search-tavily:
+  en: 637d1159b42bc6d3
+  zh: 30465300de404258
+/deepseek-ai-dsh-web-search-tavily/summary:
+  en: a2169dae738b0f13
+  zh: bc1be89767ba9d7f
+/deepseek-ai-dsh-web-search-tavily/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 09388d293f9be9cb
+/deepseek-ai-dsh-web-search-tavily/use-this-package:
+  en: d8d93f1df844531a
+  zh: f7264827ec2476e6
+/deepseek-ai-dsh-web-search-tavily/use-this-package/when-to-choose-it:
+  en: 1b669a06b1d146f7
+  zh: 06be96f5d8a6b30e
+/deepseek-ai-dsh-web-search-tavily/use-this-package/minimal-configuration:
+  en: 344da8d35da3a1c2
+  zh: b375ced1cec8c253
+/deepseek-ai-dsh-web-search-tavily/use-this-package/what-a-search-returns:
+  en: 8fd1bfada6e7f5c0
+  zh: 564350cee293a98e
+/deepseek-ai-dsh-web-search-tavily/use-this-package/failures-and-recovery:
+  en: 4f53f8c1427d9d1f
+  zh: 436ccb8c2702281e
+/deepseek-ai-dsh-web-search-tavily/understand-the-implementation:
+  en: 9842c69ad3636bb3
+  zh: 3cdc3f816cbdd0cb
+/deepseek-ai-dsh-web-search-tavily/understand-the-implementation/design-philosophy:
+  en: b46715013f741337
+  zh: 3d867b4c245c06e8
+/deepseek-ai-dsh-web-search-tavily/understand-the-implementation/source-map:
+  en: 7dd4b8f57f9be616
+  zh: 60b5f287d67674fe
+/deepseek-ai-dsh-web-search-tavily/understand-the-implementation/request-and-mapping-flow:
+  en: ee5abe2b4dd5ed84
+  zh: 94658686b0b420b8
+/deepseek-ai-dsh-web-search-tavily/further-exploration:
+  en: 081a0616c82138be
+  zh: e82988d52bb07f78
+/deepseek-ai-dsh-web-search-tavily/model-experience:
+  en: a4b8c2d003aea49c
+  zh: 4fdf40eb596f9b38
+/deepseek-ai-dsh-web-search-tavily/model-experience/kv-cache-effect:
+  en: 40294c1c31b74824
+  zh: d75d48f485447a74
+/deepseek-ai-dsh-web-search-tavily/known-limitations-and-deferred-work:
+  en: a984a9a1fe4cc261
+  zh: 99bac3fbe9afe81f
+/deepseek-ai-dsh-web-search-tavily/known-limitations-and-deferred-work/dev-note:
+  en: 7f775cc79dbce94b
+  zh: 12b8f68f9e7c48ca
+/deepseek-ai-dsh-web-search-tavily/known-limitations-and-deferred-work/dev-note/future-wider-tavily-control-surface:
+  en: 33653d7fc097caf1
+  zh: dc80e1dc835d18ba
