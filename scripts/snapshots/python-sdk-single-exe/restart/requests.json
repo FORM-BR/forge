@@ -25,6 +25,7 @@
       "job_output",
       "run_code",
       "subagent",
+      "suggest_parallel_sessions",
       "workflow"
     ]
   },
@@ -54,6 +55,7 @@
       "job_output",
       "run_code",
       "subagent",
+      "suggest_parallel_sessions",
       "workflow"
     ]
   }

@@ -206,6 +206,7 @@
             "run_code",
             "snapshot_double",
             "subagent",
+            "suggest_parallel_sessions",
             "workflow"
           ]
         },
@@ -302,6 +303,7 @@
             "run_code",
             "snapshot_double",
             "subagent",
+            "suggest_parallel_sessions",
             "workflow"
           ]
         },
@@ -1911,6 +1913,7 @@
                 "run_code",
                 "snapshot_double",
                 "subagent",
+                "suggest_parallel_sessions",
                 "workflow"
               ]
             },
@@ -2037,6 +2040,7 @@
                 "run_code",
                 "snapshot_double",
                 "subagent",
+                "suggest_parallel_sessions",
                 "workflow"
               ]
             },
@@ -3319,6 +3323,7 @@
                 "run_code",
                 "snapshot_double",
                 "subagent",
+                "suggest_parallel_sessions",
                 "workflow"
               ]
             },
@@ -4128,6 +4133,7 @@
                 "run_code",
                 "snapshot_double",
                 "subagent",
+                "suggest_parallel_sessions",
                 "workflow"
               ]
             },
