@@ -72,6 +72,18 @@ describe('npm install layout verifier', () => {
     expect(dual.get('@deepseek-ai/cordis')).toBe(index.get('@deepseek-ai/cordis'))
   })
 
+  it('drops the desktop app, which is versioned independently of the library packages', () => {
+    const index = new Map([
+      ['@deepseek-ai/dsh', new Map([['0.1.1', { name: '@deepseek-ai/dsh', version: '0.1.1' }]])],
+      ['@deepseek-ai/dsh-desktop', new Map([['0.1.2', { name: '@deepseek-ai/dsh-desktop', version: '0.1.2' }]])],
+    ])
+
+    const dual = buildDualDshRegistry(index, '0.1.1')
+
+    expect(dual.has('@deepseek-ai/dsh-desktop')).toBe(false)
+    expect([...dual.get('@deepseek-ai/dsh')?.keys() ?? []]).toEqual(['0.1.0', '0.2.0'])
+  })
+
   it('accepts isolated DSH releases with one shared Cordis installation', () => {
     expect(assertDualDshInstallLayout(validLayout())).toEqual({
       dshPackagesPerVersion: 3,

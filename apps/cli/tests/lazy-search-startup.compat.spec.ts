@@ -120,7 +120,9 @@ describe.skipIf(!requireBuiltArtifacts)('built CLI lazy-search startup', () => {
       const result = await runBuiltWeb(cwd)
       expect(result.stdout).toMatch(/dsh web: http:\/\/127\.0\.0\.1:\d+/u)
       expect(result.code).toBe(0)
-      expect(result.stderr).not.toMatch(/ExperimentalWarning: SQLite/u)
+      // The cost meter opens its own node:sqlite ledger at boot, so Node 22 may print the generic SQLite
+      // ExperimentalWarning even with search off; assert the search index itself never starts instead.
+      expect(result.stderr).not.toMatch(/session-query-sqlite/u)
     } finally {
       await rm(cwd, { recursive: true, force: true })
     }

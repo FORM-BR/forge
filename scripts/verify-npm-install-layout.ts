@@ -12,6 +12,11 @@ import {
 
 const DSH_PACKAGE = '@deepseek-ai/dsh'
 const CORDIS_PACKAGE = '@deepseek-ai/cordis'
+/**
+ * Apps versioned on their own release cadence (scripts/forge-release.ps1 bumps them without touching the
+ * library packages), so they never carry the shared workspace version and no package depends on them.
+ */
+const INDEPENDENTLY_VERSIONED_PACKAGES: ReadonlySet<string> = new Set(['@deepseek-ai/dsh-desktop'])
 const NESTED_DSH_ALIAS = 'dsh-previous'
 const NESTED_DSH_PATH = `node_modules/${NESTED_DSH_ALIAS}`
 const DEPENDENCY_FIELDS = ['dependencies', 'optionalDependencies', 'peerDependencies'] as const
@@ -96,6 +101,10 @@ export function buildDualDshRegistry(index: RegistryIndex, sourceVersion: string
   for (const [name, versions] of index) {
     if (!isDshPackage(name)) {
       output.set(name, versions)
+      continue
+    }
+    if (INDEPENDENTLY_VERSIONED_PACKAGES.has(name)) {
+      output.delete(name)
       continue
     }
     const source = versions.get(sourceVersion)

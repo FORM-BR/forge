@@ -14531,6 +14531,9 @@ importers:
       '@deepseek-ai/dsh-anonymous-user-id':
         specifier: workspace:*
         version: link:../../packages/identity/anonymous-user-id
+      '@deepseek-ai/dsh-api-mcp-status':
+        specifier: workspace:*
+        version: link:../../packages/api/mcp-status
       '@deepseek-ai/dsh-app-boot':
         specifier: workspace:*
         version: link:../../packages/boot/app-boot
@@ -14672,6 +14675,9 @@ importers:
       '@deepseek-ai/dsh-message-feedback':
         specifier: workspace:*
         version: link:../../packages/feedback/message-feedback
+      '@deepseek-ai/dsh-native-command':
+        specifier: workspace:*
+        version: link:../../packages/util/native-command
       '@deepseek-ai/dsh-otel':
         specifier: workspace:*
         version: link:../../packages/telemetry/otel
@@ -14849,6 +14855,9 @@ importers:
       '@deepseek-ai/dsh-tool-jobs':
         specifier: workspace:*
         version: link:../../packages/jobs/tool-jobs
+      '@deepseek-ai/dsh-tool-parallel-sessions':
+        specifier: workspace:*
+        version: link:../../packages/todo/tool-parallel-sessions
       '@deepseek-ai/dsh-tool-present':
         specifier: workspace:*
         version: link:../../packages/deliverables/tool-present
