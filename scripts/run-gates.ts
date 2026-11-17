@@ -477,15 +477,19 @@ function runningNodeMajor(): number {
  * packages and docs the upstream documentation standard does not yet cover, so these stay visible as
  * NON-BLOCKING in the static lane instead of failing it.
  */
-const DOCUMENTATION_STATIC_GATE_IDS: ReadonlySet<string> = new Set(['package-invariants', 'module-graph'])
+function documentationStaticGateIds(): ReadonlySet<string> {
+  // A function, not a module constant: main() runs at module load, before later `const`s initialize.
+  return new Set(['package-invariants', 'module-graph'])
+}
 
 function nonBlocking(gate: Gate): Gate {
   return { ...gate, allowFailure: true }
 }
 
 function ciStaticGates(options: { ownsBuild: boolean }): Gate[] {
+  const documentationIds = documentationStaticGateIds()
   return [
-    ...ciSharedStaticGates().map(gate => DOCUMENTATION_STATIC_GATE_IDS.has(gate.id) ? nonBlocking(gate) : gate),
+    ...ciSharedStaticGates().map(gate => documentationIds.has(gate.id) ? nonBlocking(gate) : gate),
     ...options.ownsBuild ? [ciBuildGate()] : [],
     ...docSyncLeafGates({
       includeDocTypecheck: options.ownsBuild,
