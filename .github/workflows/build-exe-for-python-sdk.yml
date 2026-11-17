@@ -163,6 +163,9 @@ jobs:
           && vars.DSH_CI_FAILOVER_WINDOWS == 'blacksmith' && 'blacksmith-2vcpu-windows-2025'
           || matrix.runner }}
     timeout-minutes: 45
+    env:
+      # Without the key (a fork with no DeepSeek account) the real-API steps are skipped, not failed.
+      HAS_DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY_EXTERNAL != '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -378,6 +381,7 @@ jobs:
           && (github.event_name != 'pull_request'
               || !(github.event.pull_request.head.repo.fork
                    || github.event.pull_request.user.login == 'dependabot[bot]'))
+          && env.HAS_DEEPSEEK_API_KEY == 'true'
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}
         run: |
@@ -394,6 +398,7 @@ jobs:
           && (github.event_name != 'pull_request'
               || !(github.event.pull_request.head.repo.fork
                    || github.event.pull_request.user.login == 'dependabot[bot]'))
+          && env.HAS_DEEPSEEK_API_KEY == 'true'
         shell: pwsh
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}
@@ -409,6 +414,7 @@ jobs:
           && (github.event_name != 'pull_request'
               || !(github.event.pull_request.head.repo.fork
                    || github.event.pull_request.user.login == 'dependabot[bot]'))
+          && env.HAS_DEEPSEEK_API_KEY == 'true'
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}
           DEEPSEEK_BASE_URL: https://api.deepseek.com/anthropic
@@ -429,6 +435,7 @@ jobs:
           && (github.event_name != 'pull_request'
               || !(github.event.pull_request.head.repo.fork
                    || github.event.pull_request.user.login == 'dependabot[bot]'))
+          && env.HAS_DEEPSEEK_API_KEY == 'true'
         shell: pwsh
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}
