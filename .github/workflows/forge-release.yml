@@ -41,7 +41,7 @@ jobs:
       DSH_DESKTOP_AUTO_UPDATE_ENV: production
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0 # necessario para listar commits desde a tag anterior
 
